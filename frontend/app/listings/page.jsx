@@ -9,6 +9,8 @@ import Pagination from '@/components/ui/Pagination';
 import useApi from '@/hooks/useApi';
 import { apiClient } from '@/lib/api';
 
+const CITIES = ['Addis Ababa','Adama','Bahir Dar','Dire Dawa','Gondar','Hawassa','Jimma','Mekelle','Shashamane'];
+
 export default function ListingsPage() {
   const { data, isLoading, execute } = useApi();
   const [filters, setFilters] = useState({ page: 1, limit: 12 });
@@ -17,7 +19,7 @@ export default function ListingsPage() {
   useEffect(() => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
-    execute(() => apiClient.get(`/listings?${params.toString()}`));
+    execute(() => apiClient.get('/listings?' + params.toString()));
   }, [filters, execute]);
 
   const listings = data?.data || [];
@@ -36,22 +38,13 @@ export default function ListingsPage() {
               {showFilter ? 'Hide Filters' : 'Show Filters'}
             </button>
             {showFilter && (
-              <ListingFilter
-                filters={filters}
-                onFilterChange={(f) => setFilters({ ...f, page: 1 })}
-                onApply={() => setShowFilter(false)}
-                onReset={() => setFilters({ page: 1, limit: 12 })}
-              />
+              <ListingFilter filters={filters} onFilterChange={(f) => setFilters({ ...f, page: 1 })} onApply={() => setShowFilter(false)} onReset={() => setFilters({ page: 1, limit: 12 })} />
             )}
           </div>
           <div style={{ flex: 1 }}>
             <ListingGrid listings={listings} isLoading={isLoading} />
             {pagination.totalPages > 1 && (
-              <Pagination
-                currentPage={pagination.page || 1}
-                totalPages={pagination.totalPages || 1}
-                onPageChange={(p) => setFilters({ ...filters, page: p })}
-              />
+              <Pagination currentPage={pagination.page || 1} totalPages={pagination.totalPages || 1} onPageChange={(p) => setFilters({ ...filters, page: p })} />
             )}
           </div>
         </div>
