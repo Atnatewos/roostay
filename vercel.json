@@ -1,16 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && next build",
+  "buildCommand": "npm run build",
   "outputDirectory": "frontend/.next",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "functions": {
-    "frontend/pages/api/[...path].js": {
-      "memory": 1024,
-      "maxDuration": 30
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
     }
-  },
-  "env": {
-    "NODE_ENV": "production"
   }
 }

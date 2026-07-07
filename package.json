@@ -9,12 +9,13 @@
   ],
   "scripts": {
     "dev": "next dev frontend",
-    "build": "next build frontend",
+    "build": "cd frontend && npm install && next build",
     "start": "next start frontend",
     "setup": "node scripts/setup.js",
     "seed": "node scripts/seed.js",
     "migrate": "node packages/database/migrate.js",
-    "db:test": "node scripts/test-connection.js"
+    "db:test": "node scripts/test-connection.js",
+    "vercel": "cd frontend && npm install && next build"
   },
   "engines": {
     "node": ">=18.0.0"
