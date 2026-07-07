@@ -1,0 +1,1 @@
+'use client'; import Header from '@/components/layout/Header'; export default function BookingDetail() { return <><Header/><div className='container'><h1>Booking Detail</h1><p>Coming soon.</p></div></>; }

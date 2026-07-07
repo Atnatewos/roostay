@@ -1,0 +1,1 @@
+'use client'; import Header from '@/components/layout/Header'; import Sidebar from '@/components/layout/Sidebar'; export default function HostBookings() { return <><Header/><div className='dashboard-layout'><Sidebar role='host'/><main className='dashboard-layout__main'><h1>Host Bookings</h1><p>Coming soon.</p></main></div></>; }

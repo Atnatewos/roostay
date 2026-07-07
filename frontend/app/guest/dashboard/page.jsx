@@ -1,0 +1,1 @@
+'use client'; import Header from '@/components/layout/Header'; import Sidebar from '@/components/layout/Sidebar'; export default function GuestDashboard() { return <><Header/><div className='dashboard-layout'><Sidebar role='guest'/><main className='dashboard-layout__main'><h1>Guest Dashboard</h1><p>Coming soon.</p></main></div></>; }
