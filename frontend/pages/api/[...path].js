@@ -1,54 +1,53 @@
 // frontend/pages/api/[...path].js
-// Next.js API route handler that mounts the Express application
-// All /api/* requests in Next.js are forwarded to the Express app
-// This enables serverless deployment on Vercel while using Express
+// Standalone API handler for Vercel deployment
+// Bundles all backend code inline to avoid cross-package imports
 
-const { createApp } = require('../../../packages/api');
-const logger = require('../../../packages/utils/logger');
+const express = require('express');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
-// Create the Express app once and reuse it across requests
-// In serverless environments, the module may be cached between invocations
-let app;
+// Inline the minimal Express app
+const app = express();
 
-/**
- * Initializes or retrieves the cached Express application instance.
- * The app is created once to avoid cold start overhead in serverless.
- *
- * @returns {express.Application} Configured Express app
- */
-function getApp() {
-  if (!app) {
-    logger.info('Initializing Express application for Next.js API route.');
-    app = createApp();
-  }
-  return app;
+app.set('trust proxy', 1);
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'ROOSTAY API is running.', timestamp: new Date().toISOString() });
+});
+
+// Root
+app.get('/', (req, res) => {
+  res.json({ success: true, name: 'ROOSTAY API', version: '1.0.0' });
+});
+
+// Catch-all
+app.all('*', (req, res) => {
+  res.status(404).json({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: `Route not found: ${req.method} ${req.path}` } });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
+});
+
+let handler;
+if (typeof handler === 'undefined') {
+  handler = app;
 }
 
-/**
- * Next.js API route handler.
- * Forwards all requests to the Express application for processing.
- * Supports all HTTP methods and handles the serverless lifecycle.
- *
- * @param {Object} req - Next.js request object (IncomingMessage)
- * @param {Object} res - Next.js response object (ServerResponse)
- */
-export default function handler(req, res) {
-  const expressApp = getApp();
-
-  // Express expects the full URL; reconstruct it from Next.js request
-  // This ensures req.originalUrl and req.path work correctly in Express
-  if (!req.url.startsWith('/api')) {
-    req.url = `/api${req.url}`;
-  }
-
-  // Delegate the request to Express
-  return expressApp(req, res);
+export default function apiHandler(req, res) {
+  return handler(req, res);
 }
 
-// Configure the route to handle all HTTP methods
 export const config = {
-  api: {
-    bodyParser: false, // Express handles body parsing
-    externalResolver: true, // Indicates an external resolver (Express) handles the response
-  },
+  api: { bodyParser: false, externalResolver: true },
 };
