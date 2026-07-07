@@ -1,0 +1,38 @@
+{
+  "development": {
+    "host": "DB_HOST",
+    "port": "DB_PORT",
+    "database": "DB_NAME",
+    "user": "DB_USER",
+    "password": "DB_PASSWORD",
+    "ssl": true,
+    "connectionString": "DATABASE_URL",
+    "maxConnections": 10,
+    "idleTimeoutMillis": 30000,
+    "connectionTimeoutMillis": 10000
+  },
+  "production": {
+    "host": "DB_HOST",
+    "port": "DB_PORT",
+    "database": "DB_NAME",
+    "user": "DB_USER",
+    "password": "DB_PASSWORD",
+    "ssl": true,
+    "connectionString": "DATABASE_URL",
+    "maxConnections": 20,
+    "idleTimeoutMillis": 30000,
+    "connectionTimeoutMillis": 10000
+  },
+  "test": {
+    "host": "DB_HOST",
+    "port": "DB_PORT",
+    "database": "DB_NAME_TEST",
+    "user": "DB_USER",
+    "password": "DB_PASSWORD",
+    "ssl": true,
+    "connectionString": "DATABASE_URL",
+    "maxConnections": 5,
+    "idleTimeoutMillis": 30000,
+    "connectionTimeoutMillis": 5000
+  }
+}

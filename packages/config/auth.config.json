@@ -1,0 +1,38 @@
+{
+  "development": {
+    "jwtSecret": "JWT_SECRET",
+    "jwtRefreshSecret": "JWT_REFRESH_SECRET",
+    "jwtExpiresIn": "1h",
+    "jwtRefreshExpiresIn": "7d",
+    "bcryptSaltRounds": 12,
+    "tokenType": "Bearer",
+    "passwordMinLength": 8,
+    "passwordMaxLength": 128,
+    "maxLoginAttempts": 5,
+    "lockoutDurationMinutes": 15
+  },
+  "production": {
+    "jwtSecret": "JWT_SECRET",
+    "jwtRefreshSecret": "JWT_REFRESH_SECRET",
+    "jwtExpiresIn": "30m",
+    "jwtRefreshExpiresIn": "7d",
+    "bcryptSaltRounds": 14,
+    "tokenType": "Bearer",
+    "passwordMinLength": 8,
+    "passwordMaxLength": 128,
+    "maxLoginAttempts": 5,
+    "lockoutDurationMinutes": 30
+  },
+  "test": {
+    "jwtSecret": "test_jwt_secret_key_for_testing_only",
+    "jwtRefreshSecret": "test_jwt_refresh_secret_key_for_testing_only",
+    "jwtExpiresIn": "15m",
+    "jwtRefreshExpiresIn": "1d",
+    "bcryptSaltRounds": 4,
+    "tokenType": "Bearer",
+    "passwordMinLength": 6,
+    "passwordMaxLength": 128,
+    "maxLoginAttempts": 3,
+    "lockoutDurationMinutes": 5
+  }
+}

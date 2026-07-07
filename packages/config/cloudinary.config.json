@@ -1,0 +1,62 @@
+{
+  "development": {
+    "cloudName": "CLOUDINARY_CLOUD_NAME",
+    "apiKey": "CLOUDINARY_API_KEY",
+    "apiSecret": "CLOUDINARY_API_SECRET",
+    "folder": "roostay-dev",
+    "maxFileSize": 5242880,
+    "allowedFormats": ["jpg", "jpeg", "png", "webp"],
+    "transformation": {
+      "width": 1200,
+      "height": 800,
+      "crop": "fill",
+      "quality": "auto"
+    },
+    "thumbnailTransformation": {
+      "width": 400,
+      "height": 300,
+      "crop": "fill",
+      "quality": "auto"
+    }
+  },
+  "production": {
+    "cloudName": "CLOUDINARY_CLOUD_NAME",
+    "apiKey": "CLOUDINARY_API_KEY",
+    "apiSecret": "CLOUDINARY_API_SECRET",
+    "folder": "roostay-prod",
+    "maxFileSize": 5242880,
+    "allowedFormats": ["jpg", "jpeg", "png", "webp"],
+    "transformation": {
+      "width": 1200,
+      "height": 800,
+      "crop": "fill",
+      "quality": "auto"
+    },
+    "thumbnailTransformation": {
+      "width": 400,
+      "height": 300,
+      "crop": "fill",
+      "quality": "auto"
+    }
+  },
+  "test": {
+    "cloudName": "test_cloud",
+    "apiKey": "test_api_key",
+    "apiSecret": "test_api_secret",
+    "folder": "roostay-test",
+    "maxFileSize": 1048576,
+    "allowedFormats": ["jpg", "jpeg", "png"],
+    "transformation": {
+      "width": 800,
+      "height": 600,
+      "crop": "fill",
+      "quality": "auto"
+    },
+    "thumbnailTransformation": {
+      "width": 200,
+      "height": 150,
+      "crop": "fill",
+      "quality": "auto"
+    }
+  }
+}

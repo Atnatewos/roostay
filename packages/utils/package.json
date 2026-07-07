@@ -1,0 +1,7 @@
+{
+  "name": "@roostay/utils",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "description": "ROOSTAY shared utilities"
+}

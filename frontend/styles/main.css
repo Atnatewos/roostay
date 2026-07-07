@@ -1,0 +1,21 @@
+/* frontend/styles/main.css */
+/* ROOSTAY Master Stylesheet */
+/* Imports all CSS modules in the correct cascade order */
+
+/* 1. Design Tokens — CSS Custom Properties */
+@import './variables.css';
+
+/* 2. CSS Reset — Normalize browser defaults */
+@import './reset.css';
+
+/* 3. Utility Classes — Rapid prototyping helpers */
+@import './utilities.css';
+
+/* 4. Component Styles — UI kit components */
+@import './components.css';
+
+/* 5. Layout Styles — Header, Footer, Sidebar, Grids */
+@import './layout.css';
+
+/* 6. Page Styles — Page-specific styles */
+@import './pages.css';

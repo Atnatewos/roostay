@@ -1,0 +1,67 @@
+{
+  "development": {
+    "maxFileSize": 5242880,
+    "maxFilesPerRequest": 10,
+    "allowedMimeTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/avif"
+    ],
+    "allowedExtensions": [".jpg", ".jpeg", ".png", ".webp", ".avif"],
+    "imageMinWidth": 800,
+    "imageMinHeight": 600,
+    "imageMaxWidth": 4000,
+    "imageMaxHeight": 3000,
+    "tempDir": "./uploads/temp",
+    "preserveOriginalName": false,
+    "generateThumbnails": true,
+    "thumbnailSizes": [
+      { "width": 150, "height": 100, "suffix": "xs" },
+      { "width": 400, "height": 300, "suffix": "sm" },
+      { "width": 800, "height": 600, "suffix": "md" }
+    ]
+  },
+  "production": {
+    "maxFileSize": 5242880,
+    "maxFilesPerRequest": 10,
+    "allowedMimeTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/avif"
+    ],
+    "allowedExtensions": [".jpg", ".jpeg", ".png", ".webp", ".avif"],
+    "imageMinWidth": 800,
+    "imageMinHeight": 600,
+    "imageMaxWidth": 4000,
+    "imageMaxHeight": 3000,
+    "tempDir": "/tmp/uploads",
+    "preserveOriginalName": false,
+    "generateThumbnails": true,
+    "thumbnailSizes": [
+      { "width": 150, "height": 100, "suffix": "xs" },
+      { "width": 400, "height": 300, "suffix": "sm" },
+      { "width": 800, "height": 600, "suffix": "md" }
+    ]
+  },
+  "test": {
+    "maxFileSize": 1048576,
+    "maxFilesPerRequest": 3,
+    "allowedMimeTypes": [
+      "image/jpeg",
+      "image/png"
+    ],
+    "allowedExtensions": [".jpg", ".jpeg", ".png"],
+    "imageMinWidth": 200,
+    "imageMinHeight": 150,
+    "imageMaxWidth": 2000,
+    "imageMaxHeight": 1500,
+    "tempDir": "./uploads/test",
+    "preserveOriginalName": false,
+    "generateThumbnails": false,
+    "thumbnailSizes": [
+      { "width": 150, "height": 100, "suffix": "xs" }
+    ]
+  }
+}

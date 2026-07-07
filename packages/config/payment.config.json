@@ -1,0 +1,110 @@
+{
+  "development": {
+    "currency": "ETB",
+    "locale": "am_ET",
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "cleaningFeeEnabled": true,
+    "securityDepositEnabled": true,
+    "bankTransfer": {
+      "enabled": true,
+      "bankName": "BANK_NAME",
+      "accountNumber": "BANK_ACCOUNT_NUMBER",
+      "accountHolder": "BANK_ACCOUNT_HOLDER",
+      "referencePrefix": "ROOSTAY",
+      "verificationRequired": true,
+      "verificationTimeoutHours": 48,
+      "instructions": "Please transfer the total amount to the bank account below and upload your payment receipt for verification. Your booking will be confirmed within 48 hours of payment verification."
+    },
+    "telebirr": {
+      "enabled": false,
+      "merchantId": "TELEBIRR_MERCHANT_ID",
+      "apiKey": "TELEBIRR_API_KEY",
+      "shortcode": "TELEBIRR_SHORTCODE",
+      "apiUrl": "https://api.telebirr.com/v1",
+      "callbackUrl": "/api/payments/telebirr/callback",
+      "timeoutSeconds": 120
+    },
+    "withdrawal": {
+      "minimumAmount": 500,
+      "maximumAmount": 100000,
+      "processingTimeDays": 3,
+      "methods": ["bank_transfer", "telebirr"],
+      "feePercent": 0,
+      "feeFixed": 0
+    }
+  },
+  "production": {
+    "currency": "ETB",
+    "locale": "am_ET",
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "cleaningFeeEnabled": true,
+    "securityDepositEnabled": true,
+    "bankTransfer": {
+      "enabled": true,
+      "bankName": "BANK_NAME",
+      "accountNumber": "BANK_ACCOUNT_NUMBER",
+      "accountHolder": "BANK_ACCOUNT_HOLDER",
+      "referencePrefix": "ROOSTAY",
+      "verificationRequired": true,
+      "verificationTimeoutHours": 24,
+      "instructions": "Please transfer the total amount to the bank account below and upload your payment receipt for verification. Your booking will be confirmed within 24 hours of payment verification."
+    },
+    "telebirr": {
+      "enabled": false,
+      "merchantId": "TELEBIRR_MERCHANT_ID",
+      "apiKey": "TELEBIRR_API_KEY",
+      "shortcode": "TELEBIRR_SHORTCODE",
+      "apiUrl": "https://api.telebirr.com/v1",
+      "callbackUrl": "/api/payments/telebirr/callback",
+      "timeoutSeconds": 120
+    },
+    "withdrawal": {
+      "minimumAmount": 500,
+      "maximumAmount": 200000,
+      "processingTimeDays": 5,
+      "methods": ["bank_transfer", "telebirr"],
+      "feePercent": 0,
+      "feeFixed": 0
+    }
+  },
+  "test": {
+    "currency": "ETB",
+    "locale": "am_ET",
+    "serviceFeePercent": 0,
+    "serviceFeeMin": 0,
+    "serviceFeeMax": 0,
+    "cleaningFeeEnabled": false,
+    "securityDepositEnabled": false,
+    "bankTransfer": {
+      "enabled": true,
+      "bankName": "Test Bank",
+      "accountNumber": "0000000000",
+      "accountHolder": "Test Account",
+      "referencePrefix": "TEST",
+      "verificationRequired": false,
+      "verificationTimeoutHours": 1,
+      "instructions": "Test payment instructions."
+    },
+    "telebirr": {
+      "enabled": false,
+      "merchantId": "test_merchant",
+      "apiKey": "test_key",
+      "shortcode": "000000",
+      "apiUrl": "http://localhost:3001/api/test",
+      "callbackUrl": "/api/payments/telebirr/callback",
+      "timeoutSeconds": 10
+    },
+    "withdrawal": {
+      "minimumAmount": 10,
+      "maximumAmount": 10000,
+      "processingTimeDays": 1,
+      "methods": ["bank_transfer"],
+      "feePercent": 0,
+      "feeFixed": 0
+    }
+  }
+}
