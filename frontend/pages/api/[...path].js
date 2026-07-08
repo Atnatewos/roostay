@@ -1549,7 +1549,6 @@ app.all(/.*/, (req, res) => {
     },
   });
 });
-});
 
 // ---- Global Error Handler ----
 app.use((err, req, res, next) => {
