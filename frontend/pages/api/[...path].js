@@ -678,6 +678,203 @@ const listingController = {
       },
     });
   }),
+
+  // =========================================================================
+  // NEW: GET /api/listings/:id/blocked-dates
+  // Returns all blocked date ranges for a listing with status labels.
+  // Groups consecutive dates into ranges with status (booked/pending).
+  // Used by the DatePicker to show unavailable dates with context.
+  // =========================================================================
+  getBlockedDates: asyncHandler(async (req, res) => {
+    const listingId = req.params.id;
+
+    // Verify the listing exists and is active before querying blocked dates
+    const listing = await queryOne(
+      'SELECT id FROM listings WHERE id = $1 AND is_active = true',
+      [listingId]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+
+    // Generate a date series for the next 365 days and check each date
+    // against confirmed and pending bookings for this listing.
+    // Confirmed bookings = hard-blocked ("booked")
+    // Pending bookings   = soft-blocked ("pending" — may expire)
+    const blockedDates = await query(
+      `SELECT DISTINCT
+              d::date as date,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1 FROM bookings b
+                  WHERE b.listing_id = $1
+                    AND b.status = 'confirmed'
+                    AND d::date >= b.check_in_date
+                    AND d::date < b.check_out_date
+                ) THEN 'booked'
+                WHEN EXISTS (
+                  SELECT 1 FROM bookings b
+                  WHERE b.listing_id = $1
+                    AND b.status = 'pending'
+                    AND d::date >= b.check_in_date
+                    AND d::date < b.check_out_date
+                ) THEN 'pending'
+                ELSE 'available'
+              END as status
+       FROM generate_series(
+         CURRENT_DATE,
+         CURRENT_DATE + INTERVAL '365 days',
+         '1 day'::interval
+       ) AS d
+       WHERE EXISTS (
+         SELECT 1 FROM bookings b
+         WHERE b.listing_id = $1
+           AND b.status IN ('confirmed', 'pending')
+           AND d::date >= b.check_in_date
+           AND d::date < b.check_out_date
+       )
+       ORDER BY d::date`,
+      [listingId]
+    );
+
+    // Group consecutive dates with the same status into display-friendly ranges.
+    // Example: Three individual days become "July 14-16 (Booked)"
+    const ranges = [];
+    let currentRange = null;
+
+    for (const row of blockedDates.rows) {
+      const dateStr = new Date(row.date).toISOString().split('T')[0];
+
+      if (!currentRange) {
+        // Start the first range
+        currentRange = {
+          startDate: dateStr,
+          endDate: dateStr,
+          status: row.status,
+        };
+      } else if (
+        currentRange.status === row.status &&
+        new Date(row.date).getTime() - new Date(currentRange.endDate).getTime() === 86400000
+      ) {
+        // Extend the current range — this is a consecutive day with the same status
+        currentRange.endDate = dateStr;
+      } else {
+        // Different status or a gap in dates — save the current range and start a new one
+        ranges.push(currentRange);
+        currentRange = {
+          startDate: dateStr,
+          endDate: dateStr,
+          status: row.status,
+        };
+      }
+    }
+
+    // Push the final range if one was being built
+    if (currentRange) {
+      ranges.push(currentRange);
+    }
+
+    // Return both the grouped ranges (for display) and individual dates (for the calendar)
+    res.json({
+      success: true,
+      data: {
+        blockedRanges: ranges,
+        blockedDates: blockedDates.rows.map((r) => ({
+          date: new Date(r.date).toISOString().split('T')[0],
+          status: r.status,
+        })),
+      },
+    });
+  }),
+
+  // =========================================================================
+  // NEW: GET /api/listings/:id/similar
+  // Returns similar listings based on city, property type, and price range.
+  // Excludes the current listing from results.
+  // Used to suggest alternatives when a listing is fully booked.
+  // =========================================================================
+  getSimilarListings: asyncHandler(async (req, res) => {
+    const listingId = req.params.id;
+    const limit = Math.min(parseInt(req.query.limit) || 6, 20);
+
+    // Fetch the current listing to use as the similarity reference point
+    const currentListing = await queryOne(
+      `SELECT city, listing_type, property_type, price_per_night, price_per_month
+       FROM listings WHERE id = $1 AND is_active = true`,
+      [listingId]
+    );
+    if (!currentListing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+
+    // Determine the reference price for similarity matching.
+    // Uses price_per_night if available, otherwise falls back to price_per_month.
+    const refPrice = parseFloat(
+      currentListing.price_per_night || currentListing.price_per_month || 0
+    );
+
+    // Find similar listings matching these criteria (in priority order):
+    // 1. Same city
+    // 2. Price within ±50% of the reference price
+    // 3. Same property type gets priority (via ORDER BY CASE)
+    // 4. Exclude the current listing
+    const similar = await query(
+      `SELECT l.id, l.title, l.listing_type, l.property_type,
+              l.bedrooms, l.bathrooms, l.max_guests,
+              l.price_per_night, l.price_per_month,
+              l.city, l.subcity, l.street_address, l.instant_book,
+              (SELECT image_url FROM listing_images
+               WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
+       FROM listings l
+       WHERE l.id != $1
+         AND l.is_active = true
+         AND l.is_approved = true
+         AND l.city = $2
+         AND (
+           (l.price_per_night IS NOT NULL AND l.price_per_night BETWEEN $3 AND $4)
+           OR
+           (l.price_per_month IS NOT NULL AND l.price_per_month BETWEEN $5 AND $6)
+           OR
+           (l.listing_type = $7)
+         )
+       ORDER BY
+         CASE WHEN l.property_type = $8 THEN 0 ELSE 1 END,
+         RANDOM()
+       LIMIT $9`,
+      [
+        listingId,
+        currentListing.city,
+        refPrice * 0.5, refPrice * 1.5,   // price_per_night range (±50%)
+        refPrice * 0.5, refPrice * 1.5,   // price_per_month range (±50%)
+        currentListing.listing_type,
+        currentListing.property_type,
+        limit,
+      ]
+    );
+
+    // Return the similar listings along with metadata about what the similarity was based on
+    res.json({
+      success: true,
+      data: similar.rows.map((l) => ({
+        id: l.id,
+        title: l.title,
+        listingType: l.listing_type,
+        propertyType: l.property_type,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        maxGuests: l.max_guests,
+        pricePerNight: l.price_per_night,
+        pricePerMonth: l.price_per_month,
+        city: l.city,
+        subcity: l.subcity,
+        primaryImage: l.primary_image,
+        instantBook: l.instant_book,
+      })),
+      meta: {
+        basedOn: {
+          city: currentListing.city,
+          propertyType: currentListing.property_type,
+          priceRange: `${refPrice * 0.5} - ${refPrice * 1.5}`,
+        },
+      },
+    });
+  }),
 };
 
 // --------------------------------------------------------------------------
@@ -1283,6 +1480,11 @@ app.get('/api/auth/me', authenticate, authController.getMe);
 app.post('/api/listings', authenticate, authorize('host', 'admin'), validateBody(schemas.createListing), listingController.createListing);
 app.get('/api/listings', listingController.searchListings);
 app.get('/api/listings/:id', listingController.getListingById);
+
+// ---- NEW: Blocked dates and similar listings routes ----
+// These endpoints provide availability data and alternatives for fully booked listings
+app.get('/api/listings/:id/blocked-dates', listingController.getBlockedDates);
+app.get('/api/listings/:id/similar', listingController.getSimilarListings);
 
 // ---- Booking Routes (with payment integration) ----
 app.post(
