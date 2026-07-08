@@ -2,18 +2,21 @@
 // Booking sidebar card for listing detail pages
 // Integrates the payment-first flow — opens BookingPaymentModal on "Book Now"
 // Combines date picker, guest selector, price breakdown, and payment modal
+// Fetches blocked dates from API and shows unavailable date messaging
 // Author: Theron
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import DatePicker from '@/components/booking/DatePicker';
 import GuestSelector from '@/components/booking/GuestSelector';
 import PriceBreakdown from '@/components/booking/PriceBreakdown';
 import BookingPaymentModal from '@/components/booking/BookingPaymentModal';
 import Button from '@/components/ui/Button';
 import useAuth from '@/hooks/useAuth';
+import { apiClient } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
@@ -27,6 +30,11 @@ import constants from '@/lib/constants';
  * 4. Guest clicks "Book Now" → BookingPaymentModal opens
  * 5. Guest enters transaction number and submits → booking + payment created
  * 6. Success state shows countdown timer for payment completion
+ *
+ * Enhanced with blocked date detection:
+ * - Fetches blocked date ranges from the API
+ * - Shows next available date when selected dates are blocked
+ * - Displays a link to similar properties
  *
  * @param {Object}        props
  * @param {Object}        props.listing          - Full listing data object
@@ -80,6 +88,25 @@ export default function BookingCard({
   // =========================================================================
   const [error, setError] = useState(null);
 
+  // =========================================================================
+  // BLOCKED DATES DATA FROM API
+  // Stores blocked date ranges fetched from the API for messaging
+  // =========================================================================
+  const [blockedRanges, setBlockedRanges] = useState([]);
+
+  // =========================================================================
+  // DATE CONFLICT STATE
+  // Tracks whether the user's selected dates conflict with existing bookings
+  // Used to show the "dates unavailable" message instead of the booking form
+  // =========================================================================
+  const [selectedDatesBlocked, setSelectedDatesBlocked] = useState(false);
+
+  // =========================================================================
+  // NEXT AVAILABLE DATE
+  // Calculated when selected dates are blocked — suggests the next open slot
+  // =========================================================================
+  const [nextAvailableDate, setNextAvailableDate] = useState(null);
+
   /**
    * Determines the price per unit based on the listing type.
    * Short-term uses price per night; long-term uses price per month.
@@ -87,6 +114,70 @@ export default function BookingCard({
   const pricePerUnit = listing.listingType === 'long_term'
     ? listing.pricePerMonth
     : listing.pricePerNight;
+
+  // =========================================================================
+  // FETCH BLOCKED DATES ON MOUNT
+  // Retrieves blocked date ranges from the API for date conflict detection
+  // =========================================================================
+  useEffect(() => {
+    if (!listing.id) return;
+
+    async function fetchBlockedDates() {
+      try {
+        const response = await apiClient.get(`/listings/${listing.id}/blocked-dates`);
+
+        if (response?.data?.blockedRanges) {
+          setBlockedRanges(response.data.blockedRanges);
+        }
+      } catch (err) {
+        // Silently handle — the DatePicker has its own API call as well
+        console.error('Failed to fetch blocked dates for conflict check:', err.message);
+      }
+    }
+
+    fetchBlockedDates();
+  }, [listing.id]);
+
+  // =========================================================================
+  // CHECK DATE CONFLICTS
+  // Whenever check-in or blocked ranges change, check if the selected dates
+  // overlap with any booked or pending date ranges
+  // =========================================================================
+  useEffect(() => {
+    if (!checkIn || !checkOut || blockedRanges.length === 0) {
+      setSelectedDatesBlocked(false);
+      setNextAvailableDate(null);
+      return;
+    }
+
+    const selectedStart = new Date(checkIn);
+    const selectedEnd = new Date(checkOut);
+
+    // Check each blocked range for overlap with the selected dates
+    let hasConflict = false;
+    let nextAvailable = null;
+
+    for (const range of blockedRanges) {
+      const rangeStart = new Date(range.startDate + 'T00:00:00');
+      const rangeEnd = new Date(range.endDate + 'T00:00:00');
+
+      // Check if the selected range overlaps with this blocked range
+      if (selectedStart < rangeEnd && selectedEnd > rangeStart) {
+        hasConflict = true;
+
+        // Calculate the next available date (day after this blocked range ends)
+        const candidate = new Date(rangeEnd);
+        candidate.setDate(candidate.getDate() + 1);
+
+        if (!nextAvailable || candidate < nextAvailable) {
+          nextAvailable = candidate;
+        }
+      }
+    }
+
+    setSelectedDatesBlocked(hasConflict);
+    setNextAvailableDate(nextAvailable);
+  }, [checkIn, checkOut, blockedRanges]);
 
   /**
    * Handles date selection from the DatePicker component.
@@ -113,6 +204,26 @@ export default function BookingCard({
    */
   function handleGuestChange(guestData) {
     setGuests(guestData);
+    setError(null);
+  }
+
+  /**
+   * Handles clicking the next available date suggestion.
+   * Pre-fills the date picker with the suggested check-in date.
+   *
+   * @param {Date} date - The suggested available date
+   */
+  function handleSelectNextAvailable(date) {
+    const checkInStr = date.toISOString().split('T')[0];
+
+    // Set a default 2-night stay from the available date
+    const checkOutDate = new Date(date);
+    checkOutDate.setDate(checkOutDate.getDate() + 2);
+    const checkOutStr = checkOutDate.toISOString().split('T')[0];
+
+    setCheckIn(checkInStr);
+    setCheckOut(checkOutStr);
+    setSelectedDatesBlocked(false);
     setError(null);
   }
 
@@ -180,6 +291,12 @@ export default function BookingCard({
       return;
     }
 
+    // Block booking if selected dates are unavailable
+    if (selectedDatesBlocked) {
+      setError('These dates are not available. Please choose different dates.');
+      return;
+    }
+
     // Redirect unauthenticated users to login
     if (!isAuthenticated) {
       router.push(`/login?redirect=/listings/${listing.id}`);
@@ -218,6 +335,15 @@ export default function BookingCard({
     ? `${new Date(checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
     : 'Select check-in and check-out dates';
 
+  // Format the next available date for display
+  const nextAvailableDisplay = nextAvailableDate
+    ? nextAvailableDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
+
   return (
     <>
       {/* Booking Sidebar Card */}
@@ -249,6 +375,156 @@ export default function BookingCard({
           )}
         </div>
 
+        {/* ===================================================================
+            DATES UNAVAILABLE MESSAGE
+            Shown when the user selects dates that conflict with existing bookings.
+            Displays the blocked date range info, next available date,
+            and links to similar properties.
+            =================================================================== */}
+        {selectedDatesBlocked && checkIn && checkOut && (
+          <div className="booking-card__section" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+            <div
+              style={{
+                padding: '1rem',
+                backgroundColor: 'var(--color-warning-light)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-warning)',
+                marginBottom: '1rem',
+              }}
+            >
+              {/* Warning Icon and Title */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="var(--color-warning)"
+                  strokeWidth="2"
+                  style={{ flexShrink: 0, marginTop: '2px' }}
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <p
+                    style={{
+                      fontWeight: 'var(--font-weight-semibold)',
+                      fontSize: 'var(--font-size-sm)',
+                      color: '#92400E',
+                      marginBottom: '0.25rem',
+                    }}
+                  >
+                    These dates are not available
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      color: '#92400E',
+                      lineHeight: '1.5',
+                    }}
+                  >
+                    This property is booked for some or all of the dates you selected.
+                    Please choose different dates or explore similar properties.
+                  </p>
+                </div>
+              </div>
+
+              {/* Next Available Date Suggestion */}
+              {nextAvailableDisplay && (
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: 'var(--color-white)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
+                    Next available date:
+                  </p>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 'var(--font-weight-semibold)',
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-success)',
+                      }}
+                    >
+                      {nextAvailableDisplay}
+                    </span>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleSelectNextAvailable(nextAvailableDate)}
+                    >
+                      Select This Date
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Links */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowDatePicker(true)}
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-primary)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Choose different dates
+                </button>
+
+                <Link
+                  href={`/listings/${listing.id}/similar`}
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-primary)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  View similar properties
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Date Selection Section */}
         <div className="booking-card__section">
           <button
@@ -275,6 +551,7 @@ export default function BookingCard({
                 checkOut={checkOut}
                 onDateChange={handleDateChange}
                 blockedDates={blockedDates}
+                listingId={listing.id}
                 minNights={listing.minNights}
                 maxNights={listing.maxNights}
                 bookingType={
@@ -295,7 +572,7 @@ export default function BookingCard({
         </div>
 
         {/* Price Breakdown — Shown when dates are selected and pricing is available */}
-        {estimate && (
+        {estimate && !selectedDatesBlocked && (
           <div className="booking-card__section">
             <PriceBreakdown
               pricing={estimate}
@@ -330,9 +607,13 @@ export default function BookingCard({
             size="lg"
             fullWidth
             onClick={handleBookNowClick}
-            disabled={!checkIn || !checkOut}
+            disabled={!checkIn || !checkOut || selectedDatesBlocked}
           >
-            {checkIn && checkOut ? 'Book Now' : 'Select Dates to Book'}
+            {selectedDatesBlocked
+              ? 'Dates Unavailable'
+              : checkIn && checkOut
+                ? 'Book Now'
+                : 'Select Dates to Book'}
           </Button>
 
           {/* Informational text — assures guest they won't be charged immediately */}

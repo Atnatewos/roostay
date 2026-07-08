@@ -1503,3 +1503,108 @@
 @media (max-width: 480px) {
   .auth-page__card { padding: var(--spacing-xl); border-radius: var(--radius-lg); }
 }
+
+/* Blocked date status styles */
+.date-picker__day--booked {
+  color: var(--color-text-light);
+  text-decoration: line-through;
+  cursor: not-allowed;
+  opacity: 0.5;
+  position: relative;
+}
+
+.date-picker__day--pending {
+  color: var(--color-warning);
+  cursor: not-allowed;
+  opacity: 0.7;
+  position: relative;
+  background-color: var(--color-warning-light);
+}
+
+/* Status indicator dot below blocked dates */
+.date-picker__day-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.date-picker__day-dot--booked {
+  background-color: var(--color-text-light);
+}
+
+.date-picker__day-dot--pending {
+  background-color: var(--color-warning);
+}
+
+/* Blocked dates summary below the calendar */
+.date-picker__blocked-summary {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+}
+
+.date-picker__blocked-title {
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-secondary);
+}
+
+.date-picker__blocked-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.date-picker__blocked-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.date-picker__blocked-item--booked {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.date-picker__blocked-item--pending {
+  background-color: var(--color-warning-light);
+}
+
+.date-picker__blocked-dates {
+  font-weight: var(--font-weight-medium);
+}
+
+.date-picker__blocked-status {
+  font-size: 0.6875rem;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-medium);
+}
+
+.date-picker__blocked-item--booked .date-picker__blocked-status {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-light);
+}
+
+.date-picker__blocked-item--pending .date-picker__blocked-status {
+  background-color: var(--color-warning);
+  color: var(--color-white);
+}
+
+/* Legend dot colors */
+.date-picker__legend-dot--booked {
+  background-color: var(--color-text-light);
+  border-color: var(--color-text-light);
+}
+
+.date-picker__legend-dot--pending {
+  background-color: var(--color-warning);
+  border-color: var(--color-warning);
+}
