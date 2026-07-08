@@ -1,7 +1,8 @@
 // frontend/pages/api/[...path].js
 // Complete ROOSTAY API handler for Vercel serverless deployment
-// Handles all API routes: auth, listings, bookings, payments, etc.
+// Handles all API routes: auth, listings, bookings, payments, admin, etc.
 // Uses native PostgreSQL driver with parameterized queries
+// Author: Theron
 
 const express = require('express');
 const helmet = require('helmet');
@@ -14,7 +15,9 @@ const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 
 // ============================================================================
-// CONFIGURATION - All from environment variables, zero hardcoded values
+// CONFIGURATION
+// All values read from environment variables — zero hardcoded values
+// Each config section maps to a specific domain of the application
 // ============================================================================
 const CONFIG = {
   app: {
@@ -52,13 +55,21 @@ const CONFIG = {
 
 // ============================================================================
 // DATABASE POOL
+// Manages PostgreSQL connection pool for serverless environment
+// Creates a singleton pool instance with SSL for Neon compatibility
 // ============================================================================
 let pool = null;
 
+/**
+ * Returns the singleton database pool instance.
+ * Creates the pool on first call with configuration from CONFIG.database.
+ *
+ * @returns {Pool} PostgreSQL connection pool
+ */
 function getPool() {
   if (!pool) {
     if (!CONFIG.database.url) {
-      console.error('DATABASE_URL not set');
+      console.error('DATABASE_URL not set — database operations will fail');
     }
     pool = new Pool({
       connectionString: CONFIG.database.url,
@@ -71,6 +82,14 @@ function getPool() {
   return pool;
 }
 
+/**
+ * Executes a parameterized SQL query with automatic client management.
+ * All database operations must use this function to prevent SQL injection.
+ *
+ * @param {string} text  - SQL query with $1, $2 parameter placeholders
+ * @param {Array}  params - Array of parameter values
+ * @returns {Promise<Object>} Query result object with rows and rowCount
+ */
 async function query(text, params = []) {
   const client = await getPool().connect();
   try {
@@ -84,14 +103,28 @@ async function query(text, params = []) {
   }
 }
 
+/**
+ * Executes a query and returns only the first row.
+ * Returns null when no rows match the query.
+ *
+ * @param {string} text  - SQL query
+ * @param {Array}  params - Parameter values
+ * @returns {Promise<Object|null>} First row or null
+ */
 async function queryOne(text, params = []) {
   const result = await query(text, params);
   return result.rows[0] || null;
 }
 
 // ============================================================================
-// UTILITIES
+// UTILITY CLASSES & FUNCTIONS
+// Custom error class and helper functions used throughout the API
 // ============================================================================
+
+/**
+ * Application error class with HTTP status code and machine-readable error code.
+ * Marked as operational to distinguish from programming errors in error handling.
+ */
 class AppError extends Error {
   constructor(message, statusCode = 500, errorCode = 'APP_ERROR') {
     super(message);
@@ -101,12 +134,26 @@ class AppError extends Error {
   }
 }
 
+/**
+ * Wraps an async Express route handler to catch errors automatically.
+ * Eliminates the need for try-catch blocks in every route handler.
+ *
+ * @param {Function} fn - Async route handler function
+ * @returns {Function} Wrapped handler that forwards errors to Express error middleware
+ */
 function asyncHandler(fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
 
+/**
+ * Generates both access and refresh JWT tokens for an authenticated user.
+ * Access tokens are short-lived; refresh tokens allow silent renewal.
+ *
+ * @param {Object} user - User object with id, email, and role properties
+ * @returns {Object} Token pair with accessToken, refreshToken, and metadata
+ */
 function generateTokens(user) {
   const accessToken = jwt.sign(
     { sub: user.id, email: user.email, role: user.role, type: 'access' },
@@ -118,9 +165,18 @@ function generateTokens(user) {
     CONFIG.auth.jwtRefreshSecret,
     { expiresIn: CONFIG.auth.jwtRefreshExpiresIn }
   );
-  return { accessToken, refreshToken, tokenType: CONFIG.auth.tokenType, expiresIn: CONFIG.auth.jwtExpiresIn };
+  return {
+    accessToken,
+    refreshToken,
+    tokenType: CONFIG.auth.tokenType,
+    expiresIn: CONFIG.auth.jwtExpiresIn,
+  };
 }
 
+/**
+ * Authentication middleware — verifies the JWT access token from the Authorization header.
+ * Attaches decoded user information to req.user on success.
+ */
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -129,18 +185,31 @@ function authenticate(req, res, next) {
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, CONFIG.auth.jwtSecret);
-    if (decoded.type !== 'access') return next(new AppError('Invalid token type.', 401, 'AUTH_ERROR'));
+    if (decoded.type !== 'access') {
+      return next(new AppError('Invalid token type.', 401, 'AUTH_ERROR'));
+    }
     req.user = { id: decoded.sub, email: decoded.email, role: decoded.role };
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') return next(new AppError('Token expired.', 401, 'TOKEN_EXPIRED'));
+    if (err.name === 'TokenExpiredError') {
+      return next(new AppError('Token expired.', 401, 'TOKEN_EXPIRED'));
+    }
     return next(new AppError('Invalid token.', 401, 'AUTH_ERROR'));
   }
 }
 
+/**
+ * Authorization middleware factory — restricts access to specified roles.
+ * Must be used after the authenticate middleware.
+ *
+ * @param {...string} roles - Allowed roles (guest, host, admin)
+ * @returns {Function} Express middleware
+ */
 function authorize(...roles) {
   return (req, res, next) => {
-    if (!req.user) return next(new AppError('Authentication required.', 401, 'AUTH_ERROR'));
+    if (!req.user) {
+      return next(new AppError('Authentication required.', 401, 'AUTH_ERROR'));
+    }
     if (!roles.includes(req.user.role)) {
       return next(new AppError(`Access denied. Required: ${roles.join(' or ')}.`, 403, 'FORBIDDEN'));
     }
@@ -148,12 +217,24 @@ function authorize(...roles) {
   };
 }
 
+/**
+ * Request body validation middleware factory.
+ * Validates req.body against a Joi schema and strips unknown fields.
+ *
+ * @param {Joi.Schema} schema - Joi validation schema
+ * @returns {Function} Express middleware
+ */
 function validateBody(schema) {
   return (req, res, next) => {
-    const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
     if (error) {
       const details = {};
-      error.details.forEach((d) => { details[d.path.join('.')] = d.message; });
+      error.details.forEach((d) => {
+        details[d.path.join('.')] = d.message;
+      });
       return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR'));
     }
     req.body = value;
@@ -163,25 +244,42 @@ function validateBody(schema) {
 
 // ============================================================================
 // VALIDATION SCHEMAS
+// Joi schemas for validating incoming request bodies
+// Enforces data integrity and provides clear error messages
 // ============================================================================
 const schemas = {
   register: Joi.object({
     email: Joi.string().email().max(255).required(),
-    password: Joi.string().min(8).max(128).pattern(/[a-z]/).pattern(/[A-Z]/).pattern(/[0-9]/).required()
-      .messages({ 'string.pattern.base': 'Password must contain uppercase, lowercase, and number.' }),
+    password: Joi.string()
+      .min(8)
+      .max(128)
+      .pattern(/[a-z]/)
+      .pattern(/[A-Z]/)
+      .pattern(/[0-9]/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Password must contain uppercase, lowercase, and number.',
+      }),
     firstName: Joi.string().trim().min(1).max(100).required(),
     lastName: Joi.string().trim().min(1).max(100).required(),
-    phoneNumber: Joi.string().pattern(/^(\+251|0)[9]\d{8}$/).optional().allow(null, ''),
+    phoneNumber: Joi.string()
+      .pattern(/^(\+251|0)[9]\d{8}$/)
+      .optional()
+      .allow(null, ''),
   }),
+
   login: Joi.object({
     email: Joi.string().email().required(),
     password: Joi.string().required(),
   }),
+
   createListing: Joi.object({
     title: Joi.string().trim().min(5).max(255).required(),
     description: Joi.string().trim().min(20).max(5000).required(),
     listingType: Joi.string().valid('short_term', 'long_term', 'both').required(),
-    propertyType: Joi.string().valid('apartment', 'house', 'villa', 'condo', 'guest_house', 'shared_room', 'serviced_apartment').required(),
+    propertyType: Joi.string()
+      .valid('apartment', 'house', 'villa', 'condo', 'guest_house', 'shared_room', 'serviced_apartment')
+      .required(),
     bedrooms: Joi.number().integer().min(0).max(50).default(1),
     bathrooms: Joi.number().integer().min(1).max(50).default(1),
     maxGuests: Joi.number().integer().min(1).max(100).default(1),
@@ -193,11 +291,21 @@ const schemas = {
     streetAddress: Joi.string().trim().min(5).max(500).required(),
     city: Joi.string().trim().min(2).max(100).required(),
     subcity: Joi.string().trim().max(100).optional().allow(null, ''),
-    amenities: Joi.array().items(Joi.object({ name: Joi.string().required(), category: Joi.string().optional(), iconName: Joi.string().optional() })).max(50).optional(),
+    amenities: Joi.array()
+      .items(
+        Joi.object({
+          name: Joi.string().required(),
+          category: Joi.string().optional(),
+          iconName: Joi.string().optional(),
+        })
+      )
+      .max(50)
+      .optional(),
     instantBook: Joi.boolean().default(false),
     minNights: Joi.number().integer().min(1).default(1),
     cancellationPolicy: Joi.string().valid('flexible', 'moderate', 'strict').default('flexible'),
   }),
+
   createBooking: Joi.object({
     listingId: Joi.string().guid({ version: 'uuidv4' }).required(),
     checkInDate: Joi.date().iso().greater('now').required(),
@@ -210,12 +318,28 @@ const schemas = {
 
 // ============================================================================
 // CONTROLLERS
+// Route handler functions organized by resource domain
+// Each controller method is wrapped with asyncHandler for error propagation
 // ============================================================================
+
+// --------------------------------------------------------------------------
+// Auth Controller — registration, login, profile retrieval
+// --------------------------------------------------------------------------
 const authController = {
+  /**
+   * POST /api/auth/register
+   * Creates a new user account with hashed password and returns JWT tokens.
+   * Checks for existing email to prevent duplicate accounts.
+   */
   register: asyncHandler(async (req, res) => {
     const { email, password, firstName, lastName, phoneNumber } = req.body;
-    const existing = await queryOne('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
-    if (existing) throw new AppError('An account with this email already exists.', 409, 'CONFLICT');
+
+    const existing = await queryOne('SELECT id FROM users WHERE email = $1', [
+      email.toLowerCase().trim(),
+    ]);
+    if (existing) {
+      throw new AppError('An account with this email already exists.', 409, 'CONFLICT');
+    }
 
     const hash = await bcrypt.hash(password, CONFIG.auth.bcryptSaltRounds);
     const user = await queryOne(
@@ -227,22 +351,40 @@ const authController = {
 
     const tokens = generateTokens(user);
     res.status(201).json({
-      success: true, message: 'Account created.',
+      success: true,
+      message: 'Account created.',
       data: {
-        user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, role: user.role, isVerified: user.is_verified },
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isVerified: user.is_verified,
+        },
         tokens,
       },
     });
   }),
 
+  /**
+   * POST /api/auth/login
+   * Authenticates user with email and password.
+   * Implements account lockout after repeated failed attempts.
+   */
   login: asyncHandler(async (req, res) => {
     const { email, password } = req.body;
+
     const user = await queryOne(
-      'SELECT id, email, password_hash, first_name, last_name, role, is_verified, is_active, login_attempts, locked_until FROM users WHERE email = $1',
+      `SELECT id, email, password_hash, first_name, last_name, role,
+              is_verified, is_active, login_attempts, locked_until
+       FROM users WHERE email = $1`,
       [email.toLowerCase().trim()]
     );
+
     if (!user) throw new AppError('Invalid email or password.', 401, 'AUTH_ERROR');
     if (!user.is_active) throw new AppError('Account deactivated.', 401, 'AUTH_ERROR');
+
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
       throw new AppError('Account temporarily locked.', 401, 'AUTH_ERROR');
     }
@@ -252,268 +394,962 @@ const authController = {
       const attempts = (user.login_attempts || 0) + 1;
       if (attempts >= CONFIG.auth.maxLoginAttempts) {
         const lockUntil = new Date(Date.now() + CONFIG.auth.lockoutDurationMinutes * 60000);
-        await query('UPDATE users SET login_attempts = $1, locked_until = $2 WHERE id = $3', [attempts, lockUntil, user.id]);
+        await query('UPDATE users SET login_attempts = $1, locked_until = $2 WHERE id = $3', [
+          attempts, lockUntil, user.id,
+        ]);
         throw new AppError('Account locked after too many failed attempts.', 401, 'AUTH_ERROR');
       }
       await query('UPDATE users SET login_attempts = $1 WHERE id = $2', [attempts, user.id]);
       throw new AppError('Invalid email or password.', 401, 'AUTH_ERROR');
     }
 
-    await query('UPDATE users SET login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = $1', [user.id]);
+    await query(
+      'UPDATE users SET login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = $1',
+      [user.id]
+    );
+
     const tokens = generateTokens(user);
     res.json({
-      success: true, message: 'Logged in.',
+      success: true,
+      message: 'Logged in.',
       data: {
-        user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, role: user.role, isVerified: user.is_verified },
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isVerified: user.is_verified,
+        },
         tokens,
       },
     });
   }),
 
+  /**
+   * GET /api/auth/me
+   * Returns the authenticated user's profile information.
+   */
   getMe: asyncHandler(async (req, res) => {
-    const user = await queryOne('SELECT id, email, phone_number, first_name, last_name, profile_image_url, role, is_verified FROM users WHERE id = $1', [req.user.id]);
+    const user = await queryOne(
+      `SELECT id, email, phone_number, first_name, last_name, profile_image_url, role, is_verified
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
     if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
-    res.json({ success: true, data: { user: { id: user.id, email: user.email, phoneNumber: user.phone_number, firstName: user.first_name, lastName: user.last_name, profileImageUrl: user.profile_image_url, role: user.role, isVerified: user.is_verified } } });
-  }),
-};
-
-const listingController = {
-  createListing: asyncHandler(async (req, res) => {
-    const d = req.body;
-    const listing = await queryOne(
-      `INSERT INTO listings (host_id, title, description, listing_type, property_type, bedrooms, bathrooms, max_guests, beds_count, price_per_night, price_per_month, cleaning_fee, security_deposit, street_address, city, subcity, is_active, is_approved, approval_status, instant_book, min_nights, cancellation_policy)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,$17,$18,$19,$20,$21)
-       RETURNING *`,
-      [req.user.id, d.title, d.description, d.listingType, d.propertyType, d.bedrooms, d.bathrooms, d.maxGuests, d.bedsCount, d.pricePerNight || null, d.pricePerMonth || null, d.cleaningFee || 0, d.securityDeposit || 0, d.streetAddress, d.city, d.subcity || null, true, 'approved', d.instantBook || false, d.minNights || 1, d.cancellationPolicy || 'flexible']
-    );
-
-    if (d.amenities && d.amenities.length > 0) {
-      for (const a of d.amenities) {
-        await query('INSERT INTO listing_amenities (listing_id, amenity_name, category, icon_name) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING', [listing.id, a.name, a.category || null, a.iconName || null]);
-      }
-    }
-
-    res.status(201).json({ success: true, message: 'Listing created.', data: { listing } });
-  }),
-
-  searchListings: asyncHandler(async (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || CONFIG.features.paginationDefaultLimit, CONFIG.features.paginationMaxLimit);
-    const offset = (page - 1) * limit;
-    let where = 'WHERE l.is_active = true AND l.is_approved = true';
-    const params = [];
-    let p = 1;
-
-    if (req.query.city) { where += ` AND l.city ILIKE $${p}`; params.push(`%${req.query.city}%`); p++; }
-    if (req.query.listingType) { where += ` AND (l.listing_type = $${p} OR l.listing_type = 'both')`; params.push(req.query.listingType); p++; }
-    if (req.query.search) { where += ` AND (l.title ILIKE $${p} OR l.description ILIKE $${p})`; params.push(`%${req.query.search}%`); p++; }
-
-    const count = await queryOne(`SELECT COUNT(*) as total FROM listings l ${where}`, params);
-    params.push(limit, offset);
-
-    const listings = await query(
-      `SELECT l.id, l.title, l.listing_type, l.property_type, l.bedrooms, l.bathrooms, l.max_guests, l.price_per_night, l.price_per_month, l.street_address, l.city, l.subcity, l.instant_book, l.created_at, u.first_name as host_first_name, u.last_name as host_last_name
-       FROM listings l JOIN users u ON l.host_id = u.id ${where} ORDER BY l.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
-      params
-    );
-
-    const listingIds = listings.rows.map((l) => l.id);
-    let primaryImages = {};
-    if (listingIds.length > 0) {
-      const imgs = await query('SELECT listing_id, image_url FROM listing_images WHERE listing_id = ANY($1::uuid[]) AND is_primary = true', [listingIds]);
-      imgs.rows.forEach((img) => { primaryImages[img.listing_id] = img.image_url; });
-    }
-
-    res.json({
-      success: true,
-      data: listings.rows.map((l) => ({
-        id: l.id, title: l.title, listingType: l.listing_type, propertyType: l.property_type,
-        bedrooms: l.bedrooms, bathrooms: l.bathrooms, maxGuests: l.max_guests,
-        pricePerNight: l.price_per_night, pricePerMonth: l.price_per_month,
-        city: l.city, subcity: l.subcity, streetAddress: l.street_address,
-        host: { firstName: l.host_first_name, lastName: l.host_last_name },
-        primaryImage: primaryImages[l.id] || null, instantBook: l.instant_book, createdAt: l.created_at,
-      })),
-      pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) },
-    });
-  }),
-
-  getListingById: asyncHandler(async (req, res) => {
-    const listing = await queryOne(
-      `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name, u.profile_image_url as host_image_url
-       FROM listings l JOIN users u ON l.host_id = u.id WHERE l.id = $1`,
-      [req.params.id]
-    );
-    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
-
-    await query('UPDATE listings SET view_count = view_count + 1 WHERE id = $1', [req.params.id]);
-
-    const amenities = await query('SELECT amenity_name, category, icon_name FROM listing_amenities WHERE listing_id = $1', [req.params.id]);
-    const images = await query('SELECT id, image_url, thumbnail_url, alt_text, sort_order, is_primary FROM listing_images WHERE listing_id = $1 ORDER BY sort_order', [req.params.id]);
 
     res.json({
       success: true,
       data: {
-        listing: {
-          id: listing.id, hostId: listing.host_id,
-          host: { firstName: listing.host_first_name, lastName: listing.host_last_name, imageUrl: listing.host_image_url },
-          title: listing.title, description: listing.description,
-          listingType: listing.listing_type, propertyType: listing.property_type,
-          bedrooms: listing.bedrooms, bathrooms: listing.bathrooms, maxGuests: listing.max_guests, bedsCount: listing.beds_count,
-          pricePerNight: listing.price_per_night, pricePerMonth: listing.price_per_month,
-          cleaningFee: listing.cleaning_fee, securityDeposit: listing.security_deposit,
-          location: { streetAddress: listing.street_address, city: listing.city, subcity: listing.subcity },
-          instantBook: listing.instant_book, minNights: listing.min_nights, maxNights: listing.max_nights,
-          checkInTime: listing.check_in_time, checkOutTime: listing.check_out_time,
-          houseRules: listing.house_rules, cancellationPolicy: listing.cancellation_policy,
-          amenities: amenities.rows, images: images.rows,
-          viewCount: listing.view_count, isActive: listing.is_active, createdAt: listing.created_at,
+        user: {
+          id: user.id,
+          email: user.email,
+          phoneNumber: user.phone_number,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          profileImageUrl: user.profile_image_url,
+          role: user.role,
+          isVerified: user.is_verified,
         },
       },
     });
   }),
 };
 
-const bookingController = {
-  createBooking: asyncHandler(async (req, res) => {
-    const { listingId, checkInDate, checkOutDate, guestCount, bookingType, specialRequests } = req.body;
+// --------------------------------------------------------------------------
+// Listing Controller — property CRUD and search
+// --------------------------------------------------------------------------
+const listingController = {
+  /**
+   * POST /api/listings
+   * Creates a new property listing for the authenticated host.
+   */
+  createListing: asyncHandler(async (req, res) => {
+    const d = req.body;
+    const listing = await queryOne(
+      `INSERT INTO listings (
+        host_id, title, description, listing_type, property_type,
+        bedrooms, bathrooms, max_guests, beds_count,
+        price_per_night, price_per_month, cleaning_fee, security_deposit,
+        street_address, city, subcity,
+        is_active, is_approved, approval_status,
+        instant_book, min_nights, cancellation_policy
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,$17,$18,$19,$20,$21)
+      RETURNING *`,
+      [
+        req.user.id, d.title, d.description, d.listingType, d.propertyType,
+        d.bedrooms, d.bathrooms, d.maxGuests, d.bedsCount,
+        d.pricePerNight || null, d.pricePerMonth || null,
+        d.cleaningFee || 0, d.securityDeposit || 0,
+        d.streetAddress, d.city, d.subcity || null,
+        true, 'approved',
+        d.instantBook || false, d.minNights || 1,
+        d.cancellationPolicy || 'flexible',
+      ]
+    );
 
-    const listing = await queryOne('SELECT * FROM listings WHERE id = $1 AND is_active = true AND is_approved = true', [listingId]);
+    if (d.amenities && d.amenities.length > 0) {
+      for (const a of d.amenities) {
+        await query(
+          `INSERT INTO listing_amenities (listing_id, amenity_name, category, icon_name)
+           VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+          [listing.id, a.name, a.category || null, a.iconName || null]
+        );
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Listing created.',
+      data: { listing },
+    });
+  }),
+
+  /**
+   * GET /api/listings
+   * Searches and filters property listings with pagination.
+   */
+  searchListings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(
+      parseInt(req.query.limit) || CONFIG.features.paginationDefaultLimit,
+      CONFIG.features.paginationMaxLimit
+    );
+    const offset = (page - 1) * limit;
+
+    let where = 'WHERE l.is_active = true AND l.is_approved = true';
+    const params = [];
+    let p = 1;
+
+    if (req.query.city) {
+      where += ` AND l.city ILIKE $${p}`;
+      params.push(`%${req.query.city}%`);
+      p++;
+    }
+    if (req.query.listingType) {
+      where += ` AND (l.listing_type = $${p} OR l.listing_type = 'both')`;
+      params.push(req.query.listingType);
+      p++;
+    }
+    if (req.query.search) {
+      where += ` AND (l.title ILIKE $${p} OR l.description ILIKE $${p})`;
+      params.push(`%${req.query.search}%`);
+      p++;
+    }
+
+    const count = await queryOne(`SELECT COUNT(*) as total FROM listings l ${where}`, params);
+    params.push(limit, offset);
+
+    const listings = await query(
+      `SELECT l.id, l.title, l.listing_type, l.property_type,
+              l.bedrooms, l.bathrooms, l.max_guests,
+              l.price_per_night, l.price_per_month,
+              l.street_address, l.city, l.subcity,
+              l.instant_book, l.created_at,
+              u.first_name as host_first_name, u.last_name as host_last_name
+       FROM listings l
+       JOIN users u ON l.host_id = u.id
+       ${where}
+       ORDER BY l.created_at DESC
+       LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+
+    const listingIds = listings.rows.map((l) => l.id);
+    let primaryImages = {};
+    if (listingIds.length > 0) {
+      const imgs = await query(
+        `SELECT listing_id, image_url FROM listing_images
+         WHERE listing_id = ANY($1::uuid[]) AND is_primary = true`,
+        [listingIds]
+      );
+      imgs.rows.forEach((img) => {
+        primaryImages[img.listing_id] = img.image_url;
+      });
+    }
+
+    res.json({
+      success: true,
+      data: listings.rows.map((l) => ({
+        id: l.id,
+        title: l.title,
+        listingType: l.listing_type,
+        propertyType: l.property_type,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        maxGuests: l.max_guests,
+        pricePerNight: l.price_per_night,
+        pricePerMonth: l.price_per_month,
+        city: l.city,
+        subcity: l.subcity,
+        streetAddress: l.street_address,
+        host: { firstName: l.host_first_name, lastName: l.host_last_name },
+        primaryImage: primaryImages[l.id] || null,
+        instantBook: l.instant_book,
+        createdAt: l.created_at,
+      })),
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * GET /api/listings/:id
+   * Returns full listing details with host info, amenities, and images.
+   */
+  getListingById: asyncHandler(async (req, res) => {
+    const listing = await queryOne(
+      `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name,
+              u.profile_image_url as host_image_url
+       FROM listings l JOIN users u ON l.host_id = u.id
+       WHERE l.id = $1`,
+      [req.params.id]
+    );
     if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
-    if (listing.host_id === req.user.id) throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
+
+    await query('UPDATE listings SET view_count = view_count + 1 WHERE id = $1', [req.params.id]);
+
+    const amenities = await query(
+      'SELECT amenity_name, category, icon_name FROM listing_amenities WHERE listing_id = $1',
+      [req.params.id]
+    );
+    const images = await query(
+      `SELECT id, image_url, thumbnail_url, alt_text, sort_order, is_primary
+       FROM listing_images WHERE listing_id = $1 ORDER BY sort_order`,
+      [req.params.id]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        listing: {
+          id: listing.id,
+          hostId: listing.host_id,
+          host: {
+            firstName: listing.host_first_name,
+            lastName: listing.host_last_name,
+            imageUrl: listing.host_image_url,
+          },
+          title: listing.title,
+          description: listing.description,
+          listingType: listing.listing_type,
+          propertyType: listing.property_type,
+          bedrooms: listing.bedrooms,
+          bathrooms: listing.bathrooms,
+          maxGuests: listing.max_guests,
+          bedsCount: listing.beds_count,
+          pricePerNight: listing.price_per_night,
+          pricePerMonth: listing.price_per_month,
+          cleaningFee: listing.cleaning_fee,
+          securityDeposit: listing.security_deposit,
+          location: {
+            streetAddress: listing.street_address,
+            city: listing.city,
+            subcity: listing.subcity,
+          },
+          instantBook: listing.instant_book,
+          minNights: listing.min_nights,
+          maxNights: listing.max_nights,
+          checkInTime: listing.check_in_time,
+          checkOutTime: listing.check_out_time,
+          houseRules: listing.house_rules,
+          cancellationPolicy: listing.cancellation_policy,
+          amenities: amenities.rows,
+          images: images.rows,
+          viewCount: listing.view_count,
+          isActive: listing.is_active,
+          createdAt: listing.created_at,
+        },
+      },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Booking Controller — reservation management
+// --------------------------------------------------------------------------
+const bookingController = {
+  /**
+   * POST /api/bookings
+   * Creates a new booking with availability check and pricing calculation.
+   */
+  createBooking: asyncHandler(async (req, res) => {
+    const { listingId, checkInDate, checkOutDate, guestCount, bookingType, specialRequests } =
+      req.body;
+
+    const listing = await queryOne(
+      'SELECT * FROM listings WHERE id = $1 AND is_active = true AND is_approved = true',
+      [listingId]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+    if (listing.host_id === req.user.id) {
+      throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
+    }
 
     const conflict = await queryOne(
-      `SELECT id FROM bookings WHERE listing_id = $1 AND status IN ('pending','confirmed') AND check_in_date < $3 AND check_out_date > $2`,
+      `SELECT id FROM bookings
+       WHERE listing_id = $1 AND status IN ('pending','confirmed')
+       AND check_in_date < $3 AND check_out_date > $2`,
       [listingId, checkInDate, checkOutDate]
     );
     if (conflict) throw new AppError('Dates are not available.', 409, 'CONFLICT');
 
-    const nights = Math.ceil((new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24));
+    const nights = Math.ceil(
+      (new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24)
+    );
     const baseAmount = parseFloat(listing.price_per_night) * nights;
     const cleaningFee = parseFloat(listing.cleaning_fee) || 0;
-    const serviceFee = Math.min(Math.max(Math.round(baseAmount * (CONFIG.payment.serviceFeePercent / 100)), CONFIG.payment.serviceFeeMin), CONFIG.payment.serviceFeeMax);
+    const serviceFee = Math.min(
+      Math.max(
+        Math.round(baseAmount * (CONFIG.payment.serviceFeePercent / 100)),
+        CONFIG.payment.serviceFeeMin
+      ),
+      CONFIG.payment.serviceFeeMax
+    );
     const totalAmount = baseAmount + cleaningFee + serviceFee;
 
     const booking = await queryOne(
-      `INSERT INTO bookings (listing_id, guest_id, host_id, booking_type, check_in_date, check_out_date, guest_count, status, base_amount, cleaning_fee, service_fee, security_deposit, total_amount, special_requests)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [listingId, req.user.id, listing.host_id, bookingType, checkInDate, checkOutDate, guestCount, baseAmount, cleaningFee, serviceFee, 0, totalAmount, specialRequests || null]
+      `INSERT INTO bookings (
+        listing_id, guest_id, host_id, booking_type,
+        check_in_date, check_out_date, guest_count,
+        status, base_amount, cleaning_fee, service_fee,
+        security_deposit, total_amount, special_requests
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13)
+      RETURNING *`,
+      [
+        listingId, req.user.id, listing.host_id, bookingType,
+        checkInDate, checkOutDate, guestCount,
+        baseAmount, cleaningFee, serviceFee,
+        0, totalAmount, specialRequests || null,
+      ]
     );
 
     res.status(201).json({
-      success: true, message: 'Booking created.',
-      data: { booking, pricing: { baseAmount, cleaningFee, serviceFee, securityDeposit: 0, totalAmount, currency: 'ETB' } },
+      success: true,
+      message: 'Booking created.',
+      data: {
+        booking,
+        pricing: {
+          baseAmount,
+          cleaningFee,
+          serviceFee,
+          securityDeposit: 0,
+          totalAmount,
+          currency: 'ETB',
+        },
+      },
     });
   }),
 
+  /**
+   * GET /api/bookings/guest
+   * Returns paginated bookings for the authenticated guest.
+   */
   getGuestBookings: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const offset = (page - 1) * limit;
 
-    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1', [req.user.id]);
+    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1', [
+      req.user.id,
+    ]);
     const bookings = await query(
-      `SELECT b.*, l.title as listing_title, l.city FROM bookings b JOIN listings l ON b.listing_id = l.id WHERE b.guest_id = $1 ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
+      `SELECT b.*, l.title as listing_title, l.city
+       FROM bookings b JOIN listings l ON b.listing_id = l.id
+       WHERE b.guest_id = $1
+       ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     );
 
-    res.json({ success: true, data: bookings.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
+    res.json({
+      success: true,
+      data: bookings.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * GET /api/bookings/host
+   * Returns paginated bookings for the authenticated host's listings.
+   */
+  getHostBookings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE host_id = $1', [
+      req.user.id,
+    ]);
+    const bookings = await query(
+      `SELECT b.*, l.title as listing_title, l.city,
+              gu.first_name as guest_first_name, gu.last_name as guest_last_name
+       FROM bookings b
+       JOIN listings l ON b.listing_id = l.id
+       JOIN users gu ON b.guest_id = gu.id
+       WHERE b.host_id = $1
+       ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: bookings.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
   }),
 };
 
+// --------------------------------------------------------------------------
+// Favorite Controller — saved listing management
+// --------------------------------------------------------------------------
 const favoriteController = {
+  /**
+   * POST /api/favorites/:listingId
+   * Toggles a listing as favorite for the authenticated user.
+   */
   toggle: asyncHandler(async (req, res) => {
-    const existing = await queryOne('SELECT id FROM favorites WHERE user_id = $1 AND listing_id = $2', [req.user.id, req.params.listingId]);
+    const existing = await queryOne(
+      'SELECT id FROM favorites WHERE user_id = $1 AND listing_id = $2',
+      [req.user.id, req.params.listingId]
+    );
+
     if (existing) {
-      await query('DELETE FROM favorites WHERE user_id = $1 AND listing_id = $2', [req.user.id, req.params.listingId]);
+      await query('DELETE FROM favorites WHERE user_id = $1 AND listing_id = $2', [
+        req.user.id,
+        req.params.listingId,
+      ]);
       res.json({ success: true, data: { action: 'removed' } });
     } else {
-      await query('INSERT INTO favorites (user_id, listing_id) VALUES ($1, $2)', [req.user.id, req.params.listingId]);
+      await query('INSERT INTO favorites (user_id, listing_id) VALUES ($1, $2)', [
+        req.user.id,
+        req.params.listingId,
+      ]);
       res.json({ success: true, data: { action: 'added' } });
     }
   }),
 
+  /**
+   * GET /api/favorites
+   * Returns paginated favorited listings for the authenticated user.
+   */
   list: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 12, 50);
     const offset = (page - 1) * limit;
 
-    const count = await queryOne('SELECT COUNT(*) as total FROM favorites WHERE user_id = $1', [req.user.id]);
+    const count = await queryOne('SELECT COUNT(*) as total FROM favorites WHERE user_id = $1', [
+      req.user.id,
+    ]);
     const favorites = await query(
-      `SELECT f.id as favorite_id, f.created_at as favorited_at, l.id, l.title, l.listing_type, l.price_per_night, l.price_per_month, l.city, l.bedrooms, l.bathrooms, l.max_guests,
+      `SELECT f.id as favorite_id, f.created_at as favorited_at,
+              l.id, l.title, l.listing_type, l.price_per_night, l.price_per_month,
+              l.city, l.bedrooms, l.bathrooms, l.max_guests,
               (SELECT image_url FROM listing_images WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
-       FROM favorites f JOIN listings l ON f.listing_id = l.id WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
+       FROM favorites f
+       JOIN listings l ON f.listing_id = l.id
+       WHERE f.user_id = $1
+       ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     );
 
-    res.json({ success: true, data: favorites.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
+    res.json({
+      success: true,
+      data: favorites.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Admin Controller — platform administration endpoints
+// --------------------------------------------------------------------------
+const adminController = {
+  /**
+   * GET /api/admin/dashboard
+   * Returns aggregated platform statistics for the admin dashboard.
+   */
+  getDashboard: asyncHandler(async (req, res) => {
+    const stats = {};
+
+    const userStats = await queryOne(
+      `SELECT COUNT(*) as total_users,
+              COUNT(*) FILTER (WHERE role = 'guest') as total_guests,
+              COUNT(*) FILTER (WHERE role = 'host') as total_hosts,
+              COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as new_users_30d
+       FROM users WHERE is_active = true`
+    );
+    stats.users = userStats;
+
+    const listingStats = await queryOne(
+      `SELECT COUNT(*) as total_listings,
+              COUNT(*) FILTER (WHERE listing_type IN ('short_term', 'both')) as short_term,
+              COUNT(*) FILTER (WHERE listing_type IN ('long_term', 'both')) as long_term,
+              COUNT(*) FILTER (WHERE approval_status = 'pending') as pending_approval
+       FROM listings WHERE is_active = true`
+    );
+    stats.listings = listingStats;
+
+    const bookingStats = await queryOne(
+      `SELECT COUNT(*) as total_bookings,
+              COUNT(*) FILTER (WHERE status = 'pending') as pending,
+              COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
+              COUNT(*) FILTER (WHERE status = 'completed') as completed,
+              COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+              COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as bookings_30d
+       FROM bookings`
+    );
+    stats.bookings = bookingStats;
+
+    const revenueStats = await queryOne(
+      `SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
+              COALESCE(SUM(service_fee), 0) as total_service_fees,
+              COALESCE(SUM(total_amount) FILTER (WHERE created_at > NOW() - INTERVAL '30 days'), 0) as revenue_30d
+       FROM bookings WHERE status IN ('confirmed', 'completed')`
+    );
+    stats.revenue = revenueStats;
+
+    const paymentStats = await queryOne(
+      `SELECT COUNT(*) FILTER (WHERE status = 'pending') as pending_payments,
+              COUNT(*) FILTER (WHERE status = 'processing') as processing_payments,
+              COUNT(*) FILTER (WHERE status = 'completed') as completed_payments
+       FROM payments`
+    );
+    stats.payments = paymentStats;
+
+    const withdrawalStats = await queryOne(
+      `SELECT COUNT(*) FILTER (WHERE status = 'pending') as pending_withdrawals,
+              COALESCE(SUM(net_amount) FILTER (WHERE status = 'pending'), 0) as pending_amount
+       FROM withdrawals`
+    );
+    stats.withdrawals = withdrawalStats;
+
+    const recentUsers = await query(
+      'SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 5'
+    );
+    const recentBookings = await query(
+      `SELECT b.id, b.status, b.total_amount, b.created_at,
+              u.first_name, u.last_name, l.title as listing_title
+       FROM bookings b
+       JOIN users u ON b.guest_id = u.id
+       JOIN listings l ON b.listing_id = l.id
+       ORDER BY b.created_at DESC LIMIT 5`
+    );
+    stats.recentActivity = {
+      users: recentUsers.rows,
+      bookings: recentBookings.rows,
+    };
+
+    res.json({ success: true, data: stats });
+  }),
+
+  /**
+   * GET /api/admin/users
+   * Lists all platform users with search and role filtering.
+   */
+  listUsers: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const role = req.query.role || '';
+
+    let where = 'WHERE 1=1';
+    const params = [];
+    let p = 1;
+
+    if (search) {
+      where += ` AND (first_name ILIKE $${p} OR last_name ILIKE $${p} OR email ILIKE $${p})`;
+      params.push(`%${search}%`);
+      p++;
+    }
+    if (role) {
+      where += ` AND role = $${p}`;
+      params.push(role);
+      p++;
+    }
+
+    const count = await queryOne(`SELECT COUNT(*) as total FROM users ${where}`, params);
+    params.push(limit, offset);
+
+    const users = await query(
+      `SELECT id, email, first_name, last_name, role, is_verified, is_active, created_at
+       FROM users ${where}
+       ORDER BY created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+
+    res.json({
+      success: true,
+      data: users.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * PATCH /api/admin/users/:id/toggle-status
+   * Activates or deactivates a user account.
+   */
+  toggleUserStatus: asyncHandler(async (req, res) => {
+    const { isActive } = req.body;
+    const user = await queryOne(
+      'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, email, is_active',
+      [isActive, req.params.id]
+    );
+    if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { user } });
+  }),
+
+  /**
+   * GET /api/admin/listings/pending
+   * Lists listings awaiting admin approval.
+   */
+  getPendingListings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+
+    const count = await queryOne(
+      "SELECT COUNT(*) as total FROM listings WHERE approval_status = 'pending'"
+    );
+    const listings = await query(
+      `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name, u.email as host_email
+       FROM listings l JOIN users u ON l.host_id = u.id
+       WHERE l.approval_status = 'pending'
+       ORDER BY l.created_at ASC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: listings.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * PATCH /api/admin/listings/:id/moderate
+   * Approves or rejects a pending listing.
+   */
+  moderateListing: asyncHandler(async (req, res) => {
+    const { action, notes } = req.body;
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+    const listing = await queryOne(
+      `UPDATE listings
+       SET approval_status = $1, is_approved = $2, reviewed_by = $3,
+           review_notes = $4, approved_at = NOW()
+       WHERE id = $5 RETURNING *`,
+      [newStatus, action === 'approve', req.user.id, notes || null, req.params.id]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { listing } });
+  }),
+
+  /**
+   * GET /api/admin/payments
+   * Lists all payments with optional status filter.
+   */
+  listPayments: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+    const status = req.query.status || '';
+
+    let where = 'WHERE 1=1';
+    const params = [];
+    let p = 1;
+
+    if (status) {
+      where += ` AND p.status = $${p}`;
+      params.push(status);
+      p++;
+    }
+
+    const count = await queryOne(`SELECT COUNT(*) as total FROM payments p ${where}`, params);
+    params.push(limit, offset);
+
+    const payments = await query(
+      `SELECT p.*, u.first_name, u.last_name, u.email, l.title as listing_title
+       FROM payments p
+       JOIN users u ON p.user_id = u.id
+       JOIN bookings b ON p.booking_id = b.id
+       JOIN listings l ON b.listing_id = l.id
+       ${where}
+       ORDER BY p.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+
+    res.json({
+      success: true,
+      data: payments.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * PATCH /api/admin/payments/:id/verify
+   * Verifies or rejects a payment proof.
+   */
+  verifyPayment: asyncHandler(async (req, res) => {
+    const { action } = req.body;
+    const newStatus = action === 'verify' ? 'completed' : 'failed';
+
+    const payment = await queryOne(
+      'UPDATE payments SET status = $1, verified_by = $2, verified_at = NOW() WHERE id = $3 RETURNING *',
+      [newStatus, req.user.id, req.params.id]
+    );
+    if (!payment) throw new AppError('Payment not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { payment } });
+  }),
+
+  /**
+   * GET /api/admin/withdrawals
+   * Lists all withdrawal requests with optional status filter.
+   */
+  listWithdrawals: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+    const status = req.query.status || '';
+
+    let where = 'WHERE 1=1';
+    const params = [];
+    let p = 1;
+
+    if (status) {
+      where += ` AND w.status = $${p}`;
+      params.push(status);
+      p++;
+    }
+
+    const count = await queryOne(`SELECT COUNT(*) as total FROM withdrawals w ${where}`, params);
+    params.push(limit, offset);
+
+    const withdrawals = await query(
+      `SELECT w.*, u.first_name, u.last_name, u.email
+       FROM withdrawals w
+       JOIN users u ON w.user_id = u.id
+       ${where}
+       ORDER BY w.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+
+    res.json({
+      success: true,
+      data: withdrawals.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * PATCH /api/admin/withdrawals/:id/process
+   * Approves or rejects a withdrawal request.
+   */
+  processWithdrawal: asyncHandler(async (req, res) => {
+    const { action } = req.body;
+    const newStatus = action === 'approve' ? 'completed' : 'failed';
+
+    const withdrawal = await queryOne(
+      `UPDATE withdrawals
+       SET status = $1, processed_by = $2, processed_at = NOW()
+       WHERE id = $3 RETURNING *`,
+      [newStatus, req.user.id, req.params.id]
+    );
+    if (!withdrawal) throw new AppError('Withdrawal not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { withdrawal } });
   }),
 };
 
 // ============================================================================
-// EXPRESS APP
+// EXPRESS APPLICATION
+// Configures middleware stack and registers all API routes
 // ============================================================================
 const app = express();
 
+// Trust proxy for correct IP detection behind Vercel's reverse proxy
 app.set('trust proxy', 1);
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
+
+// Security headers via Helmet
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false,
+  })
+);
+
+// CORS — allow all origins for the API
 app.use(cors({ origin: true, credentials: true }));
+
+// Body parsing with size limits
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cookie parsing for future refresh token cookie support
 app.use(cookieParser());
 
-// Health check
+// ============================================================================
+// ROUTE REGISTRATION
+// All API routes organized by resource domain
+// ============================================================================
+
+// Health check — public, no authentication required
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'ROOSTAY API is running.', timestamp: new Date().toISOString(), environment: CONFIG.app.env });
+  res.json({
+    success: true,
+    message: 'ROOSTAY API is running.',
+    timestamp: new Date().toISOString(),
+    environment: CONFIG.app.env,
+  });
 });
 
-// Auth routes
+// ---- Auth Routes ----
 app.post('/api/auth/register', validateBody(schemas.register), authController.register);
 app.post('/api/auth/login', validateBody(schemas.login), authController.login);
 app.get('/api/auth/me', authenticate, authController.getMe);
 
-// Listing routes
-app.post('/api/listings', authenticate, authorize('host', 'admin'), validateBody(schemas.createListing), listingController.createListing);
+// ---- Listing Routes ----
+app.post(
+  '/api/listings',
+  authenticate,
+  authorize('host', 'admin'),
+  validateBody(schemas.createListing),
+  listingController.createListing
+);
 app.get('/api/listings', listingController.searchListings);
 app.get('/api/listings/:id', listingController.getListingById);
 
-// Booking routes
-app.post('/api/bookings', authenticate, authorize('guest', 'admin'), validateBody(schemas.createBooking), bookingController.createBooking);
+// ---- Booking Routes ----
+app.post(
+  '/api/bookings',
+  authenticate,
+  authorize('guest', 'admin'),
+  validateBody(schemas.createBooking),
+  bookingController.createBooking
+);
 app.get('/api/bookings/guest', authenticate, bookingController.getGuestBookings);
+app.get('/api/bookings/host', authenticate, authorize('host', 'admin'), bookingController.getHostBookings);
 
-// Favorite routes
+// ---- Favorite Routes ----
 app.post('/api/favorites/:listingId', authenticate, favoriteController.toggle);
 app.get('/api/favorites', authenticate, favoriteController.list);
 
-// Notifications
-app.get('/api/notifications', authenticate, asyncHandler(async (req, res) => {
-  const result = await query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [req.user.id]);
-  res.json({ success: true, data: { notifications: result.rows, unreadCount: result.rows.filter((n) => !n.is_read).length } });
-}));
+// ---- Notification Routes ----
+app.get(
+  '/api/notifications',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await query(
+      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
+      [req.user.id]
+    );
+    res.json({
+      success: true,
+      data: {
+        notifications: result.rows,
+        unreadCount: result.rows.filter((n) => !n.is_read).length,
+      },
+    });
+  })
+);
 
-// Root
+// ---- Admin Routes ----
+app.get('/api/admin/dashboard', authenticate, authorize('admin'), adminController.getDashboard);
+app.get('/api/admin/users', authenticate, authorize('admin'), adminController.listUsers);
+app.patch('/api/admin/users/:id/toggle-status', authenticate, authorize('admin'), adminController.toggleUserStatus);
+app.get('/api/admin/listings/pending', authenticate, authorize('admin'), adminController.getPendingListings);
+app.patch('/api/admin/listings/:id/moderate', authenticate, authorize('admin'), adminController.moderateListing);
+app.get('/api/admin/payments', authenticate, authorize('admin'), adminController.listPayments);
+app.patch('/api/admin/payments/:id/verify', authenticate, authorize('admin'), adminController.verifyPayment);
+app.get('/api/admin/withdrawals', authenticate, authorize('admin'), adminController.listWithdrawals);
+app.patch('/api/admin/withdrawals/:id/process', authenticate, authorize('admin'), adminController.processWithdrawal);
+
+// ---- Root Endpoint ----
 app.get('/', (req, res) => {
-  res.json({ success: true, name: 'ROOSTAY API', version: '1.0.0', environment: CONFIG.app.env });
+  res.json({
+    success: true,
+    name: 'ROOSTAY API',
+    version: '1.0.0',
+    environment: CONFIG.app.env,
+  });
 });
 
-// 404 handler
+// ---- 404 Handler ----
+// Catches all unmatched routes and returns a structured error response
 app.all('*', (req, res) => {
-  res.status(404).json({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: `Route not found: ${req.method} ${req.path}` } });
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'ROUTE_NOT_FOUND',
+      message: `Route not found: ${req.method} ${req.path}`,
+    },
+  });
 });
 
-// Error handler
+// ---- Global Error Handler ----
+// Catches all errors thrown in route handlers and middleware
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Internal server error';
   console.error(`[${statusCode}] ${err.message}`);
-  res.status(statusCode).json({ success: false, error: { code: err.errorCode || 'INTERNAL_ERROR', message } });
+  res.status(statusCode).json({
+    success: false,
+    error: {
+      code: err.errorCode || 'INTERNAL_ERROR',
+      message,
+    },
+  });
 });
 
-// Export for Next.js API route
+// ============================================================================
+// NEXT.JS API ROUTE EXPORT
+// Exports the Express app as a Next.js API route handler
+// ============================================================================
 export default function handler(req, res) {
   return app(req, res);
 }
 
 export const config = {
-  api: { bodyParser: false, externalResolver: true },
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+  },
 };
