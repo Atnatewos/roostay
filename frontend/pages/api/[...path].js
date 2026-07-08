@@ -1539,7 +1539,7 @@ app.get('/', (req, res) => {
 });
 
 // ---- 404 Handler ----
-app.all('*', (req, res) => {
+app.all('/*', (req, res) => {
   res.status(404).json({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: `Route not found: ${req.method} ${req.path}` } });
 });
 
