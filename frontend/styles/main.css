@@ -19,3 +19,6 @@
 
 /* 6. Page Styles — Page-specific styles */
 @import './pages.css';
+
+/* 7. Responsive Design — Mobile-first media queries */
+@import './responsive.css';
