@@ -1539,8 +1539,16 @@ app.get('/', (req, res) => {
 });
 
 // ---- 404 Handler ----
-app.all('/*', (req, res) => {
-  res.status(404).json({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: `Route not found: ${req.method} ${req.path}` } });
+// Uses a regex pattern instead of wildcard for path-to-regexp v8 compatibility
+app.all(/.*/, (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'ROUTE_NOT_FOUND',
+      message: `Route not found: ${req.method} ${req.path}`,
+    },
+  });
+});
 });
 
 // ---- Global Error Handler ----
