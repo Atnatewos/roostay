@@ -24,6 +24,9 @@
     "cancellationWindowHours": 48,
     "refundPercentFull": 100,
     "refundPercentPartial": 50,
+    "paymentTimeoutMinutes": 30,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
     "ui": {
       "toastDuration": 4000,
       "toastPosition": "top-right",
@@ -71,6 +74,9 @@
     "cancellationWindowHours": 48,
     "refundPercentFull": 100,
     "refundPercentPartial": 50,
+    "paymentTimeoutMinutes": 30,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
     "ui": {
       "toastDuration": 4000,
       "toastPosition": "top-right",
@@ -118,6 +124,9 @@
     "cancellationWindowHours": 1,
     "refundPercentFull": 100,
     "refundPercentPartial": 50,
+    "paymentTimeoutMinutes": 5,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
     "ui": {
       "toastDuration": 2000,
       "toastPosition": "top-right",

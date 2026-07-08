@@ -45,6 +45,9 @@ const CONFIG = {
     listingApprovalRequired: false,
     paginationDefaultLimit: 12,
     paginationMaxLimit: 50,
+    paymentTimeoutMinutes: parseInt(process.env.PAYMENT_TIMEOUT_MINUTES || '30', 10),
+    requireTransactionNumber: process.env.REQUIRE_TRANSACTION_NUMBER !== 'false',
+    preventDuplicateTransactions: process.env.PREVENT_DUPLICATE_TRANSACTIONS !== 'false',
   },
   payment: {
     serviceFeePercent: 5,
@@ -306,13 +309,40 @@ const schemas = {
     cancellationPolicy: Joi.string().valid('flexible', 'moderate', 'strict').default('flexible'),
   }),
 
-  createBooking: Joi.object({
+  // ------------------------------------------------------------------------
+  // Booking with payment schema
+  // Validates booking creation with mandatory transaction number
+  // The transactionNumber field is required when config demands it
+  // ------------------------------------------------------------------------
+  createBookingWithPayment: Joi.object({
     listingId: Joi.string().guid({ version: 'uuidv4' }).required(),
     checkInDate: Joi.date().iso().greater('now').required(),
     checkOutDate: Joi.date().iso().greater(Joi.ref('checkInDate')).required(),
     guestCount: Joi.number().integer().min(1).max(100).default(1),
     bookingType: Joi.string().valid('short_term', 'long_term').required(),
     specialRequests: Joi.string().max(2000).optional().allow(null, ''),
+    paymentMethod: Joi.string().valid('bank_transfer', 'telebirr').required(),
+    transactionNumber: Joi.string().trim().min(3).max(100).required().messages({
+      'string.min': 'Transaction number is required.',
+      'any.required': 'Transaction number is required.',
+    }),
+    proofNotes: Joi.string().max(500).optional().allow(null, ''),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Transaction validation schema
+  // Used to check if a transaction number has already been used
+  // ------------------------------------------------------------------------
+  validateTransaction: Joi.object({
+    transactionNumber: Joi.string().trim().min(3).max(100).required(),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Booking status update schema
+  // ------------------------------------------------------------------------
+  updateBookingStatus: Joi.object({
+    status: Joi.string().valid('confirmed', 'cancelled', 'completed', 'rejected', 'expired').required(),
+    cancellationReason: Joi.string().max(1000).optional().allow(null, ''),
   }),
 };
 
@@ -329,7 +359,6 @@ const authController = {
   /**
    * POST /api/auth/register
    * Creates a new user account with hashed password and returns JWT tokens.
-   * Checks for existing email to prevent duplicate accounts.
    */
   register: asyncHandler(async (req, res) => {
     const { email, password, firstName, lastName, phoneNumber } = req.body;
@@ -498,11 +527,7 @@ const listingController = {
       }
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Listing created.',
-      data: { listing },
-    });
+    res.status(201).json({ success: true, message: 'Listing created.', data: { listing } });
   }),
 
   /**
@@ -547,11 +572,8 @@ const listingController = {
               l.street_address, l.city, l.subcity,
               l.instant_book, l.created_at,
               u.first_name as host_first_name, u.last_name as host_last_name
-       FROM listings l
-       JOIN users u ON l.host_id = u.id
-       ${where}
-       ORDER BY l.created_at DESC
-       LIMIT $${p} OFFSET $${p + 1}`,
+       FROM listings l JOIN users u ON l.host_id = u.id
+       ${where} ORDER BY l.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
       params
     );
 
@@ -563,9 +585,7 @@ const listingController = {
          WHERE listing_id = ANY($1::uuid[]) AND is_primary = true`,
         [listingIds]
       );
-      imgs.rows.forEach((img) => {
-        primaryImages[img.listing_id] = img.image_url;
-      });
+      imgs.rows.forEach((img) => { primaryImages[img.listing_id] = img.image_url; });
     }
 
     res.json({
@@ -605,8 +625,7 @@ const listingController = {
     const listing = await queryOne(
       `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name,
               u.profile_image_url as host_image_url
-       FROM listings l JOIN users u ON l.host_id = u.id
-       WHERE l.id = $1`,
+       FROM listings l JOIN users u ON l.host_id = u.id WHERE l.id = $1`,
       [req.params.id]
     );
     if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
@@ -629,11 +648,7 @@ const listingController = {
         listing: {
           id: listing.id,
           hostId: listing.host_id,
-          host: {
-            firstName: listing.host_first_name,
-            lastName: listing.host_last_name,
-            imageUrl: listing.host_image_url,
-          },
+          host: { firstName: listing.host_first_name, lastName: listing.host_last_name, imageUrl: listing.host_image_url },
           title: listing.title,
           description: listing.description,
           listingType: listing.listing_type,
@@ -646,11 +661,7 @@ const listingController = {
           pricePerMonth: listing.price_per_month,
           cleaningFee: listing.cleaning_fee,
           securityDeposit: listing.security_deposit,
-          location: {
-            streetAddress: listing.street_address,
-            city: listing.city,
-            subcity: listing.subcity,
-          },
+          location: { streetAddress: listing.street_address, city: listing.city, subcity: listing.subcity },
           instantBook: listing.instant_book,
           minNights: listing.min_nights,
           maxNights: listing.max_nights,
@@ -670,17 +681,24 @@ const listingController = {
 };
 
 // --------------------------------------------------------------------------
-// Booking Controller — reservation management
+// Booking Controller — reservation management with payment integration
 // --------------------------------------------------------------------------
 const bookingController = {
+
   /**
    * POST /api/bookings
-   * Creates a new booking with availability check and pricing calculation.
+   * Creates a new booking with availability check, pricing calculation,
+   * and mandatory payment record with transaction number.
+   * The booking is created as 'pending' and a payment record is attached.
    */
   createBooking: asyncHandler(async (req, res) => {
-    const { listingId, checkInDate, checkOutDate, guestCount, bookingType, specialRequests } =
-      req.body;
+    const {
+      listingId, checkInDate, checkOutDate, guestCount,
+      bookingType, specialRequests,
+      paymentMethod, transactionNumber, proofNotes,
+    } = req.body;
 
+    // Verify the listing exists and is available for booking
     const listing = await queryOne(
       'SELECT * FROM listings WHERE id = $1 AND is_active = true AND is_approved = true',
       [listingId]
@@ -690,6 +708,7 @@ const bookingController = {
       throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
     }
 
+    // Check for date conflicts with existing bookings
     const conflict = await queryOne(
       `SELECT id FROM bookings
        WHERE listing_id = $1 AND status IN ('pending','confirmed')
@@ -698,6 +717,26 @@ const bookingController = {
     );
     if (conflict) throw new AppError('Dates are not available.', 409, 'CONFLICT');
 
+    // Validate the transaction number is not already used in a completed payment
+    // This prevents users from reusing the same transaction reference
+    if (CONFIG.features.preventDuplicateTransactions && transactionNumber) {
+      const existingTransaction = await queryOne(
+        `SELECT p.id, p.status, b.id as booking_id
+         FROM payments p
+         JOIN bookings b ON p.booking_id = b.id
+         WHERE p.transaction_reference = $1 AND p.status = 'completed'`,
+        [transactionNumber.trim()]
+      );
+      if (existingTransaction) {
+        throw new AppError(
+          'This transaction number has already been used for a verified payment. Please provide a different transaction number.',
+          409,
+          'DUPLICATE_TRANSACTION'
+        );
+      }
+    }
+
+    // Calculate pricing based on booking type and listing rates
     const nights = Math.ceil(
       (new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24)
     );
@@ -712,6 +751,7 @@ const bookingController = {
     );
     const totalAmount = baseAmount + cleaningFee + serviceFee;
 
+    // Create the booking record with 'pending' status
     const booking = await queryOne(
       `INSERT INTO bookings (
         listing_id, guest_id, host_id, booking_type,
@@ -728,11 +768,35 @@ const bookingController = {
       ]
     );
 
+    // Create the payment record attached to this booking
+    // The transaction reference is stored for duplicate checking
+    const payment = await queryOne(
+      `INSERT INTO payments (
+        booking_id, user_id, amount, currency, payment_method,
+        transaction_reference, proof_notes, status
+      ) VALUES ($1, $2, $3, 'ETB', $4, $5, $6, 'pending')
+      RETURNING *`,
+      [
+        booking.id,
+        req.user.id,
+        totalAmount,
+        paymentMethod,
+        transactionNumber.trim(),
+        proofNotes || null,
+      ]
+    );
+
+    // Calculate the payment expiry time based on configurable timeout
+    const expiryTime = new Date(
+      Date.now() + CONFIG.features.paymentTimeoutMinutes * 60 * 1000
+    );
+
     res.status(201).json({
       success: true,
-      message: 'Booking created.',
+      message: 'Booking created. Please complete payment within the time limit.',
       data: {
         booking,
+        payment,
         pricing: {
           baseAmount,
           cleaningFee,
@@ -741,8 +805,51 @@ const bookingController = {
           totalAmount,
           currency: 'ETB',
         },
+        paymentTimeout: {
+          minutes: CONFIG.features.paymentTimeoutMinutes,
+          expiresAt: expiryTime.toISOString(),
+        },
       },
     });
+  }),
+
+  /**
+   * POST /api/payments/validate-transaction
+   * Checks whether a transaction number has already been used
+   * in a successfully completed payment. Returns availability status.
+   */
+  validateTransaction: asyncHandler(async (req, res) => {
+    const { transactionNumber } = req.body;
+
+    if (!transactionNumber || transactionNumber.trim().length < 3) {
+      throw new AppError('Please provide a valid transaction number.', 400, 'VALIDATION_ERROR');
+    }
+
+    // Query for any completed payment with this transaction reference
+    const existing = await queryOne(
+      `SELECT p.id, p.status, p.created_at
+       FROM payments p
+       WHERE p.transaction_reference = $1 AND p.status = 'completed'`,
+      [transactionNumber.trim()]
+    );
+
+    if (existing) {
+      res.json({
+        success: true,
+        data: {
+          valid: false,
+          message: 'This transaction number has already been used for a verified payment.',
+        },
+      });
+    } else {
+      res.json({
+        success: true,
+        data: {
+          valid: true,
+          message: 'Transaction number is available.',
+        },
+      });
+    }
   }),
 
   /**
@@ -754,12 +861,16 @@ const bookingController = {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const offset = (page - 1) * limit;
 
-    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1', [
-      req.user.id,
-    ]);
+    const count = await queryOne(
+      'SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1',
+      [req.user.id]
+    );
     const bookings = await query(
-      `SELECT b.*, l.title as listing_title, l.city
-       FROM bookings b JOIN listings l ON b.listing_id = l.id
+      `SELECT b.*, l.title as listing_title, l.city,
+              p.status as payment_status, p.transaction_reference
+       FROM bookings b
+       JOIN listings l ON b.listing_id = l.id
+       LEFT JOIN payments p ON p.booking_id = b.id
        WHERE b.guest_id = $1
        ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
@@ -786,15 +897,18 @@ const bookingController = {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const offset = (page - 1) * limit;
 
-    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE host_id = $1', [
-      req.user.id,
-    ]);
+    const count = await queryOne(
+      'SELECT COUNT(*) as total FROM bookings WHERE host_id = $1',
+      [req.user.id]
+    );
     const bookings = await query(
       `SELECT b.*, l.title as listing_title, l.city,
-              gu.first_name as guest_first_name, gu.last_name as guest_last_name
+              gu.first_name as guest_first_name, gu.last_name as guest_last_name,
+              p.status as payment_status, p.transaction_reference
        FROM bookings b
        JOIN listings l ON b.listing_id = l.id
        JOIN users gu ON b.guest_id = gu.id
+       LEFT JOIN payments p ON p.booking_id = b.id
        WHERE b.host_id = $1
        ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
@@ -811,70 +925,135 @@ const bookingController = {
       },
     });
   }),
+
+  /**
+   * GET /api/bookings/:id
+   * Returns a single booking with payment information.
+   */
+  getBookingById: asyncHandler(async (req, res) => {
+    const booking = await queryOne(
+      `SELECT b.*, l.title as listing_title, l.street_address, l.city,
+              gu.first_name as guest_first_name, gu.last_name as guest_last_name,
+              hu.first_name as host_first_name, hu.last_name as host_last_name,
+              p.id as payment_id, p.status as payment_status,
+              p.transaction_reference, p.proof_image_url, p.proof_notes
+       FROM bookings b
+       JOIN listings l ON b.listing_id = l.id
+       JOIN users gu ON b.guest_id = gu.id
+       JOIN users hu ON b.host_id = hu.id
+       LEFT JOIN payments p ON p.booking_id = b.id
+       WHERE b.id = $1`,
+      [req.params.id]
+    );
+
+    if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
+
+    // Verify the requesting user is the guest, host, or an admin
+    if (
+      booking.guest_id !== req.user.id &&
+      booking.host_id !== req.user.id &&
+      req.user.role !== 'admin'
+    ) {
+      throw new AppError('You do not have permission to view this booking.', 403, 'FORBIDDEN');
+    }
+
+    res.json({ success: true, data: { booking } });
+  }),
+
+  /**
+   * PATCH /api/bookings/:id/status
+   * Updates the status of a booking. Validates status transitions
+   * based on current status and user role.
+   */
+  updateBookingStatus: asyncHandler(async (req, res) => {
+    const { status, cancellationReason } = req.body;
+    const booking = await queryOne('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+
+    if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
+
+    // Define valid status transitions for each role
+    const validTransitions = {
+      pending: { confirmed: ['host', 'admin'], cancelled: ['guest', 'admin'], rejected: ['host', 'admin'], expired: ['system'] },
+      confirmed: { cancelled: ['guest', 'host', 'admin'], completed: ['host', 'admin'] },
+    };
+
+    const allowedRoles = validTransitions[booking.status]?.[status];
+    if (!allowedRoles) {
+      throw new AppError(
+        `Cannot change status from "${booking.status}" to "${status}".`,
+        400, 'VALIDATION_ERROR'
+      );
+    }
+
+    if (!allowedRoles.includes('system') && !allowedRoles.includes(req.user.role)) {
+      throw new AppError('You do not have permission to perform this action.', 403, 'FORBIDDEN');
+    }
+
+    // Build update fields dynamically
+    const updates = { status };
+    if (status === 'cancelled') {
+      updates.cancelled_by = req.user.id;
+      updates.cancelled_at = new Date();
+      updates.cancellation_reason = cancellationReason || null;
+    }
+    if (status === 'confirmed') updates.confirmed_at = new Date();
+    if (status === 'completed') updates.completed_at = new Date();
+
+    const setClauses = [];
+    const params = [];
+    let p = 1;
+    for (const [key, value] of Object.entries(updates)) {
+      setClauses.push(`${key} = $${p}`);
+      params.push(value);
+      p++;
+    }
+    params.push(req.params.id);
+
+    const updated = await queryOne(
+      `UPDATE bookings SET ${setClauses.join(', ')} WHERE id = $${p} RETURNING *`,
+      params
+    );
+
+    res.json({ success: true, message: `Booking ${status}.`, data: { booking: updated } });
+  }),
 };
 
 // --------------------------------------------------------------------------
 // Favorite Controller — saved listing management
 // --------------------------------------------------------------------------
 const favoriteController = {
-  /**
-   * POST /api/favorites/:listingId
-   * Toggles a listing as favorite for the authenticated user.
-   */
   toggle: asyncHandler(async (req, res) => {
     const existing = await queryOne(
       'SELECT id FROM favorites WHERE user_id = $1 AND listing_id = $2',
       [req.user.id, req.params.listingId]
     );
-
     if (existing) {
-      await query('DELETE FROM favorites WHERE user_id = $1 AND listing_id = $2', [
-        req.user.id,
-        req.params.listingId,
-      ]);
+      await query('DELETE FROM favorites WHERE user_id = $1 AND listing_id = $2', [req.user.id, req.params.listingId]);
       res.json({ success: true, data: { action: 'removed' } });
     } else {
-      await query('INSERT INTO favorites (user_id, listing_id) VALUES ($1, $2)', [
-        req.user.id,
-        req.params.listingId,
-      ]);
+      await query('INSERT INTO favorites (user_id, listing_id) VALUES ($1, $2)', [req.user.id, req.params.listingId]);
       res.json({ success: true, data: { action: 'added' } });
     }
   }),
 
-  /**
-   * GET /api/favorites
-   * Returns paginated favorited listings for the authenticated user.
-   */
   list: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 12, 50);
     const offset = (page - 1) * limit;
-
-    const count = await queryOne('SELECT COUNT(*) as total FROM favorites WHERE user_id = $1', [
-      req.user.id,
-    ]);
+    const count = await queryOne('SELECT COUNT(*) as total FROM favorites WHERE user_id = $1', [req.user.id]);
     const favorites = await query(
       `SELECT f.id as favorite_id, f.created_at as favorited_at,
               l.id, l.title, l.listing_type, l.price_per_night, l.price_per_month,
               l.city, l.bedrooms, l.bathrooms, l.max_guests,
               (SELECT image_url FROM listing_images WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
-       FROM favorites f
-       JOIN listings l ON f.listing_id = l.id
-       WHERE f.user_id = $1
-       ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
+       FROM favorites f JOIN listings l ON f.listing_id = l.id
+       WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
       [req.user.id, limit, offset]
     );
-
     res.json({
       success: true,
       data: favorites.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
+      pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) },
     });
   }),
 };
@@ -883,13 +1062,8 @@ const favoriteController = {
 // Admin Controller — platform administration endpoints
 // --------------------------------------------------------------------------
 const adminController = {
-  /**
-   * GET /api/admin/dashboard
-   * Returns aggregated platform statistics for the admin dashboard.
-   */
   getDashboard: asyncHandler(async (req, res) => {
     const stats = {};
-
     const userStats = await queryOne(
       `SELECT COUNT(*) as total_users,
               COUNT(*) FILTER (WHERE role = 'guest') as total_guests,
@@ -942,131 +1116,64 @@ const adminController = {
     );
     stats.withdrawals = withdrawalStats;
 
-    const recentUsers = await query(
-      'SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 5'
-    );
+    const recentUsers = await query('SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 5');
     const recentBookings = await query(
       `SELECT b.id, b.status, b.total_amount, b.created_at,
               u.first_name, u.last_name, l.title as listing_title
-       FROM bookings b
-       JOIN users u ON b.guest_id = u.id
-       JOIN listings l ON b.listing_id = l.id
+       FROM bookings b JOIN users u ON b.guest_id = u.id JOIN listings l ON b.listing_id = l.id
        ORDER BY b.created_at DESC LIMIT 5`
     );
-    stats.recentActivity = {
-      users: recentUsers.rows,
-      bookings: recentBookings.rows,
-    };
-
+    stats.recentActivity = { users: recentUsers.rows, bookings: recentBookings.rows };
     res.json({ success: true, data: stats });
   }),
 
-  /**
-   * GET /api/admin/users
-   * Lists all platform users with search and role filtering.
-   */
   listUsers: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
     const role = req.query.role || '';
-
     let where = 'WHERE 1=1';
     const params = [];
     let p = 1;
-
-    if (search) {
-      where += ` AND (first_name ILIKE $${p} OR last_name ILIKE $${p} OR email ILIKE $${p})`;
-      params.push(`%${search}%`);
-      p++;
-    }
-    if (role) {
-      where += ` AND role = $${p}`;
-      params.push(role);
-      p++;
-    }
-
+    if (search) { where += ` AND (first_name ILIKE $${p} OR last_name ILIKE $${p} OR email ILIKE $${p})`; params.push(`%${search}%`); p++; }
+    if (role) { where += ` AND role = $${p}`; params.push(role); p++; }
     const count = await queryOne(`SELECT COUNT(*) as total FROM users ${where}`, params);
     params.push(limit, offset);
-
     const users = await query(
       `SELECT id, email, first_name, last_name, role, is_verified, is_active, created_at
-       FROM users ${where}
-       ORDER BY created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+       FROM users ${where} ORDER BY created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
       params
     );
-
-    res.json({
-      success: true,
-      data: users.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
-    });
+    res.json({ success: true, data: users.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
   }),
 
-  /**
-   * PATCH /api/admin/users/:id/toggle-status
-   * Activates or deactivates a user account.
-   */
   toggleUserStatus: asyncHandler(async (req, res) => {
     const { isActive } = req.body;
-    const user = await queryOne(
-      'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, email, is_active',
-      [isActive, req.params.id]
-    );
+    const user = await queryOne('UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, email, is_active', [isActive, req.params.id]);
     if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
     res.json({ success: true, data: { user } });
   }),
 
-  /**
-   * GET /api/admin/listings/pending
-   * Lists listings awaiting admin approval.
-   */
   getPendingListings: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     const offset = (page - 1) * limit;
-
-    const count = await queryOne(
-      "SELECT COUNT(*) as total FROM listings WHERE approval_status = 'pending'"
-    );
+    const count = await queryOne("SELECT COUNT(*) as total FROM listings WHERE approval_status = 'pending'");
     const listings = await query(
       `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name, u.email as host_email
        FROM listings l JOIN users u ON l.host_id = u.id
-       WHERE l.approval_status = 'pending'
-       ORDER BY l.created_at ASC LIMIT $1 OFFSET $2`,
+       WHERE l.approval_status = 'pending' ORDER BY l.created_at ASC LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-
-    res.json({
-      success: true,
-      data: listings.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
-    });
+    res.json({ success: true, data: listings.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
   }),
 
-  /**
-   * PATCH /api/admin/listings/:id/moderate
-   * Approves or rejects a pending listing.
-   */
   moderateListing: asyncHandler(async (req, res) => {
     const { action, notes } = req.body;
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
-
     const listing = await queryOne(
-      `UPDATE listings
-       SET approval_status = $1, is_approved = $2, reviewed_by = $3,
-           review_notes = $4, approved_at = NOW()
+      `UPDATE listings SET approval_status = $1, is_approved = $2, reviewed_by = $3, review_notes = $4, approved_at = NOW()
        WHERE id = $5 RETURNING *`,
       [newStatus, action === 'approve', req.user.id, notes || null, req.params.id]
     );
@@ -1074,124 +1181,72 @@ const adminController = {
     res.json({ success: true, data: { listing } });
   }),
 
-  /**
-   * GET /api/admin/payments
-   * Lists all payments with optional status filter.
-   */
   listPayments: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     const offset = (page - 1) * limit;
     const status = req.query.status || '';
-
     let where = 'WHERE 1=1';
     const params = [];
     let p = 1;
-
-    if (status) {
-      where += ` AND p.status = $${p}`;
-      params.push(status);
-      p++;
-    }
-
+    if (status) { where += ` AND p.status = $${p}`; params.push(status); p++; }
     const count = await queryOne(`SELECT COUNT(*) as total FROM payments p ${where}`, params);
     params.push(limit, offset);
-
     const payments = await query(
       `SELECT p.*, u.first_name, u.last_name, u.email, l.title as listing_title
-       FROM payments p
-       JOIN users u ON p.user_id = u.id
-       JOIN bookings b ON p.booking_id = b.id
-       JOIN listings l ON b.listing_id = l.id
-       ${where}
-       ORDER BY p.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+       FROM payments p JOIN users u ON p.user_id = u.id
+       JOIN bookings b ON p.booking_id = b.id JOIN listings l ON b.listing_id = l.id
+       ${where} ORDER BY p.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
       params
     );
-
-    res.json({
-      success: true,
-      data: payments.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
-    });
+    res.json({ success: true, data: payments.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
   }),
 
-  /**
-   * PATCH /api/admin/payments/:id/verify
-   * Verifies or rejects a payment proof.
-   */
   verifyPayment: asyncHandler(async (req, res) => {
     const { action } = req.body;
     const newStatus = action === 'verify' ? 'completed' : 'failed';
-
     const payment = await queryOne(
       'UPDATE payments SET status = $1, verified_by = $2, verified_at = NOW() WHERE id = $3 RETURNING *',
       [newStatus, req.user.id, req.params.id]
     );
     if (!payment) throw new AppError('Payment not found.', 404, 'NOT_FOUND');
+
+    // If payment is verified, auto-confirm the associated booking
+    if (newStatus === 'completed') {
+      await query(
+        "UPDATE bookings SET status = 'confirmed', confirmed_at = NOW() WHERE id = $1 AND status = 'pending'",
+        [payment.booking_id]
+      );
+    }
+
     res.json({ success: true, data: { payment } });
   }),
 
-  /**
-   * GET /api/admin/withdrawals
-   * Lists all withdrawal requests with optional status filter.
-   */
   listWithdrawals: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     const offset = (page - 1) * limit;
     const status = req.query.status || '';
-
     let where = 'WHERE 1=1';
     const params = [];
     let p = 1;
-
-    if (status) {
-      where += ` AND w.status = $${p}`;
-      params.push(status);
-      p++;
-    }
-
+    if (status) { where += ` AND w.status = $${p}`; params.push(status); p++; }
     const count = await queryOne(`SELECT COUNT(*) as total FROM withdrawals w ${where}`, params);
     params.push(limit, offset);
-
     const withdrawals = await query(
       `SELECT w.*, u.first_name, u.last_name, u.email
-       FROM withdrawals w
-       JOIN users u ON w.user_id = u.id
-       ${where}
-       ORDER BY w.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+       FROM withdrawals w JOIN users u ON w.user_id = u.id
+       ${where} ORDER BY w.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
       params
     );
-
-    res.json({
-      success: true,
-      data: withdrawals.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
-    });
+    res.json({ success: true, data: withdrawals.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
   }),
 
-  /**
-   * PATCH /api/admin/withdrawals/:id/process
-   * Approves or rejects a withdrawal request.
-   */
   processWithdrawal: asyncHandler(async (req, res) => {
     const { action } = req.body;
     const newStatus = action === 'approve' ? 'completed' : 'failed';
-
     const withdrawal = await queryOne(
-      `UPDATE withdrawals
-       SET status = $1, processed_by = $2, processed_at = NOW()
-       WHERE id = $3 RETURNING *`,
+      'UPDATE withdrawals SET status = $1, processed_by = $2, processed_at = NOW() WHERE id = $3 RETURNING *',
       [newStatus, req.user.id, req.params.id]
     );
     if (!withdrawal) throw new AppError('Withdrawal not found.', 404, 'NOT_FOUND');
@@ -1201,44 +1256,22 @@ const adminController = {
 
 // ============================================================================
 // EXPRESS APPLICATION
-// Configures middleware stack and registers all API routes
 // ============================================================================
 const app = express();
-
-// Trust proxy for correct IP detection behind Vercel's reverse proxy
 app.set('trust proxy', 1);
-
-// Security headers via Helmet
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-    contentSecurityPolicy: false,
-  })
-);
-
-// CORS — allow all origins for the API
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
-
-// Body parsing with size limits
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Cookie parsing for future refresh token cookie support
 app.use(cookieParser());
 
 // ============================================================================
 // ROUTE REGISTRATION
-// All API routes organized by resource domain
 // ============================================================================
 
-// Health check — public, no authentication required
+// Health check
 app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'ROOSTAY API is running.',
-    timestamp: new Date().toISOString(),
-    environment: CONFIG.app.env,
-  });
+  res.json({ success: true, message: 'ROOSTAY API is running.', timestamp: new Date().toISOString(), environment: CONFIG.app.env });
 });
 
 // ---- Auth Routes ----
@@ -1247,49 +1280,45 @@ app.post('/api/auth/login', validateBody(schemas.login), authController.login);
 app.get('/api/auth/me', authenticate, authController.getMe);
 
 // ---- Listing Routes ----
-app.post(
-  '/api/listings',
-  authenticate,
-  authorize('host', 'admin'),
-  validateBody(schemas.createListing),
-  listingController.createListing
-);
+app.post('/api/listings', authenticate, authorize('host', 'admin'), validateBody(schemas.createListing), listingController.createListing);
 app.get('/api/listings', listingController.searchListings);
 app.get('/api/listings/:id', listingController.getListingById);
 
-// ---- Booking Routes ----
+// ---- Booking Routes (with payment integration) ----
 app.post(
   '/api/bookings',
   authenticate,
   authorize('guest', 'admin'),
-  validateBody(schemas.createBooking),
+  validateBody(schemas.createBookingWithPayment),
   bookingController.createBooking
 );
 app.get('/api/bookings/guest', authenticate, bookingController.getGuestBookings);
 app.get('/api/bookings/host', authenticate, authorize('host', 'admin'), bookingController.getHostBookings);
+app.get('/api/bookings/:id', authenticate, bookingController.getBookingById);
+app.patch(
+  '/api/bookings/:id/status',
+  authenticate,
+  validateBody(schemas.updateBookingStatus),
+  bookingController.updateBookingStatus
+);
+
+// ---- Payment Routes ----
+app.post(
+  '/api/payments/validate-transaction',
+  authenticate,
+  validateBody(schemas.validateTransaction),
+  bookingController.validateTransaction
+);
 
 // ---- Favorite Routes ----
 app.post('/api/favorites/:listingId', authenticate, favoriteController.toggle);
 app.get('/api/favorites', authenticate, favoriteController.list);
 
 // ---- Notification Routes ----
-app.get(
-  '/api/notifications',
-  authenticate,
-  asyncHandler(async (req, res) => {
-    const result = await query(
-      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
-      [req.user.id]
-    );
-    res.json({
-      success: true,
-      data: {
-        notifications: result.rows,
-        unreadCount: result.rows.filter((n) => !n.is_read).length,
-      },
-    });
-  })
-);
+app.get('/api/notifications', authenticate, asyncHandler(async (req, res) => {
+  const result = await query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [req.user.id]);
+  res.json({ success: true, data: { notifications: result.rows, unreadCount: result.rows.filter((n) => !n.is_read).length } });
+}));
 
 // ---- Admin Routes ----
 app.get('/api/admin/dashboard', authenticate, authorize('admin'), adminController.getDashboard);
@@ -1302,54 +1331,31 @@ app.patch('/api/admin/payments/:id/verify', authenticate, authorize('admin'), ad
 app.get('/api/admin/withdrawals', authenticate, authorize('admin'), adminController.listWithdrawals);
 app.patch('/api/admin/withdrawals/:id/process', authenticate, authorize('admin'), adminController.processWithdrawal);
 
-// ---- Root Endpoint ----
+// ---- Root ----
 app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    name: 'ROOSTAY API',
-    version: '1.0.0',
-    environment: CONFIG.app.env,
-  });
+  res.json({ success: true, name: 'ROOSTAY API', version: '1.0.0', environment: CONFIG.app.env });
 });
 
 // ---- 404 Handler ----
-// Catches all unmatched routes and returns a structured error response
 app.all('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      code: 'ROUTE_NOT_FOUND',
-      message: `Route not found: ${req.method} ${req.path}`,
-    },
-  });
+  res.status(404).json({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: `Route not found: ${req.method} ${req.path}` } });
 });
 
 // ---- Global Error Handler ----
-// Catches all errors thrown in route handlers and middleware
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Internal server error';
   console.error(`[${statusCode}] ${err.message}`);
-  res.status(statusCode).json({
-    success: false,
-    error: {
-      code: err.errorCode || 'INTERNAL_ERROR',
-      message,
-    },
-  });
+  res.status(statusCode).json({ success: false, error: { code: err.errorCode || 'INTERNAL_ERROR', message } });
 });
 
 // ============================================================================
 // NEXT.JS API ROUTE EXPORT
-// Exports the Express app as a Next.js API route handler
 // ============================================================================
 export default function handler(req, res) {
   return app(req, res);
 }
 
 export const config = {
-  api: {
-    bodyParser: false,
-    externalResolver: true,
-  },
+  api: { bodyParser: false, externalResolver: true },
 };

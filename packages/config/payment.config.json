@@ -15,7 +15,10 @@
       "referencePrefix": "ROOSTAY",
       "verificationRequired": true,
       "verificationTimeoutHours": 48,
-      "instructions": "Please transfer the total amount to the bank account below and upload your payment receipt for verification. Your booking will be confirmed within 48 hours of payment verification."
+      "requireTransactionNumber": true,
+      "transactionNumberLabel": "Transaction Reference Number",
+      "transactionNumberHint": "Enter the reference number from your bank transfer receipt or SMS confirmation",
+      "instructions": "Please transfer the total amount to the bank account below and enter the transaction reference number. Your booking will be confirmed within 48 hours of payment verification."
     },
     "telebirr": {
       "enabled": false,
@@ -24,7 +27,10 @@
       "shortcode": "TELEBIRR_SHORTCODE",
       "apiUrl": "https://api.telebirr.com/v1",
       "callbackUrl": "/api/payments/telebirr/callback",
-      "timeoutSeconds": 120
+      "timeoutSeconds": 120,
+      "requireTransactionNumber": true,
+      "transactionNumberLabel": "Telebirr Transaction ID",
+      "transactionNumberHint": "Enter the transaction ID from your Telebirr payment confirmation"
     },
     "withdrawal": {
       "minimumAmount": 500,
@@ -51,7 +57,10 @@
       "referencePrefix": "ROOSTAY",
       "verificationRequired": true,
       "verificationTimeoutHours": 24,
-      "instructions": "Please transfer the total amount to the bank account below and upload your payment receipt for verification. Your booking will be confirmed within 24 hours of payment verification."
+      "requireTransactionNumber": true,
+      "transactionNumberLabel": "Transaction Reference Number",
+      "transactionNumberHint": "Enter the reference number from your bank transfer receipt or SMS confirmation",
+      "instructions": "Please transfer the total amount to the bank account below and enter the transaction reference number. Your booking will be confirmed within 24 hours of payment verification."
     },
     "telebirr": {
       "enabled": false,
@@ -60,7 +69,10 @@
       "shortcode": "TELEBIRR_SHORTCODE",
       "apiUrl": "https://api.telebirr.com/v1",
       "callbackUrl": "/api/payments/telebirr/callback",
-      "timeoutSeconds": 120
+      "timeoutSeconds": 120,
+      "requireTransactionNumber": true,
+      "transactionNumberLabel": "Telebirr Transaction ID",
+      "transactionNumberHint": "Enter the transaction ID from your Telebirr payment confirmation"
     },
     "withdrawal": {
       "minimumAmount": 500,
@@ -87,6 +99,9 @@
       "referencePrefix": "TEST",
       "verificationRequired": false,
       "verificationTimeoutHours": 1,
+      "requireTransactionNumber": true,
+      "transactionNumberLabel": "Transaction Reference",
+      "transactionNumberHint": "Enter test transaction reference",
       "instructions": "Test payment instructions."
     },
     "telebirr": {
@@ -96,7 +111,10 @@
       "shortcode": "000000",
       "apiUrl": "http://localhost:3001/api/test",
       "callbackUrl": "/api/payments/telebirr/callback",
-      "timeoutSeconds": 10
+      "timeoutSeconds": 10,
+      "requireTransactionNumber": true,
+      "transactionNumberLabel": "Telebirr ID",
+      "transactionNumberHint": "Enter test transaction ID"
     },
     "withdrawal": {
       "minimumAmount": 10,
