@@ -2,37 +2,64 @@
   "development": {
     "jwtSecret": "JWT_SECRET",
     "jwtRefreshSecret": "JWT_REFRESH_SECRET",
-    "jwtExpiresIn": "1h",
+    "jwtExpiresIn": "15m",
     "jwtRefreshExpiresIn": "7d",
-    "bcryptSaltRounds": 12,
     "tokenType": "Bearer",
+    "bcryptSaltRounds": 12,
     "passwordMinLength": 8,
-    "passwordMaxLength": 128,
     "maxLoginAttempts": 5,
-    "lockoutDurationMinutes": 15
+    "lockoutDurationMinutes": 15,
+    "cookies": {
+      "accessName": "roostay_access_token",
+      "refreshName": "roostay_refresh_token",
+      "secure": false,
+      "sameSite": "lax",
+      "httpOnly": true,
+      "path": "/",
+      "maxAgeAccess": 900000,
+      "maxAgeRefresh": 604800000
+    }
   },
   "production": {
     "jwtSecret": "JWT_SECRET",
     "jwtRefreshSecret": "JWT_REFRESH_SECRET",
-    "jwtExpiresIn": "30m",
+    "jwtExpiresIn": "15m",
     "jwtRefreshExpiresIn": "7d",
-    "bcryptSaltRounds": 14,
     "tokenType": "Bearer",
+    "bcryptSaltRounds": 12,
     "passwordMinLength": 8,
-    "passwordMaxLength": 128,
     "maxLoginAttempts": 5,
-    "lockoutDurationMinutes": 30
+    "lockoutDurationMinutes": 15,
+    "cookies": {
+      "accessName": "roostay_access_token",
+      "refreshName": "roostay_refresh_token",
+      "secure": true,
+      "sameSite": "lax",
+      "httpOnly": true,
+      "path": "/",
+      "maxAgeAccess": 900000,
+      "maxAgeRefresh": 604800000
+    }
   },
   "test": {
-    "jwtSecret": "test_jwt_secret_key_for_testing_only",
-    "jwtRefreshSecret": "test_jwt_refresh_secret_key_for_testing_only",
+    "jwtSecret": "test_jwt_secret",
+    "jwtRefreshSecret": "test_jwt_refresh_secret",
     "jwtExpiresIn": "15m",
-    "jwtRefreshExpiresIn": "1d",
-    "bcryptSaltRounds": 4,
+    "jwtRefreshExpiresIn": "7d",
     "tokenType": "Bearer",
-    "passwordMinLength": 6,
-    "passwordMaxLength": 128,
-    "maxLoginAttempts": 3,
-    "lockoutDurationMinutes": 5
+    "bcryptSaltRounds": 4,
+    "passwordMinLength": 8,
+    "maxLoginAttempts": 5,
+    "lockoutDurationMinutes": 15,
+    "cookies": {
+      "accessName": "roostay_access_token",
+      "refreshName": "roostay_refresh_token",
+      "secure": false,
+      "sameSite": "lax",
+      "httpOnly": true,
+      "path": "/",
+      "maxAgeAccess": 900000,
+      "maxAgeRefresh": 604800000
+    }
   }
 }

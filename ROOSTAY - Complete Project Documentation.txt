@@ -1,0 +1,3436 @@
+﻿****************************************
+ROOSTAY - Complete Project Documentation
+****************************************
+
+Ethiopian Home Rental Platform
+Author: Theron (Atnatewos Getasew Sahlu) 
+Github Repository: https://github.com/Atnatewos/roostay 
+Live URL: https://roostay.vercel.app 
+Version: 1.0.0 
+Date: July 8, 2026
+****************************************
+
+________________
+
+*****************
+TABLE OF CONTENTS
+*****************
+1. Project Overview
+2. Architecture & Tech Stack
+3. Directory Structure
+4. Backend Documentation 4.1 Configuration System 4.2 Database Schema 4.3 Utility Modules 4.4 Middleware 4.5 Services (Business Logic) 4.6 API Controllers 4.7 Validators 4.8 Route Registration
+5. Frontend Documentation 5.1 Next.js Pages 5.2 Layout Components 5.3 UI Components 5.4 Feature Components 5.5 Custom Hooks 5.6 Library Modules 5.7 CSS Design System
+6. API Reference 6.1 Authentication Endpoints 6.2 Listing Endpoints 6.3 Booking Endpoints 6.4 Payment Endpoints 6.5 Favorite Endpoints 6.6 Notification Endpoints 6.7 Admin Endpoints 6.8 Withdrawal Endpoints
+7. Database Documentation 7.1 Tables 7.2 Indexes 7.3 Triggers 7.4 Relationships
+8. Deployment Guide
+9. Testing Guide
+10. Maintenance & Debugging
+11. Future Roadmap
+
+
+________________
+
+
+1. PROJECT OVERVIEW
+1.1 What is ROOSTAY?
+ROOSTAY (Reservations Of Other Spaces and Things) is a full-stack rental platform designed specifically for the Ethiopian market. It supports both short-term stays (nightly) and long-term rentals (monthly), similar to Airbnb but tailored for Ethiopian payment methods, cities, and cultural context.
+1.2 Key Features
+* User Authentication: Register, login, JWT-based session management with refresh tokens
+* Property Listings: Create, search, filter, and view detailed property listings
+* Dual Booking System: Short-term (per night) and long-term (per month) bookings
+* Payment-First Booking Flow: Transaction number required before booking is created
+* Duplicate Transaction Prevention: System validates transaction numbers are unique
+* Bank Transfer & Telebirr: Ethiopian payment methods supported
+* Admin Panel: User management, listing moderation, payment verification, withdrawal processing
+* Host Dashboard: Manage listings, bookings, and earnings
+* Guest Dashboard: Track bookings, favorites, and profile
+* Reviews & Ratings: Five-category rating system with host responses
+* Date Blocking: Real-time availability with blocked date visualization
+* Similar Listings: Smart suggestions when a property is booked
+* Countdown Timer: 30-minute payment window with visual countdown
+* Responsive Design: Mobile-first CSS covering all device sizes
+* Config-Driven Architecture: Zero hardcoded values; everything from environment variables
+1.3 Target Users
+Role
+	Description
+	Guest
+	Searches, books, and reviews properties
+	Host
+	Lists properties, manages bookings, withdraws earnings
+	Admin
+	Moderates listings, verifies payments, manages users
+	
+
+________________
+
+
+2. ARCHITECTURE & TECH STACK
+2.1 Architecture Diagram
+┌─────────────────────────────────────────────────────┐
+
+
+│                   CLIENT (Browser)                    │
+
+
+│  Next.js 14 App Router + React 18                    │
+
+
+│  Pure CSS Design System (7 modules)                  │
+
+
+└─────────────────────┬───────────────────────────────┘
+
+
+                      │ HTTPS
+
+
+                      ▼
+
+
+┌─────────────────────────────────────────────────────┐
+
+
+│              VERCEL SERVERLESS EDGE                   │
+
+
+│  ┌─────────────────────────────────────────────────┐ │
+
+
+│  │         Next.js API Route Handler               │ │
+
+
+│  │  /frontend/pages/api/[...path].js               │ │
+
+
+│  │  Express.js App (40+ endpoints)                 │ │
+
+
+│  └──────────────────┬──────────────────────────────┘ │
+
+
+│                     │                                 │
+
+
+│  ┌──────────────────▼──────────────────────────────┐ │
+
+
+│  │         PostgreSQL (Neon Serverless)            │ │
+
+
+│  │  15 tables, 30+ indexes, triggers               │ │
+
+
+│  └─────────────────────────────────────────────────┘ │
+
+
+└─────────────────────────────────────────────────────┘
+2.2 Tech Stack
+Layer
+	Technology
+	Purpose
+	Frontend Framework
+	Next.js 14 (App Router)
+	Server-side rendering, routing, API routes
+	UI Library
+	React 18
+	Component-based user interface
+	Styling
+	Pure CSS (7 modules)
+	Design system with CSS custom properties
+	Backend Runtime
+	Node.js
+	JavaScript runtime
+	API Framework
+	Express.js
+	HTTP server, middleware, routing
+	Database
+	PostgreSQL (Neon)
+	Relational data storage
+	Database Driver
+	pg (native)
+	Parameterized SQL queries
+	Authentication
+	JWT (jsonwebtoken)
+	Access + refresh token authentication
+	Password Hashing
+	bcryptjs
+	Secure password storage
+	Validation
+	Joi
+	Request body validation
+	Security
+	Helmet, CORS, Rate Limiting
+	HTTP security headers, origin control
+	Deployment
+	Vercel
+	Serverless hosting with CI/CD
+	Storage
+	Cloudinary (optional)
+	Image upload and CDN
+	2.3 Key Design Decisions
+Decision
+	Rationale
+	Single API handler file
+	Vercel serverless deployment requires all routes in one file
+	Native pg driver (no ORM)
+	Full control over SQL, better performance, no abstraction overhead
+	Pure CSS (no Tailwind/Bootstrap)
+	Complete design control, smaller bundle, no utility class bloat
+	Config-driven architecture
+	Zero hardcoded values; all settings from environment variables
+	JWT with refresh tokens
+	Stateless auth, no session storage needed, scalable
+	Parameterized SQL queries
+	SQL injection prevention at the database level
+	Monorepo structure
+	Shared packages between frontend and backend
+	Payment-first booking
+	Prevents unpaid bookings; transaction validation before creation
+	
+
+________________
+
+
+3. DIRECTORY STRUCTURE
+roostay/
+
+
+roostay/
+│
+├── .env                              # Environment variables (DATABASE_URL, JWT secrets, etc.)
+├── .env.example                      # Template for required environment variables
+├── .gitignore                        # Files/folders excluded from Git tracking
+├── package.json                      # Root workspace config with npm scripts
+├── vercel.json                       # Vercel deployment configuration
+├── server.js                         # Standalone Express server for local API testing
+├── README.md                         # Project overview and setup instructions
+│
+├── scripts/                          # Utility scripts
+│   ├── setup.js                      # Database setup — drops and recreates all tables
+│   ├── seed.js                       # Seeds database with test data (host, listings)
+│   ├── test-all.js                   # Complete API test suite (7 categories)
+│   └── test-connection.js            # Database connection diagnostic tool
+│
+├── packages/                         # Shared backend packages (monorepo)
+│   │
+│   ├── config/                       # Centralized configuration system
+│   │   ├── index.js                  # Barrel export — loads all configs, resolves env vars
+│   │   ├── app.config.json           # App name, port, environment settings
+│   │   ├── auth.config.json          # JWT secrets, expiry times, bcrypt settings
+│   │   ├── cloudinary.config.json    # Cloudinary credentials for image uploads
+│   │   ├── cors.config.json          # Allowed origins and CORS methods
+│   │   ├── database.config.json      # PostgreSQL connection pool settings
+│   │   ├── features.config.json      # Feature flags, limits, payment timeout, UI settings
+│   │   ├── payment.config.json       # Bank details, Telebirr config, service fees
+│   │   ├── rateLimit.config.json     # Rate limit windows and request limits
+│   │   └── upload.config.json        # File size limits, allowed image types
+│   │
+│   ├── database/                     # Database layer
+│   │   ├── index.js                  # Parameterized query interface (query, queryOne)
+│   │   ├── pool.js                   # PostgreSQL connection pool (Neon-compatible)
+│   │   ├── schema.sql                # Full DDL — 15 tables, indexes, triggers
+│   │   ├── seed.sql                  # Development seed data
+│   │   └── migrate.js                # Migration runner — executes schema.sql
+│   │
+│   ├── utils/                        # Shared utilities
+│   │   ├── index.js                  # Barrel export for all utilities
+│   │   ├── logger.js                 # Structured logging (debug/info/warn/error)
+│   │   ├── errors.js                 # 8 custom error classes (AppError, ValidationError, etc.)
+│   │   ├── errorHandler.js           # Express error handling middleware + 404 handler
+│   │   ├── validator.js              # Joi validation wrapper + reusable patterns
+│   │   ├── asyncHandler.js           # Wraps async route handlers to catch errors
+│   │   ├── pagination.js             # Pagination helpers (offset, metadata, links)
+│   │   └── token.js                  # JWT token generation and verification
+│   │
+│   ├── middleware/                    # Express middleware
+│   │   ├── index.js                  # Barrel export for all middleware
+│   │   ├── authenticate.js           # JWT access token verification
+│   │   ├── authorize.js              # Role-based access control (guest/host/admin)
+│   │   ├── rateLimiter.js            # In-memory rate limiting per route type
+│   │   ├── cors.js                   # CORS configuration from config
+│   │   ├── validate.js               # Request body/query/params validation
+│   │   └── upload.js                 # Multer file upload with type/size validation
+│   │
+│   ├── services/                     # Business logic layer
+│   │   ├── index.js                  # Barrel export for all services
+│   │   ├── user.service.js           # Registration, login, profile, user management
+│   │   ├── listing.service.js        # Listing CRUD, search, filters, availability
+│   │   ├── booking.service.js        # Booking creation, status transitions, availability
+│   │   ├── payment.service.js        # Payment creation, proof upload, verification
+│   │   ├── withdrawal.service.js     # Host payout requests, admin processing
+│   │   ├── review.service.js         # Guest reviews, host responses, rating summaries
+│   │   ├── favorite.service.js       # Toggle favorites, paginated listing
+│   │   ├── notification.service.js   # Create, list, mark read notifications
+│   │   └── admin.service.js          # Dashboard stats, moderation, user management
+│   │
+│   └── api/                          # Express API application
+│       ├── index.js                  # Express app factory with middleware stack
+│       ├── routes.js                 # All route registrations with middleware chains
+│       ├── controllers/              # HTTP request handlers (10 files)
+│       │   ├── auth.controller.js    # Register, login, refresh token, get profile
+│       │   ├── user.controller.js    # Profile CRUD, user listing
+│       │   ├── listing.controller.js # Listing CRUD, search, blocked dates, similar
+│       │   ├── booking.controller.js # Booking CRUD, status updates, transaction validation
+│       │   ├── payment.controller.js # Payment CRUD, proof upload, admin verification
+│       │   ├── withdrawal.controller.js # Withdrawal requests, admin processing
+│       │   ├── review.controller.js  # Review creation, host responses
+│       │   ├── favorite.controller.js # Toggle and list favorites
+│       │   ├── notification.controller.js # Notification retrieval and read status
+│       │   └── admin.controller.js   # Dashboard, moderation, user/listing management
+│       └── validators/               # Joi validation schemas (7 files)
+│           ├── auth.validator.js     # Register, login, password change schemas
+│           ├── user.validator.js     # Profile update, user listing schemas
+│           ├── listing.validator.js  # Create, update, search listing schemas
+│           ├── booking.validator.js  # Create booking, status update schemas
+│           ├── payment.validator.js  # Payment creation, proof upload schemas
+│           ├── withdrawal.validator.js # Withdrawal request, processing schemas
+│           └── review.validator.js   # Review creation, host response schemas
+│
+├── frontend/                         # Next.js 14 application
+│   ├── package.json                  # Frontend dependencies and scripts
+│   ├── next.config.js                # Next.js configuration (image domains, env vars)
+│   ├── jsconfig.json                 # Path aliases (@/components, @/hooks, @/lib)
+│   ├── .env                          # Frontend environment variables (copied from root)
+│   ├── .env.local                    # Local overrides for development
+│   │
+│   ├── pages/                        # Next.js Pages Router (API only)
+│   │   └── api/
+│   │       └── [...path].js          # Vercel API handler — 40+ endpoints, Express app
+│   │
+│   ├── app/                          # Next.js App Router pages
+│   │   ├── layout.jsx                # Root layout — HTML shell, metadata, global styles
+│   │   ├── page.jsx                  # Homepage — hero section, featured listings, how it works
+│   │   ├── not-found.jsx             # Custom 404 page with navigation options
+│   │   ├── loading.jsx               # Global loading skeleton for page transitions
+│   │   ├── error.jsx                 # Error boundary with recovery options
+│   │   │
+│   │   ├── (auth)/                   # Authentication route group
+│   │   │   ├── layout.jsx            # Auth layout (minimal, no header/footer)
+│   │   │   ├── login/page.jsx        # Login form with email/password
+│   │   │   └── register/page.jsx     # Registration form with validation
+│   │   │
+│   │   ├── listings/                 # Public listing pages
+│   │   │   ├── page.jsx              # Browse listings with search, filters, pagination
+│   │   │   └── [id]/page.jsx         # Listing detail — gallery, amenities, booking card
+│   │   │
+│   │   ├── search/page.jsx           # Search results page with URL-synced filters
+│   │   │
+│   │   ├── guest/                    # Guest dashboard pages
+│   │   │   ├── dashboard/page.jsx    # Guest overview — stats, recent bookings, quick actions
+│   │   │   ├── bookings/page.jsx     # Booking history with status filters
+│   │   │   ├── bookings/[id]/page.jsx # Single booking detail — pricing, timeline, actions
+│   │   │   ├── favorites/page.jsx    # Saved listings grid with remove functionality
+│   │   │   ├── profile/page.jsx      # User profile view with account details
+│   │   │   └── profile/edit/page.jsx # Edit profile form with validation
+│   │   │
+│   │   ├── host/                     # Host dashboard pages
+│   │   │   ├── dashboard/page.jsx    # Host overview — listings, bookings, earnings
+│   │   │   ├── bookings/page.jsx     # Manage guest bookings with confirm/reject
+│   │   │   ├── my-listings/page.jsx  # Manage listings with edit/toggle/delete
+│   │   │   ├── my-listings/create/page.jsx # Multi-section listing creation form
+│   │   │   ├── my-listings/[id]/edit/page.jsx # Edit existing listing form
+│   │   │   └── withdrawals/page.jsx  # Withdrawal history and request form
+│   │   │
+│   │   └── admin/                    # Admin panel pages
+│   │       ├── dashboard/page.jsx    # System stats — users, listings, bookings, revenue
+│   │       ├── users/page.jsx        # User management — search, filter, toggle active
+│   │       ├── listings/page.jsx     # Listing moderation — approve/reject pending
+│   │       ├── listings/[id]/page.jsx # Listing detail for admin review
+│   │       ├── payments/page.jsx     # Payment verification — proof image preview
+│   │       ├── withdrawals/page.jsx  # Withdrawal processing with bank details
+│   │       └── reports/page.jsx      # Analytics — revenue, booking distribution, trends
+│   │
+│   ├── components/                   # React components (26 total)
+│   │   ├── layout/                   # Layout components
+│   │   │   ├── Header.jsx            # Main navigation — logo, links, user menu, mobile hamburger
+│   │   │   ├── Footer.jsx            # Multi-column footer with navigation links
+│   │   │   ├── Sidebar.jsx           # Dashboard sidebar with role-based menu items
+│   │   │   └── Breadcrumb.jsx        # Auto-generated breadcrumb navigation
+│   │   │
+│   │   ├── ui/                       # Reusable UI components
+│   │   │   ├── Button.jsx            # Button with variants, sizes, loading, icons, Link support
+│   │   │   ├── Input.jsx             # Text, email, password, number, textarea, select inputs
+│   │   │   ├── Modal.jsx             # Accessible modal with overlay, escape key, focus trap
+│   │   │   ├── Card.jsx              # Content container with padding, hover, click variants
+│   │   │   ├── Badge.jsx             # Status/label badge with color variants
+│   │   │   ├── Skeleton.jsx          # Loading placeholder with shimmer animation
+│   │   │   ├── Avatar.jsx            # User avatar with image fallback initials
+│   │   │   ├── StarRating.jsx        # Interactive and display star ratings
+│   │   │   ├── Pagination.jsx        # Page navigation with ellipsis and info
+│   │   │   ├── Toast.jsx             # Notification toast with auto-dismiss and types
+│   │   │   └── CountdownTimer.jsx    # Visual countdown with progress bar and color states
+│   │   │
+│   │   ├── listing/                  # Listing feature components
+│   │   │   ├── ListingCard.jsx       # Property preview card — image, badges, price, rating
+│   │   │   ├── ListingGrid.jsx       # Responsive grid with loading/empty states
+│   │   │   ├── ListingFilter.jsx     # Filter panel — price, type, bedrooms, amenities
+│   │   │   ├── ListingSearch.jsx     # Search bar with city dropdown
+│   │   │   ├── ImageGallery.jsx      # Image gallery with thumbnails and lightbox
+│   │   │   └── AmenitiesList.jsx     # Categorized amenity icons with show all/less
+│   │   │
+│   │   ├── booking/                  # Booking feature components
+│   │   │   ├── BookingCard.jsx       # Complete booking sidebar — dates, guests, pricing, payment modal
+│   │   │   ├── BookingPaymentModal.jsx # Payment-first modal — bank details, transaction number, countdown
+│   │   │   ├── DatePicker.jsx        # Dual-month calendar with blocked date visualization
+│   │   │   ├── GuestSelector.jsx     # Guest count selector with adults/children/infants
+│   │   │   └── PriceBreakdown.jsx    # Detailed pricing with fees and total
+│   │   │
+│   │   ├── payment/                  # Payment components
+│   │   │   ├── PaymentForm.jsx       # Payment method selection with bank/Telebirr details
+│   │   │   └── PaymentProof.jsx      # Receipt upload with image preview and progress
+│   │   │
+│   │   └── review/                   # Review components
+│   │       ├── ReviewCard.jsx        # Single review with five-category rating bars
+│   │       └── ReviewForm.jsx        # Five-category star rating form with text review
+│   │
+│   ├── hooks/                        # Custom React hooks
+│   │   ├── useAuth.js                # Auth state — user, login, logout, role checks
+│   │   ├── useApi.js                 # Generic API call — loading, error, data states
+│   │   ├── useBookings.js            # Booking-specific data fetching
+│   │   ├── useFavorites.js           # Favorite-specific data fetching
+│   │   └── useListings.js            # Listing-specific data fetching
+│   │
+│   ├── lib/                          # Frontend utility modules
+│   │   ├── api.js                    # API client — fetch wrapper, token management, auto-refresh
+│   │   ├── auth.js                   # Auth helpers — login, register, logout, role checks
+│   │   └── constants.js              # Frontend constants — cities, types, routes, currency
+│   │
+│   ├── styles/                       # CSS Design System (8 files)
+│   │   ├── main.css                  # Master import file — imports all 7 CSS modules
+│   │   ├── variables.css             # Design tokens — colors, typography, spacing, shadows, z-index
+│   │   ├── reset.css                 # CSS reset — normalize browser defaults, accessibility
+│   │   ├── utilities.css             # Helper classes — flex, grid, text, spacing, display
+│   │   ├── components.css            # UI component styles — buttons, inputs, modal, card, badge, etc.
+│   │   ├── layout.css                # Layout styles — header, footer, sidebar, dashboard, grid
+│   │   ├── pages.css                 # Page-specific styles — homepage, listings, auth, admin, reviews
+│   │   └── responsive.css            # Mobile-first responsive design — all breakpoints
+│   │
+│   └── public/                       # Static assets
+│       └── images/
+│           └── placeholder-listing.svg # Default image for listings without photos
+│
+└── ROOSTAY - Complete Project Documentation.txt  # This documentation file
+
+________________
+
+
+4. BACKEND DOCUMENTATION
+4.1 Configuration System
+All configuration is stored in JSON files inside packages/config/ and loaded via packages/config/index.js. The loader resolves environment-specific sections (development/production/test) and replaces UPPER_CASE string values with matching process.env variables.
+
+
+Key Config Files:
+
+
+File
+	Environment Variables Used
+	database.config.json
+	DATABASE_URL, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+	auth.config.json
+	JWT_SECRET, JWT_REFRESH_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN
+	payment.config.json
+	BANK_NAME, BANK_ACCOUNT_NUMBER, BANK_ACCOUNT_HOLDER, TELEBIRR_MERCHANT_ID, TELEBIRR_API_KEY, TELEBIRR_SHORTCODE
+	features.config.json
+	PAYMENT_TIMEOUT_MINUTES, REQUIRE_TRANSACTION_NUMBER, PREVENT_DUPLICATE_TRANSACTIONS
+	cors.config.json
+	CORS_ORIGIN
+	cloudinary.config.json
+	CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+	
+
+Config Resolution Pattern:
+
+
+// config value in JSON:
+
+
+{ "host": "DB_HOST" }
+
+
+// Resolved at runtime:
+
+
+process.env.DB_HOST // e.g., "ep-steep-hall-as1pk0kp-pooler.eu-central-1.aws.neon.tech"
+4.2 Database Schema (15 Tables)
+Table
+	Purpose
+	Key Columns
+	users
+	User accounts
+	id, email, password_hash, role, is_verified, is_active
+	refresh_tokens
+	JWT refresh tokens
+	user_id, token_hash, expires_at
+	user_verifications
+	ID verification
+	user_id, id_type, id_number, status
+	listings
+	Property listings
+	host_id, title, price_per_night, price_per_month, city
+	listing_images
+	Listing photos
+	listing_id, image_url, is_primary
+	listing_amenities
+	Property amenities
+	listing_id, amenity_name, category
+	listing_availability
+	Date availability
+	listing_id, date, status
+	bookings
+	Reservations
+	listing_id, guest_id, host_id, check_in_date, check_out_date, status
+	payments
+	Payment records
+	booking_id, user_id, amount, transaction_reference, status
+	withdrawals
+	Host payouts
+	user_id, amount, net_amount, status
+	reviews
+	Guest reviews
+	booking_id, listing_id, rating_cleanliness, rating_overall
+	favorites
+	Saved listings
+	user_id, listing_id
+	notifications
+	User notifications
+	user_id, type, title, message, is_read
+	messages
+	Guest-host messages
+	booking_id, sender_id, receiver_id
+	audit_logs
+	Admin action log
+	admin_id, action, entity_type, entity_id
+	4.3 Utility Modules
+Module
+	Exports
+	Purpose
+	logger.js
+	logger object
+	Structured logging with levels (debug, info, warn, error)
+	errors.js
+	AppError, ValidationError, AuthError, ForbiddenError, NotFoundError, ConflictError, RateLimitError, PaymentError
+	Custom error classes with HTTP status codes
+	errorHandler.js
+	errorHandler, notFoundHandler
+	Express error middleware
+	validator.js
+	validate, patterns
+	Joi validation helper with reusable patterns
+	asyncHandler.js
+	asyncHandler
+	Wraps async route handlers to catch errors
+	pagination.js
+	parsePagination, buildPaginationMeta, paginatedResponse, paginationSql
+	Pagination utilities
+	token.js
+	generateAccessToken, generateRefreshToken, generateTokenPair, verifyAccessToken, verifyRefreshToken, extractTokenFromHeader
+	JWT token management
+	4.4 Middleware
+Middleware
+	Purpose
+	Config Driven By
+	authenticate
+	Verifies JWT access token from Authorization header
+	auth.config.json
+	authorize
+	Restricts access by user role (guest/host/admin)
+	Hardcoded roles
+	rateLimiter
+	Limits requests per IP within time windows
+	rateLimit.config.json
+	cors
+	Configures CORS headers
+	cors.config.json
+	validate
+	Validates request body/query/params against Joi schemas
+	Validation schemas
+	upload
+	Handles file uploads via Multer
+	upload.config.json
+	4.5 Services (Business Logic)
+Service
+	Key Methods
+	Database Tables Used
+	user.service.js
+	register, login, refreshToken, getProfile, updateProfile, changePassword, listUsers
+	users
+	listing.service.js
+	createListing, getListingById, searchListings, updateListing, deleteListing, getHostListings
+	listings, listing_amenities, listing_images, reviews
+	booking.service.js
+	createBooking, getBookingById, updateBookingStatus, getUserBookings, checkAvailability
+	bookings, listings, listing_availability
+	payment.service.js
+	createPayment, uploadPaymentProof, verifyPayment, getPaymentById, listPayments
+	payments, bookings
+	withdrawal.service.js
+	requestWithdrawal, processWithdrawal, getUserWithdrawals, listWithdrawals
+	withdrawals, bookings
+	review.service.js
+	createReview, addHostResponse, getListingReviews
+	reviews, bookings
+	favorite.service.js
+	toggleFavorite, getUserFavorites, isFavorited
+	favorites
+	notification.service.js
+	createNotification, getUserNotifications, markAsRead, markAllAsRead, notifyBookingStatusChange
+	notifications
+	admin.service.js
+	getDashboardStats, moderateListing, toggleUserStatus, getPendingListings
+	All tables
+	4.6 API Controllers
+Controller
+	Endpoints
+	auth.controller.js
+	register, login, refreshToken, changePassword, getMe
+	user.controller.js
+	getProfile, updateProfile, getUserById, listUsers, toggleUserStatus
+	listing.controller.js
+	createListing, searchListings, getListingById, updateListing, deleteListing, getHostListings, uploadListingImages, getBlockedDates, getSimilarListings
+	booking.controller.js
+	createBooking, getBookingById, updateBookingStatus, getGuestBookings, getHostBookings, checkAvailability, validateTransaction
+	payment.controller.js
+	createPayment, uploadPaymentProof, getPaymentById, verifyPayment, listPayments
+	withdrawal.controller.js
+	requestWithdrawal, getUserWithdrawals, listWithdrawals, processWithdrawal
+	review.controller.js
+	createReview, addHostResponse, getListingReviews
+	favorite.controller.js
+	toggleFavorite, getUserFavorites, checkFavorite
+	notification.controller.js
+	getUserNotifications, markAsRead, markAllAsRead
+	admin.controller.js
+	getDashboardStats, getPendingListings, moderateListing, deleteListing, toggleUserStatus
+	4.7 Validators
+Validator
+	Schemas
+	auth.validator.js
+	register, login, refreshToken, changePassword
+	user.validator.js
+	updateProfile, listUsers
+	listing.validator.js
+	createListing, updateListing, searchListings, listingIdParam
+	booking.validator.js
+	createBooking, createBookingWithPayment, updateBookingStatus, checkAvailability, validateTransaction
+	payment.validator.js
+	createPayment, uploadPaymentProof, verifyPayment, listPayments, paymentIdParam
+	withdrawal.validator.js
+	requestWithdrawal, processWithdrawal, listWithdrawals, withdrawalIdParam
+	review.validator.js
+	createReview, addHostResponse, getListingReviews, reviewIdParam
+	4.8 Route Registration
+All routes are registered in the Vercel API handler (frontend/pages/api/[...path].js). The handler creates an Express app, registers all middleware and routes, and exports a Next.js API route handler.
+
+
+Middleware Stack (in order):
+
+
+1. helmet — Security headers
+2. cors — Cross-origin resource sharing
+3. express.json — JSON body parsing (10MB limit)
+4. express.urlencoded — URL-encoded body parsing
+5. cookieParser — Cookie parsing
+
+
+Route Groups:
+
+
+* Public: /api/health, /api/auth/*, /api/listings, /api/listings/:id
+* Authenticated: /api/auth/me, /api/bookings/*, /api/favorites/*, /api/notifications
+* Host only: /api/listings (POST), /api/bookings/host, /api/withdrawals
+* Admin only: /api/admin/*
+
+
+________________
+
+
+5. FRONTEND DOCUMENTATION
+5.1 Next.js Pages
+Page
+	URL
+	Route Group
+	Auth Required
+	Role
+	Homepage
+	/
+	Root
+	No
+	Public
+	Listings Browse
+	/listings
+	listings
+	No
+	Public
+	Listing Detail
+	/listings/[id]
+	listings
+	No
+	Public
+	Search Results
+	/search
+	search
+	No
+	Public
+	Login
+	/login
+	(auth)
+	No
+	Public
+	Register
+	/register
+	(auth)
+	No
+	Public
+	Guest Dashboard
+	/guest/dashboard
+	guest
+	Yes
+	guest
+	Guest Bookings
+	/guest/bookings
+	guest
+	Yes
+	guest
+	Booking Detail
+	/guest/bookings/[id]
+	guest
+	Yes
+	guest
+	Guest Favorites
+	/guest/favorites
+	guest
+	Yes
+	guest
+	Guest Profile
+	/guest/profile
+	guest
+	Yes
+	guest
+	Edit Profile
+	/guest/profile/edit
+	guest
+	Yes
+	guest
+	Host Dashboard
+	/host/dashboard
+	host
+	Yes
+	host
+	Host Bookings
+	/host/bookings
+	host
+	Yes
+	host
+	My Listings
+	/host/my-listings
+	host
+	Yes
+	host
+	Create Listing
+	/host/my-listings/create
+	host
+	Yes
+	host
+	Edit Listing
+	/host/my-listings/[id]/edit
+	host
+	Yes
+	host
+	Host Withdrawals
+	/host/withdrawals
+	host
+	Yes
+	host
+	Admin Dashboard
+	/admin/dashboard
+	admin
+	Yes
+	admin
+	Admin Users
+	/admin/users
+	admin
+	Yes
+	admin
+	Admin Listings
+	/admin/listings
+	admin
+	Yes
+	admin
+	Admin Listing Detail
+	/admin/listings/[id]
+	admin
+	Yes
+	admin
+	Admin Payments
+	/admin/payments
+	admin
+	Yes
+	admin
+	Admin Withdrawals
+	/admin/withdrawals
+	admin
+	Yes
+	admin
+	Admin Reports
+	/admin/reports
+	admin
+	Yes
+	admin
+	404
+	Any unmatched route
+	Root
+	No
+	Public
+	5.2 Layout Components
+Component
+	File
+	Purpose
+	Header
+	components/layout/Header.jsx
+	Main navigation with responsive hamburger menu, user dropdown, role-adaptive links
+	Footer
+	components/layout/Footer.jsx
+	Multi-column footer with navigation, copyright, responsive grid
+	Sidebar
+	components/layout/Sidebar.jsx
+	Dashboard sidebar with role-based menu items and active state
+	Breadcrumb
+	components/layout/Breadcrumb.jsx
+	Auto-generated breadcrumb navigation from URL path
+	5.3 UI Components
+Component
+	File
+	Props
+	Button
+	components/ui/Button.jsx
+	variant, size, fullWidth, isLoading, href, icon, onClick
+	Input
+	components/ui/Input.jsx
+	id, label, type, placeholder, error, helperText, required, options
+	Modal
+	components/ui/Modal.jsx
+	isOpen, onClose, title, children, footer, size, closeOnOverlay
+	Card
+	components/ui/Card.jsx
+	children, padding, hoverable, clickable, onClick
+	Badge
+	components/ui/Badge.jsx
+	children, variant, size, pill
+	Skeleton
+	components/ui/Skeleton.jsx
+	type, width, height, count
+	Avatar
+	components/ui/Avatar.jsx
+	src, alt, name, size, showStatus, status
+	StarRating
+	components/ui/StarRating.jsx
+	rating, maxStars, interactive, onChange, size, showValue
+	Pagination
+	components/ui/Pagination.jsx
+	currentPage, totalPages, onPageChange, siblingCount, showInfo
+	Toast
+	components/ui/Toast.jsx
+	message, type, duration, isVisible, onClose
+	CountdownTimer
+	components/ui/CountdownTimer.jsx
+	minutes, expiresAt, onExpire, onTick, showIcon, size
+	5.4 Feature Components
+Listing Components: | Component | Purpose | |-----------|---------| | ListingCard | Property preview card with image, badges, pricing | | ListingGrid | Responsive grid of ListingCards with loading/empty states | | ListingFilter | Filter panel with price range, property type, bedrooms | | ListingSearch | Search bar with city dropdown and text search | | ImageGallery | Main image + thumbnails with lightbox | | AmenitiesList | Categorized amenity icons with show all/less toggle |
+
+
+Booking Components: | Component | Purpose | |-----------|---------| | DatePicker | Dual-month calendar with blocked date visualization | | GuestSelector | Adults/children/infants counter with dropdown | | PriceBreakdown | Detailed pricing with fees and total | | BookingCard | Complete booking sidebar with date picker, guests, pricing, and payment modal | | BookingPaymentModal | Payment-first modal with bank details, transaction number validation, countdown timer |
+
+
+Payment Components: | Component | Purpose | |-----------|---------| | PaymentForm | Payment method selection with bank/Telebirr details | | PaymentProof | Image upload for payment receipts with preview |
+
+
+Review Components: | Component | Purpose | |-----------|---------| | ReviewCard | Individual review with five-category rating bars | | ReviewForm | Five-category star rating form with text review |
+5.5 Custom Hooks
+Hook
+	File
+	Purpose
+	useAuth
+	hooks/useAuth.js
+	Authentication state management (user, login, logout, role checks)
+	useApi
+	hooks/useApi.js
+	Generic API call wrapper with loading/error/data states
+	useBookings
+	hooks/useBookings.js
+	Booking-specific API calls
+	useFavorites
+	hooks/useFavorites.js
+	Favorite-specific API calls
+	useListings
+	hooks/useListings.js
+	Listing-specific API calls
+	5.6 Library Modules
+Module
+	File
+	Exports
+	API Client
+	lib/api.js
+	api, apiClient, ApiError, storeTokens, clearTokens, getStoredUser
+	Auth Helpers
+	lib/auth.js
+	login, register, logout, getCurrentUser, isAuthenticated, redirectToDashboard
+	Constants
+	lib/constants.js
+	CITIES, PROPERTY_TYPES, LISTING_TYPES, ROUTES, CURRENCY_SYMBOL, etc.
+	5.7 CSS Design System
+File Structure:
+
+
+styles/
+
+
+├── main.css          # Master import (7 imports)
+
+
+├── variables.css     # CSS custom properties (~100 tokens)
+
+
+├── reset.css         # CSS reset/normalize
+
+
+├── utilities.css     # Flex, grid, text, spacing helpers
+
+
+├── components.css    # Buttons, inputs, modal, card, badge, skeleton, etc.
+
+
+├── layout.css        # Header, footer, sidebar, dashboard, listing grid
+
+
+├── pages.css         # Homepage, listing detail, auth, dashboard, reviews
+
+
+└── responsive.css    # Mobile-first breakpoints (480px, 768px, 1024px)
+
+
+Design Tokens:
+
+
+* Colors: Primary (#E41D56), Secondary (#222222), Accent (#00A699)
+* Typography: Circular font stack, 12px-48px scale
+* Spacing: 4px base unit (2px-80px range)
+* Shadows: 6 levels (xs through 2xl)
+* Border Radius: 6px-9999px
+* Transitions: Fast (150ms), Base (250ms), Slow (350ms), Spring (400ms)
+* Z-Index: Dropdown (100) through Loader (800)
+
+
+________________
+
+
+6. API REFERENCE
+6.1 Authentication Endpoints
+Method
+	Path
+	Auth
+	Body
+	Response
+	POST
+	/api/auth/register
+	No
+	{ email, password, firstName, lastName, phoneNumber? }
+	{ success, data: { user, tokens } }
+	POST
+	/api/auth/login
+	No
+	{ email, password }
+	{ success, data: { user, tokens } }
+	GET
+	/api/auth/me
+	Bearer Token
+	—
+	{ success, data: { user } }
+	POST
+	/api/auth/change-password
+	Bearer Token
+	{ currentPassword, newPassword, confirmPassword }
+	{ success, message }
+	6.2 Listing Endpoints
+Method
+	Path
+	Auth
+	Query/Body
+	Response
+	POST
+	/api/listings
+	host/admin
+	Listing object
+	{ success, data: { listing } }
+	GET
+	/api/listings
+	No
+	?page, limit, city, listingType, search
+	{ success, data: [...], pagination }
+	GET
+	/api/listings/:id
+	No
+	—
+	{ success, data: { listing } }
+	PUT
+	/api/listings/:id
+	host/admin
+	Update fields
+	{ success, data: { listing } }
+	DELETE
+	/api/listings/:id
+	host/admin
+	—
+	{ success, message }
+	GET
+	/api/listings/:id/blocked-dates
+	No
+	—
+	{ success, data: { blockedRanges, blockedDates } }
+	GET
+	/api/listings/:id/similar
+	No
+	?limit
+	{ success, data: [...], meta }
+	6.3 Booking Endpoints
+Method
+	Path
+	Auth
+	Body
+	Response
+	POST
+	/api/bookings
+	guest/admin
+	{ listingId, checkInDate, checkOutDate, guestCount, bookingType, paymentMethod, transactionNumber }
+	{ success, data: { booking, payment, pricing, paymentTimeout } }
+	GET
+	/api/bookings/guest
+	Bearer Token
+	?page, limit, status
+	{ success, data: [...], pagination }
+	GET
+	/api/bookings/host
+	host/admin
+	?page, limit, status
+	{ success, data: [...], pagination }
+	GET
+	/api/bookings/:id
+	Bearer Token
+	—
+	{ success, data: { booking } }
+	PATCH
+	/api/bookings/:id/status
+	Bearer Token
+	{ status, cancellationReason? }
+	{ success, data: { booking } }
+	6.4 Payment Endpoints
+Method
+	Path
+	Auth
+	Body
+	Response
+	POST
+	/api/payments/validate-transaction
+	Bearer Token
+	{ transactionNumber }
+	{ success, data: { valid, message } }
+	POST
+	/api/payments
+	guest/admin
+	{ bookingId, paymentMethod }
+	{ success, data: { payment, instructions } }
+	POST
+	/api/payments/:id/proof
+	guest/admin
+	{ proofImageUrl, notes? }
+	{ success, data: { payment } }
+	GET
+	/api/payments/:id
+	Bearer Token
+	—
+	{ success, data: { payment } }
+	PATCH
+	/api/admin/payments/:id/verify
+	admin
+	`{ action: 'verify'
+	'reject', reason? }`
+	GET
+	/api/admin/payments
+	admin
+	?page, limit, status, paymentMethod
+	{ success, data: [...], pagination }
+	6.5 Favorite Endpoints
+Method
+	Path
+	Auth
+	Response
+	POST
+	/api/favorites/:listingId
+	Bearer Token
+	{ success, data: { action } }
+	GET
+	/api/favorites
+	Bearer Token
+	{ success, data: [...], pagination }
+	6.6 Notification Endpoints
+Method
+	Path
+	Auth
+	Response
+	GET
+	/api/notifications
+	Bearer Token
+	{ success, data: { notifications, unreadCount } }
+	PATCH
+	/api/notifications/:id/read
+	Bearer Token
+	{ success, message }
+	PATCH
+	/api/notifications/read-all
+	Bearer Token
+	{ success, message }
+	6.7 Admin Endpoints
+Method
+	Path
+	Auth
+	Body/Query
+	Response
+	GET
+	/api/admin/dashboard
+	admin
+	—
+	{ success, data: { users, listings, bookings, revenue, payments, withdrawals } }
+	GET
+	/api/admin/users
+	admin
+	?page, limit, search, role
+	{ success, data: [...], pagination }
+	PATCH
+	/api/admin/users/:id/toggle-status
+	admin
+	{ isActive }
+	{ success, data: { user } }
+	GET
+	/api/admin/listings/pending
+	admin
+	?page, limit
+	{ success, data: [...], pagination }
+	PATCH
+	/api/admin/listings/:id/moderate
+	admin
+	{ action, notes? }
+	{ success, data: { listing } }
+	DELETE
+	/api/admin/listings/:id
+	admin
+	—
+	{ success, message }
+	GET
+	/api/admin/payments
+	admin
+	?page, limit, status
+	{ success, data: [...], pagination }
+	PATCH
+	/api/admin/payments/:id/verify
+	admin
+	{ action }
+	{ success, data: { payment } }
+	GET
+	/api/admin/withdrawals
+	admin
+	?page, limit, status
+	{ success, data: [...], pagination }
+	PATCH
+	/api/admin/withdrawals/:id/process
+	admin
+	{ action, transactionReference?, notes? }
+	{ success, data: { withdrawal } }
+	6.8 Withdrawal Endpoints
+Method
+	Path
+	Auth
+	Body
+	Response
+	POST
+	/api/withdrawals
+	host/admin
+	{ amount, method, bankName, accountNumber, accountHolder }
+	{ success, data: { withdrawal } }
+	GET
+	/api/withdrawals
+	host/admin
+	?page, limit
+	{ success, data: [...], pagination }
+	
+
+________________
+
+
+7. DATABASE DOCUMENTATION
+7.1 Tables (Complete Schema)
+users
+
+
+CREATE TABLE users (
+
+
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+
+    email VARCHAR(255) UNIQUE,
+
+
+    phone_number VARCHAR(20) UNIQUE,
+
+
+    password_hash VARCHAR(255) NOT NULL,
+
+
+    first_name VARCHAR(100) NOT NULL,
+
+
+    last_name VARCHAR(100) NOT NULL,
+
+
+    profile_image_url TEXT,
+
+
+    role VARCHAR(20) NOT NULL DEFAULT 'guest' CHECK (role IN ('guest', 'host', 'admin')),
+
+
+    is_verified BOOLEAN NOT NULL DEFAULT false,
+
+
+    is_active BOOLEAN NOT NULL DEFAULT true,
+
+
+    email_verified_at TIMESTAMPTZ,
+
+
+    phone_verified_at TIMESTAMPTZ,
+
+
+    last_login_at TIMESTAMPTZ,
+
+
+    login_attempts INTEGER NOT NULL DEFAULT 0,
+
+
+    locked_until TIMESTAMPTZ,
+
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+
+);
+
+
+listings
+
+
+CREATE TABLE listings (
+
+
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+
+    host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+
+    title VARCHAR(255) NOT NULL,
+
+
+    description TEXT NOT NULL,
+
+
+    listing_type VARCHAR(20) NOT NULL CHECK (listing_type IN ('short_term', 'long_term', 'both')),
+
+
+    property_type VARCHAR(50) NOT NULL CHECK (property_type IN ('apartment', 'house', 'villa', 'condo', 'guest_house', 'shared_room', 'serviced_apartment')),
+
+
+    bedrooms INTEGER NOT NULL DEFAULT 1,
+
+
+    bathrooms INTEGER NOT NULL DEFAULT 1,
+
+
+    max_guests INTEGER NOT NULL DEFAULT 1,
+
+
+    beds_count INTEGER NOT NULL DEFAULT 1,
+
+
+    price_per_night DECIMAL(10, 2),
+
+
+    price_per_month DECIMAL(12, 2),
+
+
+    cleaning_fee DECIMAL(10, 2) DEFAULT 0,
+
+
+    security_deposit DECIMAL(10, 2) DEFAULT 0,
+
+
+    street_address VARCHAR(500) NOT NULL,
+
+
+    city VARCHAR(100) NOT NULL,
+
+
+    subcity VARCHAR(100),
+
+
+    latitude DECIMAL(10, 7),
+
+
+    longitude DECIMAL(10, 7),
+
+
+    is_active BOOLEAN NOT NULL DEFAULT true,
+
+
+    is_approved BOOLEAN NOT NULL DEFAULT false,
+
+
+    instant_book BOOLEAN NOT NULL DEFAULT false,
+
+
+    min_nights INTEGER NOT NULL DEFAULT 1,
+
+
+    max_nights INTEGER,
+
+
+    check_in_time VARCHAR(5) DEFAULT '14:00',
+
+
+    check_out_time VARCHAR(5) DEFAULT '11:00',
+
+
+    house_rules TEXT,
+
+
+    cancellation_policy VARCHAR(20) NOT NULL DEFAULT 'flexible',
+
+
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+
+
+    view_count INTEGER NOT NULL DEFAULT 0,
+
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+
+);
+
+
+bookings
+
+
+CREATE TABLE bookings (
+
+
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+
+    listing_id UUID NOT NULL REFERENCES listings(id),
+
+
+    guest_id UUID NOT NULL REFERENCES users(id),
+
+
+    host_id UUID NOT NULL REFERENCES users(id),
+
+
+    booking_type VARCHAR(20) NOT NULL CHECK (booking_type IN ('short_term', 'long_term')),
+
+
+    check_in_date DATE NOT NULL,
+
+
+    check_out_date DATE NOT NULL,
+
+
+    guest_count INTEGER NOT NULL DEFAULT 1,
+
+
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed', 'rejected', 'expired')),
+
+
+    base_amount DECIMAL(12, 2) NOT NULL,
+
+
+    cleaning_fee DECIMAL(10, 2) DEFAULT 0,
+
+
+    service_fee DECIMAL(10, 2) DEFAULT 0,
+
+
+    security_deposit DECIMAL(10, 2) DEFAULT 0,
+
+
+    total_amount DECIMAL(12, 2) NOT NULL,
+
+
+    cancellation_reason TEXT,
+
+
+    cancelled_by UUID REFERENCES users(id),
+
+
+    cancelled_at TIMESTAMPTZ,
+
+
+    confirmed_at TIMESTAMPTZ,
+
+
+    completed_at TIMESTAMPTZ,
+
+
+    special_requests TEXT,
+
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    CONSTRAINT valid_dates CHECK (check_out_date > check_in_date)
+
+
+);
+
+
+payments
+
+
+CREATE TABLE payments (
+
+
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+
+    booking_id UUID NOT NULL UNIQUE REFERENCES bookings(id),
+
+
+    user_id UUID NOT NULL REFERENCES users(id),
+
+
+    amount DECIMAL(12, 2) NOT NULL,
+
+
+    currency VARCHAR(3) NOT NULL DEFAULT 'ETB',
+
+
+    payment_method VARCHAR(30) NOT NULL CHECK (payment_method IN ('bank_transfer', 'telebirr', 'cash', 'other')),
+
+
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled')),
+
+
+    transaction_reference VARCHAR(255),
+
+
+    proof_image_url TEXT,
+
+
+    proof_notes TEXT,
+
+
+    verified_by UUID REFERENCES users(id),
+
+
+    verified_at TIMESTAMPTZ,
+
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+
+);
+7.2 Indexes (27 Total)
+* idx_users_email — Fast email lookups for login
+* idx_users_role — Filter users by role
+* idx_listings_host — Get all listings for a host
+* idx_listings_city — Filter listings by city
+* idx_listings_active_approved — Only show active and approved listings
+* idx_bookings_listing — Get all bookings for a listing
+* idx_bookings_guest — Get all bookings for a guest
+* idx_bookings_dates — Check date conflicts
+* idx_bookings_status — Filter bookings by status
+* idx_payments_booking — Get payment for a booking
+* idx_payments_status — Filter payments by status
+* idx_reviews_listing — Get all reviews for a listing
+* idx_favorites_user — Get all favorites for a user
+* idx_notifications_user — Get notifications for a user
+* Plus 13 more indexes for messages, withdrawals, audit logs, etc.
+7.3 Triggers
+Trigger
+	Table
+	Purpose
+	trg_*_updated_at
+	All tables with updated_at
+	Auto-updates updated_at timestamp on row update
+	trg_reviews_overall
+	reviews
+	Auto-calculates rating_overall from 5 category ratings
+	7.4 Relationships
+users 1───┬───M listings (host_id)
+
+
+           │
+
+
+           ├───M bookings (guest_id)
+
+
+           │
+
+
+           ├───M bookings (host_id)
+
+
+           │
+
+
+           ├───M reviews (reviewer_id)
+
+
+           │
+
+
+           ├───M favorites
+
+
+           │
+
+
+           ├───M notifications
+
+
+           │
+
+
+           ├───M payments
+
+
+           │
+
+
+           └───M withdrawals
+
+
+listings 1───M bookings
+
+
+listings 1───M listing_images
+
+
+listings 1───M listing_amenities
+
+
+listings 1───M listing_availability
+
+
+listings 1───M reviews
+
+
+listings 1───M favorites
+
+
+bookings 1───1 payments
+
+
+bookings 1───1 reviews
+
+
+________________
+
+
+8. DEPLOYMENT GUIDE
+8.1 Vercel Deployment
+1. Push code to GitHub repository
+2. Connect repository to Vercel
+3. Set Root Directory to frontend
+4. Set Framework to Next.js
+5. Add Environment Variables:
+   * DATABASE_URL — Neon PostgreSQL connection string
+   * JWT_SECRET — Secret for JWT signing
+   * JWT_REFRESH_SECRET — Secret for refresh tokens
+   * NODE_ENV — Set to production
+6. Deploy
+8.2 Neon Database Setup
+1. Create a Neon project
+2. Copy the connection string
+3. Add IP 0.0.0.0/0 to allowlist (for Vercel's dynamic IPs)
+4. Run npm run setup locally to create tables, or execute schema.sql directly in Neon's SQL editor
+8.3 Local Development
+# Clone repository
+
+
+git clone https://github.com/Atnatewos/roostay.git
+
+
+cd roostay
+
+
+# Install dependencies
+
+
+npm install
+
+
+cd frontend && npm install && cd ..
+
+
+# Create .env file
+
+
+cp .env.example .env
+
+
+# Edit .env with your DATABASE_URL and JWT secrets
+
+
+# Run database setup
+
+
+npm run setup
+
+
+# Start development server
+
+
+cd frontend && npx next dev -p 3000
+8.4 Environment Variables
+Variable
+	Required
+	Default
+	Purpose
+	DATABASE_URL
+	Yes
+	—
+	PostgreSQL connection string
+	JWT_SECRET
+	Yes
+	—
+	JWT signing secret
+	JWT_REFRESH_SECRET
+	Yes
+	—
+	Refresh token secret
+	JWT_EXPIRES_IN
+	No
+	30m
+	Access token expiry
+	JWT_REFRESH_EXPIRES_IN
+	No
+	7d
+	Refresh token expiry
+	APP_NAME
+	No
+	ROOSTAY
+	Application name
+	NODE_ENV
+	No
+	development
+	Environment
+	PAYMENT_TIMEOUT_MINUTES
+	No
+	30
+	Payment countdown duration
+	REQUIRE_TRANSACTION_NUMBER
+	No
+	true
+	Require transaction number for bookings
+	PREVENT_DUPLICATE_TRANSACTIONS
+	No
+	true
+	Block reused transaction numbers
+	BANK_NAME
+	No
+	Commercial Bank of Ethiopia
+	Bank name for transfers
+	BANK_ACCOUNT_NUMBER
+	No
+	—
+	Bank account number
+	BANK_ACCOUNT_HOLDER
+	No
+	ROOSTAY PLC
+	Account holder name
+	CORS_ORIGIN
+	No
+	http://localhost:3000
+	Allowed CORS origin
+	
+
+________________
+
+
+9. TESTING GUIDE
+9.1 API Test Suite
+# Start the development server
+
+
+cd frontend && npx next dev -p 3000
+
+
+# In another terminal, run the test suite
+
+
+cd ~/roostay
+
+
+node scripts/test-all.js
+9.2 Test Categories
+Category
+	Tests
+	Expected Results
+	Health & Public
+	Health check, public listings
+	200 OK, listings returned
+	Authentication
+	Register, login, get profile, invalid login
+	201/200 for valid, 401 for invalid
+	Listings
+	Create, search, get by ID
+	201/200, filtered results
+	Bookings
+	Create booking, get bookings
+	201/200, conflict detection
+	Favorites & Reviews
+	Toggle favorite, get favorites
+	200 OK
+	Payments & Withdrawals
+	Create payment, request withdrawal
+	201/200 or 403 for wrong role
+	Edge Cases
+	Unauthenticated, 404, admin access as guest
+	401, 404, 403 as expected
+	9.3 Database Connection Test
+node scripts/test-connection.js
+
+
+________________
+
+
+10. MAINTENANCE & DEBUGGING
+10.1 Common Issues & Solutions
+Issue
+	Cause
+	Solution
+	password authentication failed
+	Neon password rotated or database paused
+	Reset password in Neon dashboard, update DATABASE_URL
+	path-to-regexp error on wildcard route
+	Express router dependency updated to v8
+	Use app.all(/.*/, ...) instead of app.all('*', ...)
+	Route conflicts ((guest)/dashboard and (host)/dashboard)
+	Route groups don't add path segments
+	Move pages to unique paths like /guest/dashboard and /host/dashboard
+	asyncHandler is not a function
+	Module exports function directly but consumer destructures
+	Export as module.exports = { asyncHandler }
+	useApi is not a function
+	CJS require vs ESM default export mismatch
+	Use import/export syntax in .jsx files
+	Slow queries on listings search
+	Missing indexes or large dataset
+	Add indexes, paginate results, optimize WHERE clauses
+	Booking foreign key error
+	Guest user doesn't exist in database
+	Ensure user is registered and logged in before booking
+	Vercel build fails with Module not found: express
+	Vercel root set to frontend but deps in root
+	Add all backend deps to frontend/package.json
+	10.2 Logging
+The API uses structured logging with levels:
+
+
+* DEBUG: Request details, authentication status
+* INFO: User actions (register, login, booking created)
+* WARN: Authentication failures, authorization denials
+* ERROR: Unhandled errors, database failures
+
+
+In production (NODE_ENV=production), only ERROR and WARN are shown.
+10.3 Database Migrations
+# Reset database (drops all tables and recreates)
+
+
+npm run setup
+
+
+# Seed with test data
+
+
+npm run seed
+10.4 Making a User Admin
+node -e "
+
+
+require('dotenv').config();
+
+
+const { Pool } = require('pg');
+
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+
+async function makeAdmin() {
+
+
+  const result = await pool.query('UPDATE users SET role = \$1 WHERE email = \$2 RETURNING id, email, role', ['admin', 'YOUR_EMAIL_HERE']);
+
+
+  console.log(result.rows[0] ? 'Admin access granted to: ' + result.rows[0].email : 'User not found');
+
+
+  await pool.end();
+
+
+}
+
+
+makeAdmin();
+
+
+"
+
+
+________________
+
+
+11. FUTURE ROADMAP
+11.1 High Priority
+* Email notifications for booking confirmations
+* SMS notifications via Telebirr API
+* Image upload to Cloudinary for listing photos
+* Payment proof image upload
+* Real-time messaging between guests and hosts
+* Booking cancellation with refund calculation
+* Automated booking expiry after payment timeout
+11.2 Medium Priority
+* Map integration (OpenStreetMap/Google Maps) for listing locations
+* Advanced search with amenity filtering
+* Wishlist sharing
+* Host verification badges
+* Seasonal pricing (weekend/holiday rates)
+* Multi-language support (Amharic)
+* Currency conversion
+11.3 Low Priority
+* Mobile app (React Native)
+* Affiliate/referral program
+* Integration with Ethiopian payment gateways (Chapa, ArifPay)
+* AI-powered listing recommendations
+* Dynamic pricing suggestions based on demand
+* Fraud detection system
+* Automated tax invoice generation
+
+
+________________
+
+
+
+
+END OF DOCUMENTATION
+
+
+________________
+
+
+
+
+ROOSTAY — Built with passion for Ethiopia. May this platform connect travelers with wonderful stays across the country.
+
+
+****************************************************************
+****************************************************************
+
+// frontend/pages/api/[...path].js
+// Complete ROOSTAY API handler for Vercel serverless deployment
+// Handles all API routes: auth, listings, bookings, payments, admin, etc.
+// Uses native PostgreSQL driver with parameterized queries
+// Author: Theron
+
+const express = require('express');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const Joi = require('joi');
+
+// ============================================================================
+// CONFIGURATION
+// All values read from environment variables — zero hardcoded values
+// Each config section maps to a specific domain of the application
+// ============================================================================
+const CONFIG = {
+  app: {
+    name: process.env.APP_NAME || 'ROOSTAY',
+    env: process.env.NODE_ENV || 'production',
+    debug: process.env.NODE_ENV !== 'production',
+  },
+  database: {
+    url: process.env.DATABASE_URL,
+    maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
+  },
+  auth: {
+    jwtSecret: process.env.JWT_SECRET || 'roostay-prod-secret-change-me',
+    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'roostay-refresh-secret-change-me',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30m',
+    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    bcryptSaltRounds: 12,
+    tokenType: 'Bearer',
+    passwordMinLength: 8,
+    maxLoginAttempts: 5,
+    lockoutDurationMinutes: 30,
+  },
+  features: {
+    registrationEnabled: true,
+    listingApprovalRequired: false,
+    paginationDefaultLimit: 12,
+    paginationMaxLimit: 50,
+    paymentTimeoutMinutes: parseInt(process.env.PAYMENT_TIMEOUT_MINUTES || '30', 10),
+    requireTransactionNumber: process.env.REQUIRE_TRANSACTION_NUMBER !== 'false',
+    preventDuplicateTransactions: process.env.PREVENT_DUPLICATE_TRANSACTIONS !== 'false',
+  },
+  payment: {
+    serviceFeePercent: 5,
+    serviceFeeMin: 100,
+    serviceFeeMax: 5000,
+  },
+};
+
+// ============================================================================
+// DATABASE POOL
+// Manages PostgreSQL connection pool for serverless environment
+// Creates a singleton pool instance with SSL for Neon compatibility
+// ============================================================================
+let pool = null;
+
+/**
+ * Returns the singleton database pool instance.
+ * Creates the pool on first call with configuration from CONFIG.database.
+ *
+ * @returns {Pool} PostgreSQL connection pool
+ */
+function getPool() {
+  if (!pool) {
+    if (!CONFIG.database.url) {
+      console.error('DATABASE_URL not set — database operations will fail');
+    }
+    pool = new Pool({
+      connectionString: CONFIG.database.url,
+      max: CONFIG.database.maxConnections,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 15000,
+      ssl: { rejectUnauthorized: false },
+    });
+  }
+  return pool;
+}
+
+/**
+ * Executes a parameterized SQL query with automatic client management.
+ * All database operations must use this function to prevent SQL injection.
+ *
+ * @param {string} text  - SQL query with $1, $2 parameter placeholders
+ * @param {Array}  params - Array of parameter values
+ * @returns {Promise<Object>} Query result object with rows and rowCount
+ */
+async function query(text, params = []) {
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(text, params);
+    return result;
+  } catch (error) {
+    console.error('Query error:', error.message);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Executes a query and returns only the first row.
+ * Returns null when no rows match the query.
+ *
+ * @param {string} text  - SQL query
+ * @param {Array}  params - Parameter values
+ * @returns {Promise<Object|null>} First row or null
+ */
+async function queryOne(text, params = []) {
+  const result = await query(text, params);
+  return result.rows[0] || null;
+}
+
+// ============================================================================
+// UTILITY CLASSES & FUNCTIONS
+// Custom error class and helper functions used throughout the API
+// ============================================================================
+
+/**
+ * Application error class with HTTP status code and machine-readable error code.
+ * Marked as operational to distinguish from programming errors in error handling.
+ */
+class AppError extends Error {
+  constructor(message, statusCode = 500, errorCode = 'APP_ERROR') {
+    super(message);
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+    this.isOperational = true;
+  }
+}
+
+/**
+ * Wraps an async Express route handler to catch errors automatically.
+ * Eliminates the need for try-catch blocks in every route handler.
+ *
+ * @param {Function} fn - Async route handler function
+ * @returns {Function} Wrapped handler that forwards errors to Express error middleware
+ */
+function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+/**
+ * Generates both access and refresh JWT tokens for an authenticated user.
+ * Access tokens are short-lived; refresh tokens allow silent renewal.
+ *
+ * @param {Object} user - User object with id, email, and role properties
+ * @returns {Object} Token pair with accessToken, refreshToken, and metadata
+ */
+function generateTokens(user) {
+  const accessToken = jwt.sign(
+    { sub: user.id, email: user.email, role: user.role, type: 'access' },
+    CONFIG.auth.jwtSecret,
+    { expiresIn: CONFIG.auth.jwtExpiresIn }
+  );
+  const refreshToken = jwt.sign(
+    { sub: user.id, type: 'refresh' },
+    CONFIG.auth.jwtRefreshSecret,
+    { expiresIn: CONFIG.auth.jwtRefreshExpiresIn }
+  );
+  return {
+    accessToken,
+    refreshToken,
+    tokenType: CONFIG.auth.tokenType,
+    expiresIn: CONFIG.auth.jwtExpiresIn,
+  };
+}
+
+/**
+ * Authentication middleware — verifies the JWT access token from the Authorization header.
+ * Attaches decoded user information to req.user on success.
+ */
+function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next(new AppError('Authentication required.', 401, 'AUTH_ERROR'));
+  }
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, CONFIG.auth.jwtSecret);
+    if (decoded.type !== 'access') {
+      return next(new AppError('Invalid token type.', 401, 'AUTH_ERROR'));
+    }
+    req.user = { id: decoded.sub, email: decoded.email, role: decoded.role };
+    next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return next(new AppError('Token expired.', 401, 'TOKEN_EXPIRED'));
+    }
+    return next(new AppError('Invalid token.', 401, 'AUTH_ERROR'));
+  }
+}
+
+/**
+ * Authorization middleware factory — restricts access to specified roles.
+ * Must be used after the authenticate middleware.
+ *
+ * @param {...string} roles - Allowed roles (guest, host, admin)
+ * @returns {Function} Express middleware
+ */
+function authorize(...roles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(new AppError('Authentication required.', 401, 'AUTH_ERROR'));
+    }
+    if (!roles.includes(req.user.role)) {
+      return next(new AppError(`Access denied. Required: ${roles.join(' or ')}.`, 403, 'FORBIDDEN'));
+    }
+    next();
+  };
+}
+
+/**
+ * Request body validation middleware factory.
+ * Validates req.body against a Joi schema and strips unknown fields.
+ *
+ * @param {Joi.Schema} schema - Joi validation schema
+ * @returns {Function} Express middleware
+ */
+function validateBody(schema) {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error) {
+      const details = {};
+      error.details.forEach((d) => {
+        details[d.path.join('.')] = d.message;
+      });
+      return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR'));
+    }
+    req.body = value;
+    next();
+  };
+}
+
+// ============================================================================
+// VALIDATION SCHEMAS
+// Joi schemas for validating incoming request bodies
+// Enforces data integrity and provides clear error messages
+// ============================================================================
+const schemas = {
+  register: Joi.object({
+    email: Joi.string().email().max(255).required(),
+    password: Joi.string()
+      .min(8)
+      .max(128)
+      .pattern(/[a-z]/)
+      .pattern(/[A-Z]/)
+      .pattern(/[0-9]/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Password must contain uppercase, lowercase, and number.',
+      }),
+    firstName: Joi.string().trim().min(1).max(100).required(),
+    lastName: Joi.string().trim().min(1).max(100).required(),
+    phoneNumber: Joi.string()
+      .pattern(/^(\+251|0)[9]\d{8}$/)
+      .optional()
+      .allow(null, ''),
+  }),
+
+  login: Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required(),
+  }),
+
+  createListing: Joi.object({
+    title: Joi.string().trim().min(5).max(255).required(),
+    description: Joi.string().trim().min(20).max(5000).required(),
+    listingType: Joi.string().valid('short_term', 'long_term', 'both').required(),
+    propertyType: Joi.string()
+      .valid('apartment', 'house', 'villa', 'condo', 'guest_house', 'shared_room', 'serviced_apartment')
+      .required(),
+    bedrooms: Joi.number().integer().min(0).max(50).default(1),
+    bathrooms: Joi.number().integer().min(1).max(50).default(1),
+    maxGuests: Joi.number().integer().min(1).max(100).default(1),
+    bedsCount: Joi.number().integer().min(1).max(100).default(1),
+    pricePerNight: Joi.number().positive().precision(2).optional().allow(null),
+    pricePerMonth: Joi.number().positive().precision(2).optional().allow(null),
+    cleaningFee: Joi.number().min(0).precision(2).default(0),
+    securityDeposit: Joi.number().min(0).precision(2).default(0),
+    streetAddress: Joi.string().trim().min(5).max(500).required(),
+    city: Joi.string().trim().min(2).max(100).required(),
+    subcity: Joi.string().trim().max(100).optional().allow(null, ''),
+    amenities: Joi.array()
+      .items(
+        Joi.object({
+          name: Joi.string().required(),
+          category: Joi.string().optional(),
+          iconName: Joi.string().optional(),
+        })
+      )
+      .max(50)
+      .optional(),
+    instantBook: Joi.boolean().default(false),
+    minNights: Joi.number().integer().min(1).default(1),
+    cancellationPolicy: Joi.string().valid('flexible', 'moderate', 'strict').default('flexible'),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Booking with payment schema
+  // Validates booking creation with mandatory transaction number
+  // The transactionNumber field is required when config demands it
+  // ------------------------------------------------------------------------
+  createBookingWithPayment: Joi.object({
+    listingId: Joi.string().guid({ version: 'uuidv4' }).required(),
+    checkInDate: Joi.date().iso().greater('now').required(),
+    checkOutDate: Joi.date().iso().greater(Joi.ref('checkInDate')).required(),
+    guestCount: Joi.number().integer().min(1).max(100).default(1),
+    bookingType: Joi.string().valid('short_term', 'long_term').required(),
+    specialRequests: Joi.string().max(2000).optional().allow(null, ''),
+    paymentMethod: Joi.string().valid('bank_transfer', 'telebirr').required(),
+    transactionNumber: Joi.string().trim().min(3).max(100).required().messages({
+      'string.min': 'Transaction number is required.',
+      'any.required': 'Transaction number is required.',
+    }),
+    proofNotes: Joi.string().max(500).optional().allow(null, ''),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Transaction validation schema
+  // Used to check if a transaction number has already been used
+  // ------------------------------------------------------------------------
+  validateTransaction: Joi.object({
+    transactionNumber: Joi.string().trim().min(3).max(100).required(),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Booking status update schema
+  // ------------------------------------------------------------------------
+  updateBookingStatus: Joi.object({
+    status: Joi.string().valid('confirmed', 'cancelled', 'completed', 'rejected', 'expired').required(),
+    cancellationReason: Joi.string().max(1000).optional().allow(null, ''),
+  }),
+};
+
+// ============================================================================
+// CONTROLLERS
+// Route handler functions organized by resource domain
+// Each controller method is wrapped with asyncHandler for error propagation
+// ============================================================================
+
+// --------------------------------------------------------------------------
+// Auth Controller — registration, login, profile retrieval
+// --------------------------------------------------------------------------
+const authController = {
+  /**
+   * POST /api/auth/register
+   * Creates a new user account with hashed password and returns JWT tokens.
+   */
+  register: asyncHandler(async (req, res) => {
+    const { email, password, firstName, lastName, phoneNumber } = req.body;
+
+    const existing = await queryOne('SELECT id FROM users WHERE email = $1', [
+      email.toLowerCase().trim(),
+    ]);
+    if (existing) {
+      throw new AppError('An account with this email already exists.', 409, 'CONFLICT');
+    }
+
+    const hash = await bcrypt.hash(password, CONFIG.auth.bcryptSaltRounds);
+    const user = await queryOne(
+      `INSERT INTO users (email, phone_number, password_hash, first_name, last_name, role)
+       VALUES ($1, $2, $3, $4, $5, 'guest')
+       RETURNING id, email, phone_number, first_name, last_name, role, is_verified, created_at`,
+      [email.toLowerCase().trim(), phoneNumber || null, hash, firstName.trim(), lastName.trim()]
+    );
+
+    const tokens = generateTokens(user);
+    res.status(201).json({
+      success: true,
+      message: 'Account created.',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isVerified: user.is_verified,
+        },
+        tokens,
+      },
+    });
+  }),
+
+  /**
+   * POST /api/auth/login
+   * Authenticates user with email and password.
+   * Implements account lockout after repeated failed attempts.
+   */
+  login: asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+
+    const user = await queryOne(
+      `SELECT id, email, password_hash, first_name, last_name, role,
+              is_verified, is_active, login_attempts, locked_until
+       FROM users WHERE email = $1`,
+      [email.toLowerCase().trim()]
+    );
+
+    if (!user) throw new AppError('Invalid email or password.', 401, 'AUTH_ERROR');
+    if (!user.is_active) throw new AppError('Account deactivated.', 401, 'AUTH_ERROR');
+
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      throw new AppError('Account temporarily locked.', 401, 'AUTH_ERROR');
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      const attempts = (user.login_attempts || 0) + 1;
+      if (attempts >= CONFIG.auth.maxLoginAttempts) {
+        const lockUntil = new Date(Date.now() + CONFIG.auth.lockoutDurationMinutes * 60000);
+        await query('UPDATE users SET login_attempts = $1, locked_until = $2 WHERE id = $3', [
+          attempts, lockUntil, user.id,
+        ]);
+        throw new AppError('Account locked after too many failed attempts.', 401, 'AUTH_ERROR');
+      }
+      await query('UPDATE users SET login_attempts = $1 WHERE id = $2', [attempts, user.id]);
+      throw new AppError('Invalid email or password.', 401, 'AUTH_ERROR');
+    }
+
+    await query(
+      'UPDATE users SET login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = $1',
+      [user.id]
+    );
+
+    const tokens = generateTokens(user);
+    res.json({
+      success: true,
+      message: 'Logged in.',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isVerified: user.is_verified,
+        },
+        tokens,
+      },
+    });
+  }),
+
+  /**
+   * GET /api/auth/me
+   * Returns the authenticated user's profile information.
+   */
+  getMe: asyncHandler(async (req, res) => {
+    const user = await queryOne(
+      `SELECT id, email, phone_number, first_name, last_name, profile_image_url, role, is_verified
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          phoneNumber: user.phone_number,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          profileImageUrl: user.profile_image_url,
+          role: user.role,
+          isVerified: user.is_verified,
+        },
+      },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Listing Controller — property CRUD and search
+// --------------------------------------------------------------------------
+const listingController = {
+  /**
+   * POST /api/listings
+   * Creates a new property listing for the authenticated host.
+   */
+  createListing: asyncHandler(async (req, res) => {
+    const d = req.body;
+    const listing = await queryOne(
+      `INSERT INTO listings (
+        host_id, title, description, listing_type, property_type,
+        bedrooms, bathrooms, max_guests, beds_count,
+        price_per_night, price_per_month, cleaning_fee, security_deposit,
+        street_address, city, subcity,
+        is_active, is_approved, approval_status,
+        instant_book, min_nights, cancellation_policy
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,$17,$18,$19,$20,$21)
+      RETURNING *`,
+      [
+        req.user.id, d.title, d.description, d.listingType, d.propertyType,
+        d.bedrooms, d.bathrooms, d.maxGuests, d.bedsCount,
+        d.pricePerNight || null, d.pricePerMonth || null,
+        d.cleaningFee || 0, d.securityDeposit || 0,
+        d.streetAddress, d.city, d.subcity || null,
+        true, 'approved',
+        d.instantBook || false, d.minNights || 1,
+        d.cancellationPolicy || 'flexible',
+      ]
+    );
+
+    if (d.amenities && d.amenities.length > 0) {
+      for (const a of d.amenities) {
+        await query(
+          `INSERT INTO listing_amenities (listing_id, amenity_name, category, icon_name)
+           VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+          [listing.id, a.name, a.category || null, a.iconName || null]
+        );
+      }
+    }
+
+    res.status(201).json({ success: true, message: 'Listing created.', data: { listing } });
+  }),
+
+  /**
+   * GET /api/listings
+   * Searches and filters property listings with pagination.
+   */
+  searchListings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(
+      parseInt(req.query.limit) || CONFIG.features.paginationDefaultLimit,
+      CONFIG.features.paginationMaxLimit
+    );
+    const offset = (page - 1) * limit;
+
+    let where = 'WHERE l.is_active = true AND l.is_approved = true';
+    const params = [];
+    let p = 1;
+
+    if (req.query.city) {
+      where += ` AND l.city ILIKE $${p}`;
+      params.push(`%${req.query.city}%`);
+      p++;
+    }
+    if (req.query.listingType) {
+      where += ` AND (l.listing_type = $${p} OR l.listing_type = 'both')`;
+      params.push(req.query.listingType);
+      p++;
+    }
+    if (req.query.search) {
+      where += ` AND (l.title ILIKE $${p} OR l.description ILIKE $${p})`;
+      params.push(`%${req.query.search}%`);
+      p++;
+    }
+
+    const count = await queryOne(`SELECT COUNT(*) as total FROM listings l ${where}`, params);
+    params.push(limit, offset);
+
+    const listings = await query(
+      `SELECT l.id, l.title, l.listing_type, l.property_type,
+              l.bedrooms, l.bathrooms, l.max_guests,
+              l.price_per_night, l.price_per_month,
+              l.street_address, l.city, l.subcity,
+              l.instant_book, l.created_at,
+              u.first_name as host_first_name, u.last_name as host_last_name
+       FROM listings l JOIN users u ON l.host_id = u.id
+       ${where} ORDER BY l.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+
+    const listingIds = listings.rows.map((l) => l.id);
+    let primaryImages = {};
+    if (listingIds.length > 0) {
+      const imgs = await query(
+        `SELECT listing_id, image_url FROM listing_images
+         WHERE listing_id = ANY($1::uuid[]) AND is_primary = true`,
+        [listingIds]
+      );
+      imgs.rows.forEach((img) => { primaryImages[img.listing_id] = img.image_url; });
+    }
+
+    res.json({
+      success: true,
+      data: listings.rows.map((l) => ({
+        id: l.id,
+        title: l.title,
+        listingType: l.listing_type,
+        propertyType: l.property_type,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        maxGuests: l.max_guests,
+        pricePerNight: l.price_per_night,
+        pricePerMonth: l.price_per_month,
+        city: l.city,
+        subcity: l.subcity,
+        streetAddress: l.street_address,
+        host: { firstName: l.host_first_name, lastName: l.host_last_name },
+        primaryImage: primaryImages[l.id] || null,
+        instantBook: l.instant_book,
+        createdAt: l.created_at,
+      })),
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * GET /api/listings/:id
+   * Returns full listing details with host info, amenities, and images.
+   */
+  getListingById: asyncHandler(async (req, res) => {
+    const listing = await queryOne(
+      `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name,
+              u.profile_image_url as host_image_url
+       FROM listings l JOIN users u ON l.host_id = u.id WHERE l.id = $1`,
+      [req.params.id]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+
+    await query('UPDATE listings SET view_count = view_count + 1 WHERE id = $1', [req.params.id]);
+
+    const amenities = await query(
+      'SELECT amenity_name, category, icon_name FROM listing_amenities WHERE listing_id = $1',
+      [req.params.id]
+    );
+    const images = await query(
+      `SELECT id, image_url, thumbnail_url, alt_text, sort_order, is_primary
+       FROM listing_images WHERE listing_id = $1 ORDER BY sort_order`,
+      [req.params.id]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        listing: {
+          id: listing.id,
+          hostId: listing.host_id,
+          host: { firstName: listing.host_first_name, lastName: listing.host_last_name, imageUrl: listing.host_image_url },
+          title: listing.title,
+          description: listing.description,
+          listingType: listing.listing_type,
+          propertyType: listing.property_type,
+          bedrooms: listing.bedrooms,
+          bathrooms: listing.bathrooms,
+          maxGuests: listing.max_guests,
+          bedsCount: listing.beds_count,
+          pricePerNight: listing.price_per_night,
+          pricePerMonth: listing.price_per_month,
+          cleaningFee: listing.cleaning_fee,
+          securityDeposit: listing.security_deposit,
+          location: { streetAddress: listing.street_address, city: listing.city, subcity: listing.subcity },
+          instantBook: listing.instant_book,
+          minNights: listing.min_nights,
+          maxNights: listing.max_nights,
+          checkInTime: listing.check_in_time,
+          checkOutTime: listing.check_out_time,
+          houseRules: listing.house_rules,
+          cancellationPolicy: listing.cancellation_policy,
+          amenities: amenities.rows,
+          images: images.rows,
+          viewCount: listing.view_count,
+          isActive: listing.is_active,
+          createdAt: listing.created_at,
+        },
+      },
+    });
+  }),
+
+  // =========================================================================
+  // NEW: GET /api/listings/:id/blocked-dates
+  // Returns all blocked date ranges for a listing with status labels.
+  // Groups consecutive dates into ranges with status (booked/pending).
+  // Used by the DatePicker to show unavailable dates with context.
+  // =========================================================================
+  getBlockedDates: asyncHandler(async (req, res) => {
+    const listingId = req.params.id;
+
+    // Verify the listing exists and is active before querying blocked dates
+    const listing = await queryOne(
+      'SELECT id FROM listings WHERE id = $1 AND is_active = true',
+      [listingId]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+
+    // Generate a date series for the next 365 days and check each date
+    // against confirmed and pending bookings for this listing.
+    // Confirmed bookings = hard-blocked ("booked")
+    // Pending bookings   = soft-blocked ("pending" — may expire)
+    const blockedDates = await query(
+      `SELECT DISTINCT
+              d::date as date,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1 FROM bookings b
+                  WHERE b.listing_id = $1
+                    AND b.status = 'confirmed'
+                    AND d::date >= b.check_in_date
+                    AND d::date < b.check_out_date
+                ) THEN 'booked'
+                WHEN EXISTS (
+                  SELECT 1 FROM bookings b
+                  WHERE b.listing_id = $1
+                    AND b.status = 'pending'
+                    AND d::date >= b.check_in_date
+                    AND d::date < b.check_out_date
+                ) THEN 'pending'
+                ELSE 'available'
+              END as status
+       FROM generate_series(
+         CURRENT_DATE,
+         CURRENT_DATE + INTERVAL '365 days',
+         '1 day'::interval
+       ) AS d
+       WHERE EXISTS (
+         SELECT 1 FROM bookings b
+         WHERE b.listing_id = $1
+           AND b.status IN ('confirmed', 'pending')
+           AND d::date >= b.check_in_date
+           AND d::date < b.check_out_date
+       )
+       ORDER BY d::date`,
+      [listingId]
+    );
+
+    // Group consecutive dates with the same status into display-friendly ranges.
+    // Example: Three individual days become "July 14-16 (Booked)"
+    const ranges = [];
+    let currentRange = null;
+
+    for (const row of blockedDates.rows) {
+      const dateStr = new Date(row.date).toISOString().split('T')[0];
+
+      if (!currentRange) {
+        // Start the first range
+        currentRange = {
+          startDate: dateStr,
+          endDate: dateStr,
+          status: row.status,
+        };
+      } else if (
+        currentRange.status === row.status &&
+        new Date(row.date).getTime() - new Date(currentRange.endDate).getTime() === 86400000
+      ) {
+        // Extend the current range — this is a consecutive day with the same status
+        currentRange.endDate = dateStr;
+      } else {
+        // Different status or a gap in dates — save the current range and start a new one
+        ranges.push(currentRange);
+        currentRange = {
+          startDate: dateStr,
+          endDate: dateStr,
+          status: row.status,
+        };
+      }
+    }
+
+    // Push the final range if one was being built
+    if (currentRange) {
+      ranges.push(currentRange);
+    }
+
+    // Return both the grouped ranges (for display) and individual dates (for the calendar)
+    res.json({
+      success: true,
+      data: {
+        blockedRanges: ranges,
+        blockedDates: blockedDates.rows.map((r) => ({
+          date: new Date(r.date).toISOString().split('T')[0],
+          status: r.status,
+        })),
+      },
+    });
+  }),
+
+  // =========================================================================
+  // NEW: GET /api/listings/:id/similar
+  // Returns similar listings based on city, property type, and price range.
+  // Excludes the current listing from results.
+  // Used to suggest alternatives when a listing is fully booked.
+  // =========================================================================
+  getSimilarListings: asyncHandler(async (req, res) => {
+    const listingId = req.params.id;
+    const limit = Math.min(parseInt(req.query.limit) || 6, 20);
+
+    // Fetch the current listing to use as the similarity reference point
+    const currentListing = await queryOne(
+      `SELECT city, listing_type, property_type, price_per_night, price_per_month
+       FROM listings WHERE id = $1 AND is_active = true`,
+      [listingId]
+    );
+    if (!currentListing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+
+    // Determine the reference price for similarity matching.
+    // Uses price_per_night if available, otherwise falls back to price_per_month.
+    const refPrice = parseFloat(
+      currentListing.price_per_night || currentListing.price_per_month || 0
+    );
+
+    // Find similar listings matching these criteria (in priority order):
+    // 1. Same city
+    // 2. Price within ±50% of the reference price
+    // 3. Same property type gets priority (via ORDER BY CASE)
+    // 4. Exclude the current listing
+    const similar = await query(
+      `SELECT l.id, l.title, l.listing_type, l.property_type,
+              l.bedrooms, l.bathrooms, l.max_guests,
+              l.price_per_night, l.price_per_month,
+              l.city, l.subcity, l.street_address, l.instant_book,
+              (SELECT image_url FROM listing_images
+               WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
+       FROM listings l
+       WHERE l.id != $1
+         AND l.is_active = true
+         AND l.is_approved = true
+         AND l.city = $2
+         AND (
+           (l.price_per_night IS NOT NULL AND l.price_per_night BETWEEN $3 AND $4)
+           OR
+           (l.price_per_month IS NOT NULL AND l.price_per_month BETWEEN $5 AND $6)
+           OR
+           (l.listing_type = $7)
+         )
+       ORDER BY
+         CASE WHEN l.property_type = $8 THEN 0 ELSE 1 END,
+         RANDOM()
+       LIMIT $9`,
+      [
+        listingId,
+        currentListing.city,
+        refPrice * 0.5, refPrice * 1.5,   // price_per_night range (±50%)
+        refPrice * 0.5, refPrice * 1.5,   // price_per_month range (±50%)
+        currentListing.listing_type,
+        currentListing.property_type,
+        limit,
+      ]
+    );
+
+    // Return the similar listings along with metadata about what the similarity was based on
+    res.json({
+      success: true,
+      data: similar.rows.map((l) => ({
+        id: l.id,
+        title: l.title,
+        listingType: l.listing_type,
+        propertyType: l.property_type,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        maxGuests: l.max_guests,
+        pricePerNight: l.price_per_night,
+        pricePerMonth: l.price_per_month,
+        city: l.city,
+        subcity: l.subcity,
+        primaryImage: l.primary_image,
+        instantBook: l.instant_book,
+      })),
+      meta: {
+        basedOn: {
+          city: currentListing.city,
+          propertyType: currentListing.property_type,
+          priceRange: `${refPrice * 0.5} - ${refPrice * 1.5}`,
+        },
+      },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Booking Controller — reservation management with payment integration
+// --------------------------------------------------------------------------
+const bookingController = {
+
+  /**
+   * POST /api/bookings
+   * Creates a new booking with availability check, pricing calculation,
+   * and mandatory payment record with transaction number.
+   * The booking is created as 'pending' and a payment record is attached.
+   */
+  createBooking: asyncHandler(async (req, res) => {
+    const {
+      listingId, checkInDate, checkOutDate, guestCount,
+      bookingType, specialRequests,
+      paymentMethod, transactionNumber, proofNotes,
+    } = req.body;
+
+    // Verify the listing exists and is available for booking
+    const listing = await queryOne(
+      'SELECT * FROM listings WHERE id = $1 AND is_active = true AND is_approved = true',
+      [listingId]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+    if (listing.host_id === req.user.id) {
+      throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
+    }
+
+    // Check for date conflicts with existing bookings
+    const conflict = await queryOne(
+      `SELECT id FROM bookings
+       WHERE listing_id = $1 AND status IN ('pending','confirmed')
+       AND check_in_date < $3 AND check_out_date > $2`,
+      [listingId, checkInDate, checkOutDate]
+    );
+    if (conflict) throw new AppError('Dates are not available.', 409, 'CONFLICT');
+
+    // Validate the transaction number is not already used in a completed payment
+    // This prevents users from reusing the same transaction reference
+    if (CONFIG.features.preventDuplicateTransactions && transactionNumber) {
+      const existingTransaction = await queryOne(
+        `SELECT p.id, p.status, b.id as booking_id
+         FROM payments p
+         JOIN bookings b ON p.booking_id = b.id
+         WHERE p.transaction_reference = $1 AND p.status = 'completed'`,
+        [transactionNumber.trim()]
+      );
+      if (existingTransaction) {
+        throw new AppError(
+          'This transaction number has already been used for a verified payment. Please provide a different transaction number.',
+          409,
+          'DUPLICATE_TRANSACTION'
+        );
+      }
+    }
+
+    // Calculate pricing based on booking type and listing rates
+    const nights = Math.ceil(
+      (new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24)
+    );
+    const baseAmount = parseFloat(listing.price_per_night) * nights;
+    const cleaningFee = parseFloat(listing.cleaning_fee) || 0;
+    const serviceFee = Math.min(
+      Math.max(
+        Math.round(baseAmount * (CONFIG.payment.serviceFeePercent / 100)),
+        CONFIG.payment.serviceFeeMin
+      ),
+      CONFIG.payment.serviceFeeMax
+    );
+    const totalAmount = baseAmount + cleaningFee + serviceFee;
+
+    // Create the booking record with 'pending' status
+    const booking = await queryOne(
+      `INSERT INTO bookings (
+        listing_id, guest_id, host_id, booking_type,
+        check_in_date, check_out_date, guest_count,
+        status, base_amount, cleaning_fee, service_fee,
+        security_deposit, total_amount, special_requests
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13)
+      RETURNING *`,
+      [
+        listingId, req.user.id, listing.host_id, bookingType,
+        checkInDate, checkOutDate, guestCount,
+        baseAmount, cleaningFee, serviceFee,
+        0, totalAmount, specialRequests || null,
+      ]
+    );
+
+    // Create the payment record attached to this booking
+    // The transaction reference is stored for duplicate checking
+    const payment = await queryOne(
+      `INSERT INTO payments (
+        booking_id, user_id, amount, currency, payment_method,
+        transaction_reference, proof_notes, status
+      ) VALUES ($1, $2, $3, 'ETB', $4, $5, $6, 'pending')
+      RETURNING *`,
+      [
+        booking.id,
+        req.user.id,
+        totalAmount,
+        paymentMethod,
+        transactionNumber.trim(),
+        proofNotes || null,
+      ]
+    );
+
+    // Calculate the payment expiry time based on configurable timeout
+    const expiryTime = new Date(
+      Date.now() + CONFIG.features.paymentTimeoutMinutes * 60 * 1000
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Booking created. Please complete payment within the time limit.',
+      data: {
+        booking,
+        payment,
+        pricing: {
+          baseAmount,
+          cleaningFee,
+          serviceFee,
+          securityDeposit: 0,
+          totalAmount,
+          currency: 'ETB',
+        },
+        paymentTimeout: {
+          minutes: CONFIG.features.paymentTimeoutMinutes,
+          expiresAt: expiryTime.toISOString(),
+        },
+      },
+    });
+  }),
+
+  /**
+   * POST /api/payments/validate-transaction
+   * Checks whether a transaction number has already been used
+   * in a successfully completed payment. Returns availability status.
+   */
+  validateTransaction: asyncHandler(async (req, res) => {
+    const { transactionNumber } = req.body;
+
+    if (!transactionNumber || transactionNumber.trim().length < 3) {
+      throw new AppError('Please provide a valid transaction number.', 400, 'VALIDATION_ERROR');
+    }
+
+    // Query for any completed payment with this transaction reference
+    const existing = await queryOne(
+      `SELECT p.id, p.status, p.created_at
+       FROM payments p
+       WHERE p.transaction_reference = $1 AND p.status = 'completed'`,
+      [transactionNumber.trim()]
+    );
+
+    if (existing) {
+      res.json({
+        success: true,
+        data: {
+          valid: false,
+          message: 'This transaction number has already been used for a verified payment.',
+        },
+      });
+    } else {
+      res.json({
+        success: true,
+        data: {
+          valid: true,
+          message: 'Transaction number is available.',
+        },
+      });
+    }
+  }),
+
+  /**
+   * GET /api/bookings/guest
+   * Returns paginated bookings for the authenticated guest.
+   */
+  getGuestBookings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    const count = await queryOne(
+      'SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1',
+      [req.user.id]
+    );
+    const bookings = await query(
+      `SELECT b.*, l.title as listing_title, l.city,
+              p.status as payment_status, p.transaction_reference
+       FROM bookings b
+       JOIN listings l ON b.listing_id = l.id
+       LEFT JOIN payments p ON p.booking_id = b.id
+       WHERE b.guest_id = $1
+       ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: bookings.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * GET /api/bookings/host
+   * Returns paginated bookings for the authenticated host's listings.
+   */
+  getHostBookings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    const count = await queryOne(
+      'SELECT COUNT(*) as total FROM bookings WHERE host_id = $1',
+      [req.user.id]
+    );
+    const bookings = await query(
+      `SELECT b.*, l.title as listing_title, l.city,
+              gu.first_name as guest_first_name, gu.last_name as guest_last_name,
+              p.status as payment_status, p.transaction_reference
+       FROM bookings b
+       JOIN listings l ON b.listing_id = l.id
+       JOIN users gu ON b.guest_id = gu.id
+       LEFT JOIN payments p ON p.booking_id = b.id
+       WHERE b.host_id = $1
+       ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: bookings.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  /**
+   * GET /api/bookings/:id
+   * Returns a single booking with payment information.
+   */
+  getBookingById: asyncHandler(async (req, res) => {
+    const booking = await queryOne(
+      `SELECT b.*, l.title as listing_title, l.street_address, l.city,
+              gu.first_name as guest_first_name, gu.last_name as guest_last_name,
+              hu.first_name as host_first_name, hu.last_name as host_last_name,
+              p.id as payment_id, p.status as payment_status,
+              p.transaction_reference, p.proof_image_url, p.proof_notes
+       FROM bookings b
+       JOIN listings l ON b.listing_id = l.id
+       JOIN users gu ON b.guest_id = gu.id
+       JOIN users hu ON b.host_id = hu.id
+       LEFT JOIN payments p ON p.booking_id = b.id
+       WHERE b.id = $1`,
+      [req.params.id]
+    );
+
+    if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
+
+    // Verify the requesting user is the guest, host, or an admin
+    if (
+      booking.guest_id !== req.user.id &&
+      booking.host_id !== req.user.id &&
+      req.user.role !== 'admin'
+    ) {
+      throw new AppError('You do not have permission to view this booking.', 403, 'FORBIDDEN');
+    }
+
+    res.json({ success: true, data: { booking } });
+  }),
+
+  /**
+   * PATCH /api/bookings/:id/status
+   * Updates the status of a booking. Validates status transitions
+   * based on current status and user role.
+   */
+  updateBookingStatus: asyncHandler(async (req, res) => {
+    const { status, cancellationReason } = req.body;
+    const booking = await queryOne('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+
+    if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
+
+    // Define valid status transitions for each role
+    const validTransitions = {
+      pending: { confirmed: ['host', 'admin'], cancelled: ['guest', 'admin'], rejected: ['host', 'admin'], expired: ['system'] },
+      confirmed: { cancelled: ['guest', 'host', 'admin'], completed: ['host', 'admin'] },
+    };
+
+    const allowedRoles = validTransitions[booking.status]?.[status];
+    if (!allowedRoles) {
+      throw new AppError(
+        `Cannot change status from "${booking.status}" to "${status}".`,
+        400, 'VALIDATION_ERROR'
+      );
+    }
+
+    if (!allowedRoles.includes('system') && !allowedRoles.includes(req.user.role)) {
+      throw new AppError('You do not have permission to perform this action.', 403, 'FORBIDDEN');
+    }
+
+    // Build update fields dynamically
+    const updates = { status };
+    if (status === 'cancelled') {
+      updates.cancelled_by = req.user.id;
+      updates.cancelled_at = new Date();
+      updates.cancellation_reason = cancellationReason || null;
+    }
+    if (status === 'confirmed') updates.confirmed_at = new Date();
+    if (status === 'completed') updates.completed_at = new Date();
+
+    const setClauses = [];
+    const params = [];
+    let p = 1;
+    for (const [key, value] of Object.entries(updates)) {
+      setClauses.push(`${key} = $${p}`);
+      params.push(value);
+      p++;
+    }
+    params.push(req.params.id);
+
+    const updated = await queryOne(
+      `UPDATE bookings SET ${setClauses.join(', ')} WHERE id = $${p} RETURNING *`,
+      params
+    );
+
+    res.json({ success: true, message: `Booking ${status}.`, data: { booking: updated } });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Favorite Controller — saved listing management
+// --------------------------------------------------------------------------
+const favoriteController = {
+  toggle: asyncHandler(async (req, res) => {
+    const existing = await queryOne(
+      'SELECT id FROM favorites WHERE user_id = $1 AND listing_id = $2',
+      [req.user.id, req.params.listingId]
+    );
+    if (existing) {
+      await query('DELETE FROM favorites WHERE user_id = $1 AND listing_id = $2', [req.user.id, req.params.listingId]);
+      res.json({ success: true, data: { action: 'removed' } });
+    } else {
+      await query('INSERT INTO favorites (user_id, listing_id) VALUES ($1, $2)', [req.user.id, req.params.listingId]);
+      res.json({ success: true, data: { action: 'added' } });
+    }
+  }),
+
+  list: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 12, 50);
+    const offset = (page - 1) * limit;
+    const count = await queryOne('SELECT COUNT(*) as total FROM favorites WHERE user_id = $1', [req.user.id]);
+    const favorites = await query(
+      `SELECT f.id as favorite_id, f.created_at as favorited_at,
+              l.id, l.title, l.listing_type, l.price_per_night, l.price_per_month,
+              l.city, l.bedrooms, l.bathrooms, l.max_guests,
+              (SELECT image_url FROM listing_images WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
+       FROM favorites f JOIN listings l ON f.listing_id = l.id
+       WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+    res.json({
+      success: true,
+      data: favorites.rows,
+      pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Admin Controller — platform administration endpoints
+// --------------------------------------------------------------------------
+const adminController = {
+  getDashboard: asyncHandler(async (req, res) => {
+    const stats = {};
+    const userStats = await queryOne(
+      `SELECT COUNT(*) as total_users,
+              COUNT(*) FILTER (WHERE role = 'guest') as total_guests,
+              COUNT(*) FILTER (WHERE role = 'host') as total_hosts,
+              COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as new_users_30d
+       FROM users WHERE is_active = true`
+    );
+    stats.users = userStats;
+
+    const listingStats = await queryOne(
+      `SELECT COUNT(*) as total_listings,
+              COUNT(*) FILTER (WHERE listing_type IN ('short_term', 'both')) as short_term,
+              COUNT(*) FILTER (WHERE listing_type IN ('long_term', 'both')) as long_term,
+              COUNT(*) FILTER (WHERE approval_status = 'pending') as pending_approval
+       FROM listings WHERE is_active = true`
+    );
+    stats.listings = listingStats;
+
+    const bookingStats = await queryOne(
+      `SELECT COUNT(*) as total_bookings,
+              COUNT(*) FILTER (WHERE status = 'pending') as pending,
+              COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
+              COUNT(*) FILTER (WHERE status = 'completed') as completed,
+              COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+              COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as bookings_30d
+       FROM bookings`
+    );
+    stats.bookings = bookingStats;
+
+    const revenueStats = await queryOne(
+      `SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
+              COALESCE(SUM(service_fee), 0) as total_service_fees,
+              COALESCE(SUM(total_amount) FILTER (WHERE created_at > NOW() - INTERVAL '30 days'), 0) as revenue_30d
+       FROM bookings WHERE status IN ('confirmed', 'completed')`
+    );
+    stats.revenue = revenueStats;
+
+    const paymentStats = await queryOne(
+      `SELECT COUNT(*) FILTER (WHERE status = 'pending') as pending_payments,
+              COUNT(*) FILTER (WHERE status = 'processing') as processing_payments,
+              COUNT(*) FILTER (WHERE status = 'completed') as completed_payments
+       FROM payments`
+    );
+    stats.payments = paymentStats;
+
+    const withdrawalStats = await queryOne(
+      `SELECT COUNT(*) FILTER (WHERE status = 'pending') as pending_withdrawals,
+              COALESCE(SUM(net_amount) FILTER (WHERE status = 'pending'), 0) as pending_amount
+       FROM withdrawals`
+    );
+    stats.withdrawals = withdrawalStats;
+
+    const recentUsers = await query('SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 5');
+    const recentBookings = await query(
+      `SELECT b.id, b.status, b.total_amount, b.created_at,
+              u.first_name, u.last_name, l.title as listing_title
+       FROM bookings b JOIN users u ON b.guest_id = u.id JOIN listings l ON b.listing_id = l.id
+       ORDER BY b.created_at DESC LIMIT 5`
+    );
+    stats.recentActivity = { users: recentUsers.rows, bookings: recentBookings.rows };
+    res.json({ success: true, data: stats });
+  }),
+
+  listUsers: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const role = req.query.role || '';
+    let where = 'WHERE 1=1';
+    const params = [];
+    let p = 1;
+    if (search) { where += ` AND (first_name ILIKE $${p} OR last_name ILIKE $${p} OR email ILIKE $${p})`; params.push(`%${search}%`); p++; }
+    if (role) { where += ` AND role = $${p}`; params.push(role); p++; }
+    const count = await queryOne(`SELECT COUNT(*) as total FROM users ${where}`, params);
+    params.push(limit, offset);
+    const users = await query(
+      `SELECT id, email, first_name, last_name, role, is_verified, is_active, created_at
+       FROM users ${where} ORDER BY created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+    res.json({ success: true, data: users.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
+  }),
+
+  toggleUserStatus: asyncHandler(async (req, res) => {
+    const { isActive } = req.body;
+    const user = await queryOne('UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, email, is_active', [isActive, req.params.id]);
+    if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { user } });
+  }),
+
+  getPendingListings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+    const count = await queryOne("SELECT COUNT(*) as total FROM listings WHERE approval_status = 'pending'");
+    const listings = await query(
+      `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name, u.email as host_email
+       FROM listings l JOIN users u ON l.host_id = u.id
+       WHERE l.approval_status = 'pending' ORDER BY l.created_at ASC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    res.json({ success: true, data: listings.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
+  }),
+
+  moderateListing: asyncHandler(async (req, res) => {
+    const { action, notes } = req.body;
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    const listing = await queryOne(
+      `UPDATE listings SET approval_status = $1, is_approved = $2, reviewed_by = $3, review_notes = $4, approved_at = NOW()
+       WHERE id = $5 RETURNING *`,
+      [newStatus, action === 'approve', req.user.id, notes || null, req.params.id]
+    );
+    if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { listing } });
+  }),
+
+  listPayments: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+    const status = req.query.status || '';
+    let where = 'WHERE 1=1';
+    const params = [];
+    let p = 1;
+    if (status) { where += ` AND p.status = $${p}`; params.push(status); p++; }
+    const count = await queryOne(`SELECT COUNT(*) as total FROM payments p ${where}`, params);
+    params.push(limit, offset);
+    const payments = await query(
+      `SELECT p.*, u.first_name, u.last_name, u.email, l.title as listing_title
+       FROM payments p JOIN users u ON p.user_id = u.id
+       JOIN bookings b ON p.booking_id = b.id JOIN listings l ON b.listing_id = l.id
+       ${where} ORDER BY p.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+    res.json({ success: true, data: payments.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
+  }),
+
+  verifyPayment: asyncHandler(async (req, res) => {
+    const { action } = req.body;
+    const newStatus = action === 'verify' ? 'completed' : 'failed';
+    const payment = await queryOne(
+      'UPDATE payments SET status = $1, verified_by = $2, verified_at = NOW() WHERE id = $3 RETURNING *',
+      [newStatus, req.user.id, req.params.id]
+    );
+    if (!payment) throw new AppError('Payment not found.', 404, 'NOT_FOUND');
+
+    // If payment is verified, auto-confirm the associated booking
+    if (newStatus === 'completed') {
+      await query(
+        "UPDATE bookings SET status = 'confirmed', confirmed_at = NOW() WHERE id = $1 AND status = 'pending'",
+        [payment.booking_id]
+      );
+    }
+
+    res.json({ success: true, data: { payment } });
+  }),
+
+  listWithdrawals: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+    const status = req.query.status || '';
+    let where = 'WHERE 1=1';
+    const params = [];
+    let p = 1;
+    if (status) { where += ` AND w.status = $${p}`; params.push(status); p++; }
+    const count = await queryOne(`SELECT COUNT(*) as total FROM withdrawals w ${where}`, params);
+    params.push(limit, offset);
+    const withdrawals = await query(
+      `SELECT w.*, u.first_name, u.last_name, u.email
+       FROM withdrawals w JOIN users u ON w.user_id = u.id
+       ${where} ORDER BY w.created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      params
+    );
+    res.json({ success: true, data: withdrawals.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
+  }),
+
+  processWithdrawal: asyncHandler(async (req, res) => {
+    const { action } = req.body;
+    const newStatus = action === 'approve' ? 'completed' : 'failed';
+    const withdrawal = await queryOne(
+      'UPDATE withdrawals SET status = $1, processed_by = $2, processed_at = NOW() WHERE id = $3 RETURNING *',
+      [newStatus, req.user.id, req.params.id]
+    );
+    if (!withdrawal) throw new AppError('Withdrawal not found.', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { withdrawal } });
+  }),
+};
+
+// ============================================================================
+// EXPRESS APPLICATION
+// ============================================================================
+const app = express();
+app.set('trust proxy', 1);
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
+
+// ============================================================================
+// ROUTE REGISTRATION
+// ============================================================================
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'ROOSTAY API is running.', timestamp: new Date().toISOString(), environment: CONFIG.app.env });
+});
+
+// ---- Auth Routes ----
+app.post('/api/auth/register', validateBody(schemas.register), authController.register);
+app.post('/api/auth/login', validateBody(schemas.login), authController.login);
+app.get('/api/auth/me', authenticate, authController.getMe);
+
+// ---- Listing Routes ----
+app.post('/api/listings', authenticate, authorize('host', 'admin'), validateBody(schemas.createListing), listingController.createListing);
+app.get('/api/listings', listingController.searchListings);
+app.get('/api/listings/:id', listingController.getListingById);
+
+// ---- NEW: Blocked dates and similar listings routes ----
+// These endpoints provide availability data and alternatives for fully booked listings
+app.get('/api/listings/:id/blocked-dates', listingController.getBlockedDates);
+app.get('/api/listings/:id/similar', listingController.getSimilarListings);
+
+// ---- Booking Routes (with payment integration) ----
+app.post(
+  '/api/bookings',
+  authenticate,
+  authorize('guest', 'admin'),
+  validateBody(schemas.createBookingWithPayment),
+  bookingController.createBooking
+);
+app.get('/api/bookings/guest', authenticate, bookingController.getGuestBookings);
+app.get('/api/bookings/host', authenticate, authorize('host', 'admin'), bookingController.getHostBookings);
+app.get('/api/bookings/:id', authenticate, bookingController.getBookingById);
+app.patch(
+  '/api/bookings/:id/status',
+  authenticate,
+  validateBody(schemas.updateBookingStatus),
+  bookingController.updateBookingStatus
+);
+
+// ---- Payment Routes ----
+app.post(
+  '/api/payments/validate-transaction',
+  authenticate,
+  validateBody(schemas.validateTransaction),
+  bookingController.validateTransaction
+);
+
+// ---- Favorite Routes ----
+app.post('/api/favorites/:listingId', authenticate, favoriteController.toggle);
+app.get('/api/favorites', authenticate, favoriteController.list);
+
+// ---- Notification Routes ----
+app.get('/api/notifications', authenticate, asyncHandler(async (req, res) => {
+  const result = await query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [req.user.id]);
+  res.json({ success: true, data: { notifications: result.rows, unreadCount: result.rows.filter((n) => !n.is_read).length } });
+}));
+
+// ---- Admin Routes ----
+app.get('/api/admin/dashboard', authenticate, authorize('admin'), adminController.getDashboard);
+app.get('/api/admin/users', authenticate, authorize('admin'), adminController.listUsers);
+app.patch('/api/admin/users/:id/toggle-status', authenticate, authorize('admin'), adminController.toggleUserStatus);
+app.get('/api/admin/listings/pending', authenticate, authorize('admin'), adminController.getPendingListings);
+app.patch('/api/admin/listings/:id/moderate', authenticate, authorize('admin'), adminController.moderateListing);
+app.get('/api/admin/payments', authenticate, authorize('admin'), adminController.listPayments);
+app.patch('/api/admin/payments/:id/verify', authenticate, authorize('admin'), adminController.verifyPayment);
+app.get('/api/admin/withdrawals', authenticate, authorize('admin'), adminController.listWithdrawals);
+app.patch('/api/admin/withdrawals/:id/process', authenticate, authorize('admin'), adminController.processWithdrawal);
+
+// ---- Root ----
+app.get('/', (req, res) => {
+  res.json({ success: true, name: 'ROOSTAY API', version: '1.0.0', environment: CONFIG.app.env });
+});
+
+// ---- 404 Handler ----
+// Uses a regex pattern instead of wildcard for path-to-regexp v8 compatibility
+app.all(/.*/, (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'ROUTE_NOT_FOUND',
+      message: `Route not found: ${req.method} ${req.path}`,
+    },
+  });
+});
+
+// ---- Global Error Handler ----
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  const message = err.isOperational ? err.message : 'Internal server error';
+  console.error(`[${statusCode}] ${err.message}`);
+  res.status(statusCode).json({ success: false, error: { code: err.errorCode || 'INTERNAL_ERROR', message } });
+});
+
+// ============================================================================
+// NEXT.JS API ROUTE EXPORT
+// ============================================================================
+export default function handler(req, res) {
+  return app(req, res);
+}
+
+export const config = {
+  api: { bodyParser: false, externalResolver: true },
+};
+
+************************************************************
+END!
+************************************************************

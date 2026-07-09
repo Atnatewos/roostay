@@ -1,9 +1,8 @@
 // frontend/components/booking/BookingPaymentModal.jsx
-// Payment-first booking modal — collects transaction number before creating booking
-// Displays bank/Telebirr details, validates transaction uniqueness, and submits booking
-// Integrates with the new payment-flow API endpoints
+// Payment-first booking modal with countdown timer starting immediately
+// Displays bank/Telebirr details FIRST, then collects transaction number
+// Validates transaction uniqueness before final booking submission
 // Author: Theron
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -17,19 +16,17 @@ import { apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
- * Booking Payment Modal
- * Appears when a guest clicks "Book Now" on a listing detail page.
- * Requires the guest to enter a transaction reference number before the booking is created.
- * Displays payment instructions (bank account or Telebirr details) and validates
- * that the transaction number has not been previously used in a completed payment.
- *
- * Flow:
- * 1. Guest selects dates and guests → clicks "Book Now"
- * 2. Modal opens showing payment details and transaction number input
- * 3. Guest enters transaction number (validated for uniqueness)
- * 4. Guest clicks "Submit & Book" → booking + payment created together
- * 5. 30-minute countdown starts for the guest to complete the actual transfer
- *
+ * Booking Payment Modal - Phase 2 Implementation
+ * 
+ * CORRECT FLOW:
+ * 1. Modal opens → Countdown timer STARTS immediately (30 minutes)
+ * 2. Guest sees payment instructions (bank account or Telebirr details)
+ * 3. Guest goes to bank app, sends money, receives SMS with transaction number
+ * 4. Guest enters transaction number in modal
+ * 5. Guest clicks "Verify" → system checks if number is unique
+ * 6. If valid, guest clicks "Submit & Book" → booking + payment created
+ * 7. Success state shows booking confirmation
+ * 
  * @param {Object}   props
  * @param {boolean}  props.isOpen            - Whether the modal is visible
  * @param {Function} props.onClose           - Callback to close the modal
@@ -46,7 +43,6 @@ export default function BookingPaymentModal({
   pricing,
   onBookingComplete,
 }) {
-
   // =========================================================================
   // PAYMENT METHOD STATE
   // Tracks which payment method the guest selects (bank_transfer or telebirr)
@@ -92,12 +88,19 @@ export default function BookingPaymentModal({
   // =========================================================================
   const [copiedField, setCopiedField] = useState(null);
 
+  // =========================================================================
+  // PAYMENT TIMEOUT STATE
+  // Tracks when the payment window expires (30 minutes from modal open)
+  // =========================================================================
+  const [paymentExpiresAt, setPaymentExpiresAt] = useState(null);
+
   /**
-   * Resets all form state when the modal opens or closes.
-   * Ensures a clean slate for each new booking attempt.
+   * Resets all form state and starts countdown timer when modal opens
+   * Ensures a clean slate for each new booking attempt
    */
   useEffect(() => {
     if (isOpen) {
+      // Reset all form state
       setPaymentMethod('bank_transfer');
       setTransactionNumber('');
       setTransactionError(null);
@@ -106,13 +109,19 @@ export default function BookingPaymentModal({
       setSubmitError(null);
       setBookingResult(null);
       setIsSubmitting(false);
+      
+      // Start the 30-minute countdown timer IMMEDIATELY
+      const expiryTime = new Date(Date.now() + 30 * 60 * 1000);
+      setPaymentExpiresAt(expiryTime);
+    } else {
+      // Clear expiry time when modal closes
+      setPaymentExpiresAt(null);
     }
   }, [isOpen]);
 
   /**
    * Handles payment method selection.
    * Resets transaction validation when switching methods.
-   *
    * @param {string} method - The selected payment method
    */
   function handleMethodChange(method) {
@@ -124,7 +133,6 @@ export default function BookingPaymentModal({
   /**
    * Handles transaction number input changes.
    * Clears previous validation state when the user edits the number.
-   *
    * @param {Event} e - Input change event
    */
   function handleTransactionChange(e) {
@@ -137,7 +145,7 @@ export default function BookingPaymentModal({
   /**
    * Validates the transaction number against the API.
    * Checks if the number has already been used in a completed payment.
-   * Debounces naturally through user action — only fires on explicit check.
+   * This is called BEFORE final submission to prevent duplicate payments.
    */
   async function handleValidateTransaction() {
     if (!transactionNumber || transactionNumber.trim().length < 3) {
@@ -178,7 +186,7 @@ export default function BookingPaymentModal({
   /**
    * Submits the booking with payment information to the API.
    * Creates the booking and payment record in a single atomic operation.
-   * On success, displays the booking confirmation with countdown timer.
+   * On success, displays the booking confirmation.
    */
   async function handleSubmitBooking() {
     // Validate transaction number is present and verified
@@ -228,7 +236,6 @@ export default function BookingPaymentModal({
   /**
    * Copies text to the clipboard with fallback for older browsers.
    * Shows a temporary confirmation state on the copied button.
-   *
    * @param {string} text  - The text to copy
    * @param {string} field - Identifier for the copied field (for visual feedback)
    */
@@ -254,16 +261,12 @@ export default function BookingPaymentModal({
 
   /**
    * Handles the countdown expiry.
-   * Closes the modal or updates state when time runs out.
+   * When timer expires, the booking window is closed and user must start over.
    */
   function handleCountdownExpire() {
-    // The booking is already created — if payment isn't verified in time,
-    // the admin can manually expire it. Here we just show expiry state.
-    if (bookingResult) {
-      setBookingResult((prev) => ({
-        ...prev,
-        expired: true,
-      }));
+    // If booking hasn't been created yet, show expiry message
+    if (!bookingResult) {
+      setSubmitError('Payment window has expired. Please close this modal and try again.');
     }
   }
 
@@ -293,11 +296,6 @@ export default function BookingPaymentModal({
   const bankDetails = getBankDetails();
   const telebirrDetails = getTelebirrDetails();
 
-  // Calculate the expiry time for the countdown
-  const expiryTime = bookingResult?.paymentTimeout?.expiresAt
-    ? new Date(bookingResult.paymentTimeout.expiresAt)
-    : new Date(Date.now() + 30 * 60 * 1000);
-
   return (
     <Modal
       isOpen={isOpen}
@@ -308,7 +306,7 @@ export default function BookingPaymentModal({
     >
       {/* =====================================================================
           SUCCESS STATE — Shown after booking is successfully created
-          Displays confirmation message, countdown timer, and next steps
+          Displays confirmation message and next steps
           ===================================================================== */}
       {bookingResult ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -321,27 +319,13 @@ export default function BookingPaymentModal({
               textAlign: 'center',
             }}
           >
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-              &#10003;
-            </div>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✓</div>
             <p style={{ fontWeight: 'var(--font-weight-semibold)', color: '#065F46', marginBottom: '0.25rem' }}>
               Booking Created Successfully!
             </p>
             <p style={{ fontSize: 'var(--font-size-sm)', color: '#065F46' }}>
               Booking #{bookingResult.booking?.id?.substring(0, 8).toUpperCase()}
             </p>
-          </div>
-
-          {/* Countdown Timer */}
-          <div>
-            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>
-              Complete your bank transfer within:
-            </p>
-            <CountdownTimer
-              expiresAt={expiryTime}
-              onExpire={handleCountdownExpire}
-              size="md"
-            />
           </div>
 
           {/* Payment Instructions Reminder */}
@@ -393,10 +377,24 @@ export default function BookingPaymentModal({
         </div>
       ) : (
         /* ===================================================================
-            FORM STATE — Payment method selection and transaction input
-            Shown before the booking is submitted
+            FORM STATE — Countdown timer, payment details, and transaction input
+            Timer starts IMMEDIATELY when modal opens
             =================================================================== */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Countdown Timer - STARTS IMMEDIATELY */}
+          {paymentExpiresAt && (
+            <div>
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>
+                Complete your payment within:
+              </p>
+              <CountdownTimer
+                expiresAt={paymentExpiresAt}
+                onExpire={handleCountdownExpire}
+                size="md"
+              />
+            </div>
+          )}
+
           {/* Pricing Summary */}
           {pricing && (
             <PriceBreakdown
@@ -545,6 +543,7 @@ export default function BookingPaymentModal({
                     <span style={{ color: 'var(--color-text-secondary)' }}>Merchant</span>
                     <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{telebirrDetails.merchantName}</span>
                   </div>
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: 'var(--color-text-secondary)' }}>Shortcode</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -568,6 +567,7 @@ export default function BookingPaymentModal({
                       </button>
                     </div>
                   </div>
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border-light)' }}>
                     <span style={{ color: 'var(--color-text-secondary)' }}>Amount</span>
                     <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-lg)', color: 'var(--color-primary)' }}>
@@ -587,9 +587,8 @@ export default function BookingPaymentModal({
                 : 'Telebirr Transaction ID'}
             </p>
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-light)', marginBottom: '0.75rem' }}>
-              Enter the reference number from your payment confirmation. This helps us verify your payment.
+              After sending payment, enter the reference number from your confirmation SMS.
             </p>
-
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <div style={{ flex: 1 }}>
                 <Input
@@ -628,7 +627,7 @@ export default function BookingPaymentModal({
                   gap: '0.25rem',
                 }}
               >
-                &#10003; Transaction number verified — not previously used.
+                ✓ Transaction number verified — not previously used.
               </p>
             )}
           </div>
@@ -679,8 +678,7 @@ export default function BookingPaymentModal({
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <span>
-              Your booking will be created immediately but confirmed only after payment verification.
-              Please complete the transfer within the time limit to avoid automatic cancellation.
+              Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.
             </span>
           </div>
 

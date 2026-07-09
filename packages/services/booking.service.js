@@ -1,9 +1,10 @@
 // packages/services/booking.service.js
-// Booking service - handles reservation creation, availability checks, and status management
+// Booking service - handles reservation creation, availability checks, status management, and automated expiry
 // Supports both short-term (nightly) and long-term (monthly) bookings
+// Implements atomic booking + payment creation to prevent race conditions
 // All database operations use parameterized queries
-
 const { query, queryOne, beginTransaction, commitTransaction, rollbackTransaction } = require('../database');
+const paymentService = require('./payment.service');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors');
 const logger = require('../utils/logger');
 
@@ -24,22 +25,26 @@ try {
       serviceFeePercent: 5,
       serviceFeeMin: 100,
       serviceFeeMax: 5000,
+      paymentTimeoutMinutes: 30,
     },
   };
 }
 
 const bookingService = {
   /**
-   * Creates a new booking for a listing.
-   * Validates availability, calculates pricing, and prevents double booking.
-   * Uses database transactions to ensure atomicity.
-   *
+   * Creates a new booking with payment information in a single atomic transaction.
+   * Validates availability, calculates pricing, prevents double booking, and creates payment record.
+   * Sets payment expiry timestamp for automated expiry.
+   * 
    * @param {string} guestId - The guest user ID
-   * @param {Object} bookingData - Booking details { listingId, checkInDate, checkOutDate, guestCount, bookingType, specialRequests }
-   * @returns {Promise<Object>} Created booking with pricing breakdown
+   * @param {Object} bookingData - Booking details with payment info
+   * @returns {Promise<Object>} Created booking with payment and pricing breakdown
    */
   async createBooking(guestId, bookingData) {
-    const { listingId, checkInDate, checkOutDate, guestCount, bookingType, specialRequests } = bookingData;
+    const { 
+      listingId, checkInDate, checkOutDate, guestCount, bookingType, 
+      specialRequests, paymentMethod, transactionNumber, proofNotes 
+    } = bookingData;
 
     // Validate dates
     const checkIn = new Date(checkInDate);
@@ -95,29 +100,24 @@ const bookingService = {
     let baseAmount, totalNights;
     if (bookingType === 'short_term') {
       totalNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-
       if (totalNights < (config.features.shortTermMinNights || 1)) {
         throw new ValidationError(
           `Minimum stay is ${config.features.shortTermMinNights} night(s).`
         );
       }
-
       if (totalNights > (config.features.shortTermMaxNights || 30)) {
         throw new ValidationError(
           `Maximum stay is ${config.features.shortTermMaxNights} nights.`
         );
       }
-
       baseAmount = parseFloat(listing.price_per_night) * totalNights;
     } else {
       const totalMonths = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24 * 30));
-
       if (totalMonths < (config.features.longTermMinMonths || 1)) {
         throw new ValidationError(
           `Minimum stay is ${config.features.longTermMinMonths} month(s).`
         );
       }
-
       baseAmount = parseFloat(listing.price_per_month) * totalMonths;
       totalNights = totalMonths * 30;
     }
@@ -132,9 +132,13 @@ const bookingService = {
     const securityDeposit = parseFloat(listing.security_deposit) || 0;
     const totalAmount = baseAmount + serviceFee + cleaningFee;
 
+    // Calculate payment expiry time
+    const paymentTimeoutMinutes = config.payment.paymentTimeoutMinutes || 30;
+    const paymentExpiresAt = new Date(Date.now() + paymentTimeoutMinutes * 60 * 1000);
+
     // Use transaction for atomicity
     const client = await beginTransaction();
-
+    
     try {
       // Check date availability within transaction
       const dateOverlap = await client.query(
@@ -166,16 +170,16 @@ const bookingService = {
         );
       }
 
-      // Create the booking
+      // Create the booking with payment expiry timestamp
       const booking = await client.query(
         `INSERT INTO bookings (
-          listing_id, guest_id, host_id, booking_type,
-          check_in_date, check_out_date, guest_count,
-          status, base_amount, cleaning_fee, service_fee,
-          security_deposit, total_amount,
-          special_requests
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        RETURNING *`,
+           listing_id, guest_id, host_id, booking_type,
+           check_in_date, check_out_date, guest_count,
+           status, base_amount, cleaning_fee, service_fee,
+           security_deposit, total_amount,
+           special_requests, payment_expires_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         RETURNING *`,
         [
           listingId,
           guestId,
@@ -191,6 +195,7 @@ const bookingService = {
           securityDeposit,
           totalAmount,
           specialRequests || null,
+          paymentExpiresAt,
         ]
       );
 
@@ -210,18 +215,41 @@ const bookingService = {
         );
       }
 
+      // Create payment record with transaction number
+      const payment = await client.query(
+        `INSERT INTO payments (
+           booking_id, user_id, amount, currency, payment_method,
+           transaction_reference, proof_notes, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          booking.rows[0].id,
+          guestId,
+          totalAmount,
+          config.payment.currency || 'ETB',
+          paymentMethod,
+          transactionNumber,
+          proofNotes || null,
+          'processing',
+        ]
+      );
+
       await commitTransaction(client);
 
-      logger.info('Booking created', {
+      logger.info('Booking created with payment', {
         bookingId: booking.rows[0].id,
+        paymentId: payment.rows[0].id,
         listingId,
         guestId,
         bookingType,
         totalAmount,
+        transactionNumber,
+        paymentExpiresAt: paymentExpiresAt.toISOString(),
       });
 
       return {
         booking: booking.rows[0],
+        payment: payment.rows[0],
         pricing: {
           baseAmount,
           cleaningFee,
@@ -229,6 +257,10 @@ const bookingService = {
           securityDeposit,
           totalAmount,
           currency: 'ETB',
+        },
+        paymentTimeout: {
+          expiresAt: paymentExpiresAt.toISOString(),
+          minutes: paymentTimeoutMinutes,
         },
       };
     } catch (error) {
@@ -240,7 +272,7 @@ const bookingService = {
   /**
    * Retrieves a booking by ID with full details.
    * Verifies the requester is the guest, host, or admin.
-   *
+   * 
    * @param {string} bookingId - The booking ID
    * @param {string} userId - The requesting user ID
    * @param {string} userRole - The requesting user role
@@ -274,7 +306,7 @@ const bookingService = {
   /**
    * Updates the status of a booking.
    * Enforces valid status transitions based on current status and user role.
-   *
+   * 
    * @param {string} bookingId - The booking ID
    * @param {string} userId - The requesting user ID
    * @param {string} userRole - The requesting user role
@@ -370,12 +402,19 @@ const bookingService = {
       params
     );
 
-    // Release dates if cancelled or rejected
-    if (newStatus === 'cancelled' || newStatus === 'rejected') {
+    // Release dates if cancelled, rejected, or expired
+    if (newStatus === 'cancelled' || newStatus === 'rejected' || newStatus === 'expired') {
       await query(
         `UPDATE listing_availability SET status = 'available'
          WHERE listing_id = $1 AND date >= $2 AND date < $3`,
         [booking.listing_id, booking.check_in_date, booking.check_out_date]
+      );
+
+      // Also mark payment as failed/cancelled
+      await query(
+        `UPDATE payments SET status = 'cancelled', failure_reason = $1 
+         WHERE booking_id = $2 AND status = 'processing'`,
+        [`Booking ${newStatus}`, bookingId]
       );
     }
 
@@ -390,8 +429,76 @@ const bookingService = {
   },
 
   /**
+   * Expires unpaid bookings that have exceeded their payment timeout.
+   * Called by the automated cron job every 5 minutes.
+   * 
+   * @returns {Promise<Object>} Number of expired bookings
+   */
+  async expireUnpaidBookings() {
+    const now = new Date();
+
+    // Find all pending bookings with expired payment windows
+    const expiredBookings = await query(
+      `SELECT id, listing_id, check_in_date, check_out_date 
+       FROM bookings 
+       WHERE status = 'pending' 
+       AND payment_expires_at IS NOT NULL 
+       AND payment_expires_at < $1`,
+      [now]
+    );
+
+    if (expiredBookings.rows.length === 0) {
+      return { expired: 0 };
+    }
+
+    logger.info('Found expired unpaid bookings', {
+      count: expiredBookings.rows.length,
+    });
+
+    let expiredCount = 0;
+
+    for (const booking of expiredBookings.rows) {
+      try {
+        // Update booking status to expired
+        await query(
+          `UPDATE bookings SET status = 'expired', updated_at = NOW() WHERE id = $1`,
+          [booking.id]
+        );
+
+        // Release the blocked dates
+        await query(
+          `UPDATE listing_availability SET status = 'available'
+           WHERE listing_id = $1 AND date >= $2 AND date < $3`,
+          [booking.listing_id, booking.check_in_date, booking.check_out_date]
+        );
+
+        // Mark payment as cancelled
+        await query(
+          `UPDATE payments SET status = 'cancelled', failure_reason = 'Payment timeout expired'
+           WHERE booking_id = $1 AND status = 'processing'`,
+          [booking.id]
+        );
+
+        expiredCount++;
+
+        logger.info('Booking expired due to payment timeout', {
+          bookingId: booking.id,
+          listingId: booking.listing_id,
+        });
+      } catch (error) {
+        logger.error('Failed to expire booking', {
+          bookingId: booking.id,
+          error: error.message,
+        });
+      }
+    }
+
+    return { expired: expiredCount };
+  },
+
+  /**
    * Gets bookings for a user (as guest or host).
-   *
+   * 
    * @param {string} userId - The user ID
    * @param {string} role - 'guest' or 'host'
    * @param {Object} options - Filter and pagination options
@@ -402,6 +509,7 @@ const bookingService = {
     const offset = (page - 1) * limit;
 
     const idField = role === 'guest' ? 'guest_id' : 'host_id';
+
     let whereClause = `WHERE b.${idField} = $1`;
     const params = [userId];
     let paramIndex = 2;
@@ -444,7 +552,7 @@ const bookingService = {
 
   /**
    * Checks availability for a listing on given dates.
-   *
+   * 
    * @param {string} listingId - The listing ID
    * @param {string} checkInDate - Check-in date
    * @param {string} checkOutDate - Check-out date

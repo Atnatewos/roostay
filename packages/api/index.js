@@ -1,8 +1,8 @@
 // packages/api/index.js
 // Express application factory for ROOSTAY API
 // Creates and configures the Express app with all middleware and routes
+// Initializes automated cron jobs for booking expiry and maintenance tasks
 // Designed to be mounted in Next.js API routes or run standalone
-
 const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -12,6 +12,7 @@ const cookieParser = require('cookie-parser');
 const createRoutes = require('./routes');
 const { errorHandler, notFoundHandler } = require('../utils/errorHandler');
 const { createCorsMiddleware, rateLimiter } = require('../middleware');
+const { initCronJobs } = require('../utils/cron');
 const logger = require('../utils/logger');
 
 let config;
@@ -29,8 +30,9 @@ try {
 /**
  * Creates and configures the Express application.
  * Registers security middleware, parsing middleware, routes, and error handlers.
+ * Initializes cron jobs for automated tasks like booking expiry.
  * The app is designed to be mounted as a sub-app in Next.js or run standalone.
- *
+ * 
  * @returns {express.Application} Configured Express app
  */
 function createApp() {
@@ -44,7 +46,7 @@ function createApp() {
   // ============================================================================
   // SECURITY MIDDLEWARE
   // ============================================================================
-
+  
   // Helmet sets various HTTP security headers
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -60,7 +62,7 @@ function createApp() {
   // ============================================================================
   // PARSING MIDDLEWARE
   // ============================================================================
-
+  
   // Parse JSON request bodies with size limit
   app.use(express.json({
     limit: '10mb',
@@ -73,13 +75,13 @@ function createApp() {
   // Parse URL-encoded request bodies
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Parse cookies
+  // Parse cookies for httpOnly cookie authentication
   app.use(cookieParser());
 
   // ============================================================================
   // LOGGING MIDDLEWARE
   // ============================================================================
-
+  
   // HTTP request logging in development
   if (config.app.debug) {
     app.use(morgan('dev', {
@@ -103,10 +105,9 @@ function createApp() {
   app.use((req, res, next) => {
     req.requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     req.requestStartTime = Date.now();
-
+    
     // Add response header with request ID for debugging
     res.setHeader('X-Request-ID', req.requestId);
-
     next();
   });
 
@@ -114,6 +115,17 @@ function createApp() {
   // API ROUTES
   // ============================================================================
   app.use('/api', createRoutes());
+
+  // ============================================================================
+  // INITIALIZE CRON JOBS
+  // Automated tasks run on schedule (booking expiry, cleanup, etc.)
+  // Only initialize once when the app is created (not on hot reload)
+  // ============================================================================
+  if (!global.cronJobsInitialized) {
+    initCronJobs();
+    global.cronJobsInitialized = true;
+    logger.info('Cron jobs initialized for automated tasks');
+  }
 
   // ============================================================================
   // ROOT ENDPOINT - API information
@@ -156,7 +168,7 @@ function createApp() {
 /**
  * Starts the Express server on the configured port.
  * Used for standalone development without Next.js.
- *
+ * 
  * @returns {express.Application} The started Express app
  */
 function startServer() {

@@ -3,6 +3,7 @@
 -- All tables use IF NOT EXISTS for idempotent migrations
 -- UUIDs as primary keys for distributed-friendliness
 -- Timestamps with timezone for proper internationalization
+-- Includes payment expiry tracking for automated booking expiry
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -147,6 +148,7 @@ CREATE TABLE IF NOT EXISTS listing_availability (
 
 -- ============================================================================
 -- BOOKINGS
+-- Includes payment_expires_at for automated expiry of unpaid bookings
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS bookings (
@@ -175,6 +177,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     completed_at TIMESTAMPTZ,
     special_requests TEXT,
     guest_message TEXT,
+    payment_expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT valid_dates CHECK (check_out_date > check_in_date)
@@ -193,7 +196,7 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_method VARCHAR(30) NOT NULL
         CHECK (payment_method IN ('bank_transfer', 'telebirr', 'cash', 'other')),
     status VARCHAR(20) NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled')),
+        CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled', 'pending_review')),
     transaction_reference VARCHAR(255),
     proof_image_url TEXT,
     proof_notes TEXT,
@@ -344,11 +347,16 @@ CREATE INDEX IF NOT EXISTS idx_bookings_guest ON bookings(guest_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_host ON bookings(host_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_dates ON bookings(check_in_date, check_out_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_payment_expires 
+    ON bookings(payment_expires_at) 
+    WHERE status = 'pending' AND payment_expires_at IS NOT NULL;
 
 -- Payments indexes
 CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments(transaction_reference) 
+    WHERE transaction_reference IS NOT NULL;
 
 -- Reviews indexes
 CREATE INDEX IF NOT EXISTS idx_reviews_listing ON reviews(listing_id);
@@ -429,3 +437,23 @@ CREATE TRIGGER trg_reviews_overall
     BEFORE INSERT OR UPDATE ON reviews
     FOR EACH ROW
     EXECUTE FUNCTION calculate_overall_rating();
+
+-- ============================================================================
+-- MIGRATION: Add payment_expires_at to existing bookings table
+-- Run this if the table already exists
+-- ============================================================================
+
+-- ALTER TABLE bookings 
+-- ADD COLUMN IF NOT EXISTS payment_expires_at TIMESTAMPTZ;
+
+-- CREATE INDEX IF NOT EXISTS idx_bookings_payment_expires 
+-- ON bookings(payment_expires_at) 
+-- WHERE status = 'pending' AND payment_expires_at IS NOT NULL;
+
+-- ALTER TABLE payments 
+-- ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'
+--     CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled', 'pending_review'));
+
+-- CREATE INDEX IF NOT EXISTS idx_payments_transaction 
+-- ON payments(transaction_reference) 
+-- WHERE transaction_reference IS NOT NULL;

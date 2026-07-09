@@ -1,6 +1,7 @@
 // frontend/pages/api/[...path].js
 // Complete ROOSTAY API handler for Vercel serverless deployment
 // Handles all API routes: auth, listings, bookings, payments, admin, etc.
+// Uses httpOnly cookies for XSS-safe authentication
 // Uses native PostgreSQL driver with parameterized queries
 // Author: Theron
 
@@ -39,6 +40,19 @@ const CONFIG = {
     passwordMinLength: 8,
     maxLoginAttempts: 5,
     lockoutDurationMinutes: 30,
+    // ------------------------------------------------------------------
+    // Cookie configuration for httpOnly token storage
+    // secure: true in production (HTTPS only), false on localhost
+    // sameSite: 'lax' allows cookies on same-site navigation
+    // ------------------------------------------------------------------
+    cookies: {
+      accessName: 'roostay_access_token',
+      refreshName: 'roostay_refresh_token',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAgeAccess: 30 * 60 * 1000,
+      maxAgeRefresh: 7 * 24 * 60 * 60 * 1000,
+    },
   },
   features: {
     registrationEnabled: true,
@@ -176,24 +190,112 @@ function generateTokens(user) {
   };
 }
 
+// ============================================================================
+// COOKIE HELPER FUNCTIONS
+// Manage httpOnly cookies for XSS-safe authentication
+// Tokens are stored in browser cookies, invisible to JavaScript
+// ============================================================================
+
 /**
- * Authentication middleware — verifies the JWT access token from the Authorization header.
+ * Sets access and refresh tokens as httpOnly cookies.
+ * Cookies are automatically sent by the browser on every request.
+ * Secure flag ensures cookies only transmit over HTTPS in production.
+ *
+ * @param {Object} res          - Express response object
+ * @param {string} accessToken  - JWT access token (30 min expiry)
+ * @param {string} refreshToken - JWT refresh token (7 day expiry)
+ */
+function setAuthCookies(res, accessToken, refreshToken) {
+  const c = CONFIG.auth.cookies;
+
+  res.cookie(c.accessName, accessToken, {
+    httpOnly: true,
+    secure: c.secure,
+    sameSite: c.sameSite,
+    maxAge: c.maxAgeAccess,
+    path: '/',
+  });
+
+  res.cookie(c.refreshName, refreshToken, {
+    httpOnly: true,
+    secure: c.secure,
+    sameSite: c.sameSite,
+    maxAge: c.maxAgeRefresh,
+    path: '/api/auth/refresh-token',
+  });
+}
+
+/**
+ * Clears authentication cookies from the browser.
+ * Used during logout to remove all authentication state.
+ *
+ * @param {Object} res - Express response object
+ */
+function clearAuthCookies(res) {
+  const c = CONFIG.auth.cookies;
+
+  res.cookie(c.accessName, '', {
+    httpOnly: true,
+    secure: c.secure,
+    sameSite: c.sameSite,
+    maxAge: 0,
+    path: '/',
+  });
+
+  res.cookie(c.refreshName, '', {
+    httpOnly: true,
+    secure: c.secure,
+    sameSite: c.sameSite,
+    maxAge: 0,
+    path: '/api/auth/refresh-token',
+  });
+}
+
+/**
+ * Authentication middleware — verifies the JWT access token.
+ * Reads from httpOnly cookie FIRST (browser clients),
+ * then falls back to Authorization header (API clients / mobile apps).
  * Attaches decoded user information to req.user on success.
  */
 function authenticate(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new AppError('Authentication required.', 401, 'AUTH_ERROR'));
-  }
   try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, CONFIG.auth.jwtSecret);
-    if (decoded.type !== 'access') {
-      return next(new AppError('Invalid token type.', 401, 'AUTH_ERROR'));
+    let token = null;
+
+    // Priority 1: Read access token from httpOnly cookie
+    if (req.cookies && req.cookies[CONFIG.auth.cookies.accessName]) {
+      token = req.cookies[CONFIG.auth.cookies.accessName];
     }
-    req.user = { id: decoded.sub, email: decoded.email, role: decoded.role };
+
+    // Priority 2: Fallback to Authorization header for backward compatibility
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+      }
+    }
+
+    // No token found in either location
+    if (!token) {
+      throw new AppError('Authentication required. Please log in.', 401, 'AUTH_ERROR');
+    }
+
+    const decoded = jwt.verify(token, CONFIG.auth.jwtSecret);
+
+    if (decoded.type !== 'access') {
+      throw new AppError('Invalid token type.', 401, 'AUTH_ERROR');
+    }
+
+    req.user = {
+      id: decoded.sub,
+      email: decoded.email,
+      role: decoded.role,
+    };
+
     next();
   } catch (err) {
+    if (err instanceof AppError) {
+      return next(err);
+    }
     if (err.name === 'TokenExpiredError') {
       return next(new AppError('Token expired.', 401, 'TOKEN_EXPIRED'));
     }
@@ -353,12 +455,14 @@ const schemas = {
 // ============================================================================
 
 // --------------------------------------------------------------------------
-// Auth Controller — registration, login, profile retrieval
+// Auth Controller — registration, login, profile retrieval, token refresh, logout
 // --------------------------------------------------------------------------
 const authController = {
+
   /**
    * POST /api/auth/register
-   * Creates a new user account with hashed password and returns JWT tokens.
+   * Creates a new user account with hashed password.
+   * Sets httpOnly cookies with access and refresh tokens on success.
    */
   register: asyncHandler(async (req, res) => {
     const { email, password, firstName, lastName, phoneNumber } = req.body;
@@ -379,6 +483,10 @@ const authController = {
     );
 
     const tokens = generateTokens(user);
+
+    // Set httpOnly cookies for XSS-safe authentication
+    setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+
     res.status(201).json({
       success: true,
       message: 'Account created.',
@@ -391,7 +499,6 @@ const authController = {
           role: user.role,
           isVerified: user.is_verified,
         },
-        tokens,
       },
     });
   }),
@@ -400,6 +507,7 @@ const authController = {
    * POST /api/auth/login
    * Authenticates user with email and password.
    * Implements account lockout after repeated failed attempts.
+   * Sets httpOnly cookies with access and refresh tokens on success.
    */
   login: asyncHandler(async (req, res) => {
     const { email, password } = req.body;
@@ -438,6 +546,10 @@ const authController = {
     );
 
     const tokens = generateTokens(user);
+
+    // Set httpOnly cookies for XSS-safe authentication
+    setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+
     res.json({
       success: true,
       message: 'Logged in.',
@@ -450,7 +562,6 @@ const authController = {
           role: user.role,
           isVerified: user.is_verified,
         },
-        tokens,
       },
     });
   }),
@@ -458,6 +569,7 @@ const authController = {
   /**
    * GET /api/auth/me
    * Returns the authenticated user's profile information.
+   * Authentication is verified via httpOnly cookie by the authenticate middleware.
    */
   getMe: asyncHandler(async (req, res) => {
     const user = await queryOne(
@@ -481,6 +593,68 @@ const authController = {
           isVerified: user.is_verified,
         },
       },
+    });
+  }),
+
+  /**
+   * POST /api/auth/refresh-token
+   * Reads the refresh token from httpOnly cookie and issues new token pair.
+   * Called automatically by the frontend when the access token expires.
+   * The refresh cookie is only sent to this specific endpoint.
+   */
+  refreshToken: asyncHandler(async (req, res) => {
+    const refreshToken = req.cookies?.[CONFIG.auth.cookies.refreshName];
+
+    if (!refreshToken) {
+      throw new AppError('No refresh token provided.', 401, 'AUTH_ERROR');
+    }
+
+    try {
+      const decoded = jwt.verify(refreshToken, CONFIG.auth.jwtRefreshSecret);
+
+      if (decoded.type !== 'refresh') {
+        throw new AppError('Invalid token type.', 401, 'AUTH_ERROR');
+      }
+
+      // Verify the user still exists and is active
+      const user = await queryOne(
+        'SELECT id, email, role, is_active FROM users WHERE id = $1',
+        [decoded.sub]
+      );
+
+      if (!user) throw new AppError('User not found.', 401, 'AUTH_ERROR');
+      if (!user.is_active) throw new AppError('Account deactivated.', 401, 'AUTH_ERROR');
+
+      // Generate new token pair and set new cookies
+      const tokens = generateTokens(user);
+      setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+
+      res.json({
+        success: true,
+        message: 'Token refreshed successfully.',
+      });
+    } catch (err) {
+      // Clear invalid cookies on any error
+      clearAuthCookies(res);
+
+      if (err instanceof AppError) throw err;
+      if (err.name === 'TokenExpiredError') {
+        throw new AppError('Refresh token expired. Please log in again.', 401, 'TOKEN_EXPIRED');
+      }
+      throw new AppError('Invalid refresh token.', 401, 'AUTH_ERROR');
+    }
+  }),
+
+  /**
+   * POST /api/auth/logout
+   * Clears httpOnly cookies to log the user out.
+   * No authentication required — simply removes the cookies.
+   */
+  logout: asyncHandler(async (req, res) => {
+    clearAuthCookies(res);
+    res.json({
+      success: true,
+      message: 'Logged out successfully.',
     });
   }),
 };
@@ -680,7 +854,7 @@ const listingController = {
   }),
 
   // =========================================================================
-  // NEW: GET /api/listings/:id/blocked-dates
+  // GET /api/listings/:id/blocked-dates
   // Returns all blocked date ranges for a listing with status labels.
   // Groups consecutive dates into ranges with status (booked/pending).
   // Used by the DatePicker to show unavailable dates with context.
@@ -688,17 +862,12 @@ const listingController = {
   getBlockedDates: asyncHandler(async (req, res) => {
     const listingId = req.params.id;
 
-    // Verify the listing exists and is active before querying blocked dates
     const listing = await queryOne(
       'SELECT id FROM listings WHERE id = $1 AND is_active = true',
       [listingId]
     );
     if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
 
-    // Generate a date series for the next 365 days and check each date
-    // against confirmed and pending bookings for this listing.
-    // Confirmed bookings = hard-blocked ("booked")
-    // Pending bookings   = soft-blocked ("pending" — may expire)
     const blockedDates = await query(
       `SELECT DISTINCT
               d::date as date,
@@ -735,8 +904,6 @@ const listingController = {
       [listingId]
     );
 
-    // Group consecutive dates with the same status into display-friendly ranges.
-    // Example: Three individual days become "July 14-16 (Booked)"
     const ranges = [];
     let currentRange = null;
 
@@ -744,7 +911,6 @@ const listingController = {
       const dateStr = new Date(row.date).toISOString().split('T')[0];
 
       if (!currentRange) {
-        // Start the first range
         currentRange = {
           startDate: dateStr,
           endDate: dateStr,
@@ -754,10 +920,8 @@ const listingController = {
         currentRange.status === row.status &&
         new Date(row.date).getTime() - new Date(currentRange.endDate).getTime() === 86400000
       ) {
-        // Extend the current range — this is a consecutive day with the same status
         currentRange.endDate = dateStr;
       } else {
-        // Different status or a gap in dates — save the current range and start a new one
         ranges.push(currentRange);
         currentRange = {
           startDate: dateStr,
@@ -767,12 +931,10 @@ const listingController = {
       }
     }
 
-    // Push the final range if one was being built
     if (currentRange) {
       ranges.push(currentRange);
     }
 
-    // Return both the grouped ranges (for display) and individual dates (for the calendar)
     res.json({
       success: true,
       data: {
@@ -786,7 +948,7 @@ const listingController = {
   }),
 
   // =========================================================================
-  // NEW: GET /api/listings/:id/similar
+  // GET /api/listings/:id/similar
   // Returns similar listings based on city, property type, and price range.
   // Excludes the current listing from results.
   // Used to suggest alternatives when a listing is fully booked.
@@ -795,7 +957,6 @@ const listingController = {
     const listingId = req.params.id;
     const limit = Math.min(parseInt(req.query.limit) || 6, 20);
 
-    // Fetch the current listing to use as the similarity reference point
     const currentListing = await queryOne(
       `SELECT city, listing_type, property_type, price_per_night, price_per_month
        FROM listings WHERE id = $1 AND is_active = true`,
@@ -803,17 +964,10 @@ const listingController = {
     );
     if (!currentListing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
 
-    // Determine the reference price for similarity matching.
-    // Uses price_per_night if available, otherwise falls back to price_per_month.
     const refPrice = parseFloat(
       currentListing.price_per_night || currentListing.price_per_month || 0
     );
 
-    // Find similar listings matching these criteria (in priority order):
-    // 1. Same city
-    // 2. Price within ±50% of the reference price
-    // 3. Same property type gets priority (via ORDER BY CASE)
-    // 4. Exclude the current listing
     const similar = await query(
       `SELECT l.id, l.title, l.listing_type, l.property_type,
               l.bedrooms, l.bathrooms, l.max_guests,
@@ -840,15 +994,14 @@ const listingController = {
       [
         listingId,
         currentListing.city,
-        refPrice * 0.5, refPrice * 1.5,   // price_per_night range (±50%)
-        refPrice * 0.5, refPrice * 1.5,   // price_per_month range (±50%)
+        refPrice * 0.5, refPrice * 1.5,
+        refPrice * 0.5, refPrice * 1.5,
         currentListing.listing_type,
         currentListing.property_type,
         limit,
       ]
     );
 
-    // Return the similar listings along with metadata about what the similarity was based on
     res.json({
       success: true,
       data: similar.rows.map((l) => ({
@@ -895,7 +1048,6 @@ const bookingController = {
       paymentMethod, transactionNumber, proofNotes,
     } = req.body;
 
-    // Verify the listing exists and is available for booking
     const listing = await queryOne(
       'SELECT * FROM listings WHERE id = $1 AND is_active = true AND is_approved = true',
       [listingId]
@@ -905,7 +1057,6 @@ const bookingController = {
       throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
     }
 
-    // Check for date conflicts with existing bookings
     const conflict = await queryOne(
       `SELECT id FROM bookings
        WHERE listing_id = $1 AND status IN ('pending','confirmed')
@@ -914,8 +1065,6 @@ const bookingController = {
     );
     if (conflict) throw new AppError('Dates are not available.', 409, 'CONFLICT');
 
-    // Validate the transaction number is not already used in a completed payment
-    // This prevents users from reusing the same transaction reference
     if (CONFIG.features.preventDuplicateTransactions && transactionNumber) {
       const existingTransaction = await queryOne(
         `SELECT p.id, p.status, b.id as booking_id
@@ -933,7 +1082,6 @@ const bookingController = {
       }
     }
 
-    // Calculate pricing based on booking type and listing rates
     const nights = Math.ceil(
       (new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24)
     );
@@ -948,7 +1096,6 @@ const bookingController = {
     );
     const totalAmount = baseAmount + cleaningFee + serviceFee;
 
-    // Create the booking record with 'pending' status
     const booking = await queryOne(
       `INSERT INTO bookings (
         listing_id, guest_id, host_id, booking_type,
@@ -965,8 +1112,6 @@ const bookingController = {
       ]
     );
 
-    // Create the payment record attached to this booking
-    // The transaction reference is stored for duplicate checking
     const payment = await queryOne(
       `INSERT INTO payments (
         booking_id, user_id, amount, currency, payment_method,
@@ -983,7 +1128,6 @@ const bookingController = {
       ]
     );
 
-    // Calculate the payment expiry time based on configurable timeout
     const expiryTime = new Date(
       Date.now() + CONFIG.features.paymentTimeoutMinutes * 60 * 1000
     );
@@ -1022,7 +1166,6 @@ const bookingController = {
       throw new AppError('Please provide a valid transaction number.', 400, 'VALIDATION_ERROR');
     }
 
-    // Query for any completed payment with this transaction reference
     const existing = await queryOne(
       `SELECT p.id, p.status, p.created_at
        FROM payments p
@@ -1145,7 +1288,6 @@ const bookingController = {
 
     if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
 
-    // Verify the requesting user is the guest, host, or an admin
     if (
       booking.guest_id !== req.user.id &&
       booking.host_id !== req.user.id &&
@@ -1168,7 +1310,6 @@ const bookingController = {
 
     if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
 
-    // Define valid status transitions for each role
     const validTransitions = {
       pending: { confirmed: ['host', 'admin'], cancelled: ['guest', 'admin'], rejected: ['host', 'admin'], expired: ['system'] },
       confirmed: { cancelled: ['guest', 'host', 'admin'], completed: ['host', 'admin'] },
@@ -1186,7 +1327,6 @@ const bookingController = {
       throw new AppError('You do not have permission to perform this action.', 403, 'FORBIDDEN');
     }
 
-    // Build update fields dynamically
     const updates = { status };
     if (status === 'cancelled') {
       updates.cancelled_by = req.user.id;
@@ -1408,7 +1548,6 @@ const adminController = {
     );
     if (!payment) throw new AppError('Payment not found.', 404, 'NOT_FOUND');
 
-    // If payment is verified, auto-confirm the associated booking
     if (newStatus === 'completed') {
       await query(
         "UPDATE bookings SET status = 'confirmed', confirmed_at = NOW() WHERE id = $1 AND status = 'pending'",
@@ -1471,17 +1610,19 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'ROOSTAY API is running.', timestamp: new Date().toISOString(), environment: CONFIG.app.env });
 });
 
-// ---- Auth Routes ----
+// ---- Auth Routes (with httpOnly cookie support) ----
 app.post('/api/auth/register', validateBody(schemas.register), authController.register);
 app.post('/api/auth/login', validateBody(schemas.login), authController.login);
 app.get('/api/auth/me', authenticate, authController.getMe);
+app.post('/api/auth/refresh-token', authController.refreshToken);
+app.post('/api/auth/logout', authController.logout);
 
 // ---- Listing Routes ----
 app.post('/api/listings', authenticate, authorize('host', 'admin'), validateBody(schemas.createListing), listingController.createListing);
 app.get('/api/listings', listingController.searchListings);
 app.get('/api/listings/:id', listingController.getListingById);
 
-// ---- NEW: Blocked dates and similar listings routes ----
+// ---- Blocked dates and similar listings routes ----
 // These endpoints provide availability data and alternatives for fully booked listings
 app.get('/api/listings/:id/blocked-dates', listingController.getBlockedDates);
 app.get('/api/listings/:id/similar', listingController.getSimilarListings);

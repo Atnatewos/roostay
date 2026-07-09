@@ -1,9 +1,9 @@
 // packages/api/controllers/listing.controller.js
 // Listing controller - handles HTTP requests for property listing endpoints
 // Supports CRUD operations, search, and image management
-
 const listingService = require('../../services/listing.service');
 const { asyncHandler } = require('../../utils/asyncHandler');
+const { ValidationError } = require('../../utils/errors');
 const logger = require('../../utils/logger');
 
 const listingController = {
@@ -14,13 +14,11 @@ const listingController = {
    */
   createListing: asyncHandler(async (req, res) => {
     const listing = await listingService.createListing(req.user.id, req.body);
-
     logger.info('Listing created via API', {
       listingId: listing.id,
       hostId: req.user.id,
       title: listing.title,
     });
-
     res.status(201).json({
       success: true,
       message: 'Listing created successfully.',
@@ -35,7 +33,6 @@ const listingController = {
    */
   searchListings: asyncHandler(async (req, res) => {
     const result = await listingService.searchListings(req.query);
-
     res.status(200).json({
       success: true,
       data: result.listings,
@@ -49,7 +46,6 @@ const listingController = {
    */
   getListingById: asyncHandler(async (req, res) => {
     const listing = await listingService.getListingById(req.params.id);
-
     res.status(200).json({
       success: true,
       data: { listing },
@@ -63,12 +59,10 @@ const listingController = {
    */
   updateListing: asyncHandler(async (req, res) => {
     const listing = await listingService.updateListing(req.params.id, req.user.id, req.body);
-
     logger.info('Listing updated via API', {
-      listingId: listing.id,
+      listingId: req.params.id,
       hostId: req.user.id,
     });
-
     res.status(200).json({
       success: true,
       message: 'Listing updated successfully.',
@@ -82,12 +76,10 @@ const listingController = {
    */
   deleteListing: asyncHandler(async (req, res) => {
     await listingService.deleteListing(req.params.id, req.user.id, req.user.role);
-
     logger.info('Listing deleted via API', {
       listingId: req.params.id,
       userId: req.user.id,
     });
-
     res.status(200).json({
       success: true,
       message: 'Listing deleted successfully.',
@@ -101,7 +93,6 @@ const listingController = {
    */
   getHostListings: asyncHandler(async (req, res) => {
     const result = await listingService.getHostListings(req.user.id, req.query);
-
     res.status(200).json({
       success: true,
       data: result.listings,
@@ -111,31 +102,44 @@ const listingController = {
 
   /**
    * POST /api/listings/:id/images
-   * Uploads images for a listing. Only the host owner can upload.
-   * Form data: images (multipart)
+   * Saves uploaded image URLs to the database for a specific listing.
+   * Only the host owner can upload.
+   * 
+   * Body: { images: [{ url, publicId, width, height, format }] }
    */
   uploadListingImages: asyncHandler(async (req, res) => {
-    const imageUrls = req.files.map((file) => ({
-      url: file.path || file.location,
-      originalName: file.originalname,
-      size: file.size,
-    }));
-
-    // Save image URLs to database
-    const { query } = require('../../database');
-
-    for (let i = 0; i < imageUrls.length; i++) {
-      await query(
-        `INSERT INTO listing_images (listing_id, image_url, sort_order, is_primary)
-         VALUES ($1, $2, $3, $4)`,
-        [req.params.id, imageUrls[i].url, i, i === 0]
-      );
+    const { images } = req.body;
+    
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      throw new ValidationError('An array of image objects is required.');
     }
+
+    const { query } = require('../../database');
+    const savedImages = [];
+
+    // Insert each image URL into the database using parameterized queries
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (!img.url) continue;
+
+      const result = await query(
+        `INSERT INTO listing_images (listing_id, image_url, sort_order, is_primary)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, image_url, sort_order, is_primary`,
+        [req.params.id, img.url, i, i === 0]
+      );
+      savedImages.push(result);
+    }
+
+    logger.info('Listing images saved via API', {
+      listingId: req.params.id,
+      imageCount: savedImages.length,
+    });
 
     res.status(201).json({
       success: true,
-      message: `${imageUrls.length} image(s) uploaded successfully.`,
-      data: { images: imageUrls },
+      message: `${savedImages.length} image(s) saved successfully.`,
+      data: { images: savedImages },
     });
   }),
 };

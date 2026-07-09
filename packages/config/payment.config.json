@@ -1,128 +1,77 @@
 {
   "development": {
     "currency": "ETB",
-    "locale": "am_ET",
     "serviceFeePercent": 5,
     "serviceFeeMin": 100,
     "serviceFeeMax": 5000,
-    "cleaningFeeEnabled": true,
-    "securityDepositEnabled": true,
+    "paymentTimeoutMinutes": 30,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
     "bankTransfer": {
       "enabled": true,
       "bankName": "BANK_NAME",
       "accountNumber": "BANK_ACCOUNT_NUMBER",
       "accountHolder": "BANK_ACCOUNT_HOLDER",
       "referencePrefix": "ROOSTAY",
-      "verificationRequired": true,
       "verificationTimeoutHours": 48,
-      "requireTransactionNumber": true,
-      "transactionNumberLabel": "Transaction Reference Number",
-      "transactionNumberHint": "Enter the reference number from your bank transfer receipt or SMS confirmation",
-      "instructions": "Please transfer the total amount to the bank account below and enter the transaction reference number. Your booking will be confirmed within 48 hours of payment verification."
+      "instructions": "Please transfer the total amount and enter the transaction reference number."
     },
     "telebirr": {
-      "enabled": false,
+      "enabled": true,
       "merchantId": "TELEBIRR_MERCHANT_ID",
       "apiKey": "TELEBIRR_API_KEY",
       "shortcode": "TELEBIRR_SHORTCODE",
-      "apiUrl": "https://api.telebirr.com/v1",
-      "callbackUrl": "/api/payments/telebirr/callback",
-      "timeoutSeconds": 120,
-      "requireTransactionNumber": true,
-      "transactionNumberLabel": "Telebirr Transaction ID",
-      "transactionNumberHint": "Enter the transaction ID from your Telebirr payment confirmation"
-    },
-    "withdrawal": {
-      "minimumAmount": 500,
-      "maximumAmount": 100000,
-      "processingTimeDays": 3,
-      "methods": ["bank_transfer", "telebirr"],
-      "feePercent": 0,
-      "feeFixed": 0
+      "merchantName": "ROOSTAY"
     }
   },
   "production": {
     "currency": "ETB",
-    "locale": "am_ET",
     "serviceFeePercent": 5,
     "serviceFeeMin": 100,
     "serviceFeeMax": 5000,
-    "cleaningFeeEnabled": true,
-    "securityDepositEnabled": true,
+    "paymentTimeoutMinutes": 30,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
     "bankTransfer": {
       "enabled": true,
       "bankName": "BANK_NAME",
       "accountNumber": "BANK_ACCOUNT_NUMBER",
       "accountHolder": "BANK_ACCOUNT_HOLDER",
       "referencePrefix": "ROOSTAY",
-      "verificationRequired": true,
-      "verificationTimeoutHours": 24,
-      "requireTransactionNumber": true,
-      "transactionNumberLabel": "Transaction Reference Number",
-      "transactionNumberHint": "Enter the reference number from your bank transfer receipt or SMS confirmation",
-      "instructions": "Please transfer the total amount to the bank account below and enter the transaction reference number. Your booking will be confirmed within 24 hours of payment verification."
+      "verificationTimeoutHours": 48,
+      "instructions": "Please transfer the total amount and enter the transaction reference number."
     },
     "telebirr": {
-      "enabled": false,
+      "enabled": true,
       "merchantId": "TELEBIRR_MERCHANT_ID",
       "apiKey": "TELEBIRR_API_KEY",
       "shortcode": "TELEBIRR_SHORTCODE",
-      "apiUrl": "https://api.telebirr.com/v1",
-      "callbackUrl": "/api/payments/telebirr/callback",
-      "timeoutSeconds": 120,
-      "requireTransactionNumber": true,
-      "transactionNumberLabel": "Telebirr Transaction ID",
-      "transactionNumberHint": "Enter the transaction ID from your Telebirr payment confirmation"
-    },
-    "withdrawal": {
-      "minimumAmount": 500,
-      "maximumAmount": 200000,
-      "processingTimeDays": 5,
-      "methods": ["bank_transfer", "telebirr"],
-      "feePercent": 0,
-      "feeFixed": 0
+      "merchantName": "ROOSTAY"
     }
   },
   "test": {
     "currency": "ETB",
-    "locale": "am_ET",
-    "serviceFeePercent": 0,
-    "serviceFeeMin": 0,
-    "serviceFeeMax": 0,
-    "cleaningFeeEnabled": false,
-    "securityDepositEnabled": false,
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "paymentTimeoutMinutes": 5,
+    "requireTransactionNumber": false,
+    "preventDuplicateTransactions": false,
     "bankTransfer": {
       "enabled": true,
       "bankName": "Test Bank",
-      "accountNumber": "0000000000",
-      "accountHolder": "Test Account",
+      "accountNumber": "1234567890",
+      "accountHolder": "TEST",
       "referencePrefix": "TEST",
-      "verificationRequired": false,
       "verificationTimeoutHours": 1,
-      "requireTransactionNumber": true,
-      "transactionNumberLabel": "Transaction Reference",
-      "transactionNumberHint": "Enter test transaction reference",
-      "instructions": "Test payment instructions."
+      "instructions": "Test instructions"
     },
     "telebirr": {
-      "enabled": false,
+      "enabled": true,
       "merchantId": "test_merchant",
       "apiKey": "test_key",
-      "shortcode": "000000",
-      "apiUrl": "http://localhost:3001/api/test",
-      "callbackUrl": "/api/payments/telebirr/callback",
-      "timeoutSeconds": 10,
-      "requireTransactionNumber": true,
-      "transactionNumberLabel": "Telebirr ID",
-      "transactionNumberHint": "Enter test transaction ID"
-    },
-    "withdrawal": {
-      "minimumAmount": 10,
-      "maximumAmount": 10000,
-      "processingTimeDays": 1,
-      "methods": ["bank_transfer"],
-      "feePercent": 0,
-      "feeFixed": 0
+      "shortcode": "999999",
+      "merchantName": "TEST"
     }
   }
 }

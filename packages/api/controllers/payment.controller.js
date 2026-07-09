@@ -1,12 +1,26 @@
 // packages/api/controllers/payment.controller.js
 // Payment controller - handles HTTP requests for payment endpoints
-// Supports payment creation, proof upload, and admin verification
-
+// Supports payment creation, proof upload, admin verification, and transaction validation
 const paymentService = require('../../services/payment.service');
 const { asyncHandler } = require('../../utils/asyncHandler');
 const logger = require('../../utils/logger');
 
 const paymentController = {
+  /**
+   * POST /api/payments/validate-transaction
+   * Validates that a transaction number has not been used before.
+   * Body: { transactionNumber }
+   */
+  validateTransaction: asyncHandler(async (req, res) => {
+    const { transactionNumber } = req.body;
+    const result = await paymentService.validateTransactionNumber(transactionNumber);
+    
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }),
+
   /**
    * POST /api/payments
    * Creates a payment for a confirmed booking.
@@ -14,16 +28,15 @@ const paymentController = {
    */
   createPayment: asyncHandler(async (req, res) => {
     const { bookingId, paymentMethod } = req.body;
-
     const result = await paymentService.createPayment(bookingId, req.user.id, paymentMethod);
-
+    
     logger.info('Payment created via API', {
       paymentId: result.payment.id,
       bookingId,
       userId: req.user.id,
       method: paymentMethod,
     });
-
+    
     res.status(201).json({
       success: true,
       message: 'Payment created. Please complete the transfer.',
@@ -38,14 +51,13 @@ const paymentController = {
    */
   uploadPaymentProof: asyncHandler(async (req, res) => {
     const { proofImageUrl, notes } = req.body;
-
     const payment = await paymentService.uploadPaymentProof(
       req.params.id,
       req.user.id,
       proofImageUrl,
       notes
     );
-
+    
     res.status(200).json({
       success: true,
       message: 'Payment proof uploaded. Awaiting verification.',
@@ -59,7 +71,7 @@ const paymentController = {
    */
   getPaymentById: asyncHandler(async (req, res) => {
     const payment = await paymentService.getPaymentById(req.params.id, req.user.id);
-
+    
     res.status(200).json({
       success: true,
       data: { payment },
@@ -73,19 +85,18 @@ const paymentController = {
    */
   verifyPayment: asyncHandler(async (req, res) => {
     const { action, reason } = req.body;
-
     const payment = await paymentService.verifyPayment(
       req.params.id,
       req.user.id,
       action,
       reason
     );
-
+    
     logger.info(`Payment ${action}d via API`, {
       paymentId: req.params.id,
       adminId: req.user.id,
     });
-
+    
     res.status(200).json({
       success: true,
       message: `Payment ${action === 'verify' ? 'verified' : 'rejected'} successfully.`,
@@ -100,7 +111,7 @@ const paymentController = {
    */
   listPayments: asyncHandler(async (req, res) => {
     const result = await paymentService.listPayments(req.query);
-
+    
     res.status(200).json({
       success: true,
       data: result.payments,

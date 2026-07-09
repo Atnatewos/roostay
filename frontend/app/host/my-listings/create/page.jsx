@@ -1,9 +1,7 @@
 // frontend/app/host/my-listings/create/page.jsx
 // Create Listing Page — multi-section form for hosts to create new property listings
-// Handles all listing fields including pricing, location, amenities, and house rules
+// Handles all listing fields including pricing, location, amenities, and image uploads
 // Validates input on submission and redirects to the listing on success
-// Author: Theron
-
 'use client';
 
 import { useState } from 'react';
@@ -14,54 +12,44 @@ import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { apiClient, ApiError } from '@/lib/api';
+import { api, apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
  * Create Listing Page
  * Provides a comprehensive form for hosts to create new property listings.
  * Organized into logical sections: Basic Info, Property Details, Pricing,
- * Location, Amenities, and Rules. Validates all required fields before submission.
+ * Location, Amenities, Rules, and Images. Validates all required fields before submission.
  */
 export default function CreateListingPage() {
   const router = useRouter();
 
   // Form state — organized by section for clarity
   const [form, setForm] = useState({
-    // Basic Information
     title: '',
     description: '',
     listingType: 'short_term',
     propertyType: 'apartment',
-
-    // Property Details
     bedrooms: 1,
     bathrooms: 1,
     maxGuests: 1,
     bedsCount: 1,
-
-    // Pricing
     pricePerNight: '',
     pricePerMonth: '',
     cleaningFee: '0',
     securityDeposit: '0',
-
-    // Location
     streetAddress: '',
     city: '',
     subcity: '',
-
-    // Booking Settings
     instantBook: false,
     minNights: 1,
     cancellationPolicy: 'flexible',
-
-    // Amenities (comma-separated for simplicity, parsed on submit)
     amenitiesInput: '',
-
-    // House Rules
     houseRules: '',
   });
+
+  // Image upload state
+  const [images, setImages] = useState([]);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,13 +58,11 @@ export default function CreateListingPage() {
 
   /**
    * Updates a form field and clears its error.
-   *
    * @param {string} field - Field name to update
    * @param {*} value - New field value
    */
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
-
     if (fieldErrors[field]) {
       setFieldErrors((prev) => {
         const updated = { ...prev };
@@ -88,39 +74,29 @@ export default function CreateListingPage() {
 
   /**
    * Validates all required form fields before submission.
-   *
    * @returns {boolean} True if the form passes all validation checks
    */
   function validateForm() {
     const errors = {};
 
-    // Required text fields validation
     if (!form.title.trim() || form.title.trim().length < 5) {
       errors.title = 'Title must be at least 5 characters.';
     }
-
     if (!form.description.trim() || form.description.trim().length < 20) {
       errors.description = 'Description must be at least 20 characters.';
     }
-
     if (!form.streetAddress.trim()) {
       errors.streetAddress = 'Street address is required.';
     }
-
     if (!form.city.trim()) {
       errors.city = 'City is required.';
     }
-
-    // Pricing validation based on listing type
     if ((form.listingType === 'short_term' || form.listingType === 'both') && !form.pricePerNight) {
       errors.pricePerNight = 'Price per night is required for short-term listings.';
     }
-
     if ((form.listingType === 'long_term' || form.listingType === 'both') && !form.pricePerMonth) {
       errors.pricePerMonth = 'Price per month is required for long-term listings.';
     }
-
-    // Numeric field validation
     if (form.maxGuests < 1) errors.maxGuests = 'Must accommodate at least 1 guest.';
     if (form.bedrooms < 0) errors.bedrooms = 'Cannot be negative.';
     if (form.bathrooms < 1) errors.bathrooms = 'Must have at least 1 bathroom.';
@@ -131,21 +107,18 @@ export default function CreateListingPage() {
 
   /**
    * Handles form submission.
-   * Validates all fields, constructs the API payload, and sends the request.
+   * Validates all fields, constructs the API payload, uploads images, and sends the request.
    * On success, redirects to the host listings page.
-   *
    * @param {Event} e - Form submit event
    */
   async function handleSubmit(e) {
     e.preventDefault();
-
     if (!validateForm()) return;
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Parse amenities from comma-separated input
       const amenities = form.amenitiesInput
         ? form.amenitiesInput.split(',').map((a) => ({
             name: a.trim(),
@@ -153,7 +126,6 @@ export default function CreateListingPage() {
           }))
         : [];
 
-      // Construct the API payload
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
@@ -177,10 +149,34 @@ export default function CreateListingPage() {
         houseRules: form.houseRules.trim() || null,
       };
 
+      // Create the listing first
       const response = await apiClient.post('/listings', payload);
+      const listingId = response?.data?.listing?.id;
 
-      // Redirect to the host listings page on success
-      if (response?.data?.listing?.id) {
+      // If images are selected and listing was created, upload them to Cloudinary
+      if (listingId && images.length > 0) {
+        const formData = new FormData();
+        images.forEach((file) => {
+          formData.append('images', file);
+        });
+        formData.append('folder', 'listings');
+
+        const uploadResponse = await api('/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const uploadedImages = uploadResponse.data?.images || [];
+        
+        // Save image URLs to the listing database
+        if (uploadedImages.length > 0) {
+          await apiClient.post(`/listings/${listingId}/images`, {
+            images: uploadedImages,
+          });
+        }
+      }
+
+      if (listingId) {
         router.push('/host/my-listings');
       }
     } catch (err) {
@@ -197,7 +193,6 @@ export default function CreateListingPage() {
   return (
     <>
       <Header />
-
       <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem', maxWidth: '700px' }}>
         {/* Page Header */}
         <div style={{ marginBottom: '2rem' }}>
@@ -242,7 +237,6 @@ export default function CreateListingPage() {
             <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
               Basic Information
             </h2>
-
             <Input
               id="title"
               label="Listing Title"
@@ -252,7 +246,6 @@ export default function CreateListingPage() {
               required
               placeholder="e.g., Modern Apartment in Bole with City View"
             />
-
             <Input
               id="description"
               type="textarea"
@@ -263,7 +256,6 @@ export default function CreateListingPage() {
               required
               placeholder="Describe your property in detail. Highlight unique features, nearby attractions, and house rules..."
             />
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Input
                 id="listingType"
@@ -291,7 +283,6 @@ export default function CreateListingPage() {
             <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
               Property Details
             </h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Input
                 id="bedrooms"
@@ -336,7 +327,6 @@ export default function CreateListingPage() {
             <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
               Pricing ({constants.CURRENCY_SYMBOL})
             </h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Input
                 id="pricePerNight"
@@ -383,7 +373,6 @@ export default function CreateListingPage() {
             <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
               Location
             </h2>
-
             <Input
               id="streetAddress"
               label="Street Address"
@@ -393,7 +382,6 @@ export default function CreateListingPage() {
               required
               placeholder="Bole Road, Near Edna Mall"
             />
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Input
                 id="city"
@@ -423,7 +411,6 @@ export default function CreateListingPage() {
             <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
               Amenities & Rules
             </h2>
-
             <Input
               id="amenitiesInput"
               label="Amenities"
@@ -432,7 +419,6 @@ export default function CreateListingPage() {
               placeholder="WiFi, Kitchen, TV, Air Conditioning, Parking"
               helperText="Enter amenities separated by commas"
             />
-
             <Input
               id="houseRules"
               type="textarea"
@@ -448,7 +434,6 @@ export default function CreateListingPage() {
             <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
               Booking Settings
             </h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Input
                 id="minNights"
@@ -466,7 +451,6 @@ export default function CreateListingPage() {
                 options={constants.CANCELLATION_POLICIES}
               />
             </div>
-
             <div style={{ marginTop: '1rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: 'var(--font-size-sm)' }}>
                 <input
@@ -480,6 +464,66 @@ export default function CreateListingPage() {
             </div>
           </Card>
 
+          {/* Section 7: Property Images */}
+          <Card padding="lg" style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '1.25rem' }}>
+              Property Images
+            </h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+                Upload Photos
+              </label>
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setImages((prev) => [...prev, ...files].slice(0, 10)); // Max 10 images
+                }}
+                style={{ marginBottom: '0.5rem' }}
+              />
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                Upload up to 10 images. JPEG, PNG, or WebP.
+              </p>
+            </div>
+            {images.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.5rem' }}>
+                {images.map((file, index) => (
+                  <div key={index} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={`Preview ${index + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImages((prev) => prev.filter((_, i) => i !== index))}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: 'rgba(0,0,0,0.6)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
           {/* Submit Buttons */}
           <div style={{ display: 'flex', gap: '1rem' }}>
             <Link href="/host/my-listings" className="btn btn--outline" style={{ flex: 1 }}>
@@ -491,7 +535,6 @@ export default function CreateListingPage() {
           </div>
         </form>
       </main>
-
       <Footer />
     </>
   );

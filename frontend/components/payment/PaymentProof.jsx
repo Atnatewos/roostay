@@ -1,18 +1,17 @@
 // frontend/components/payment/PaymentProof.jsx
 // Payment proof upload component for manual bank transfer verification
-// Supports image upload with preview and submission
-
+// Supports image upload with preview and submission via Cloudinary
 'use client';
 
 const { useState, useRef } = require('react');
 const Button = require('@components/ui/Button').default;
-const { apiClient, ApiError } = require('@lib/api');
+const { api, apiClient, ApiError } = require('@lib/api');
 
 /**
  * Payment proof upload component.
  * Allows users to upload a receipt/screenshot as proof of bank transfer payment.
  * Includes image preview, notes field, and submission handling.
- *
+ * 
  * @param {Object} props
  * @param {string} props.paymentId - The payment ID to attach proof to
  * @param {Function} [props.onSuccess] - Callback after successful upload
@@ -29,21 +28,18 @@ function PaymentProof({ paymentId, onSuccess }) {
   /**
    * Handles file selection and generates a preview.
    * Validates file type and size before accepting.
-   *
    * @param {Event} e - File input change event
    */
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       setError('Please select a valid image file (JPEG, PNG, WebP, or AVIF).');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB.');
       return;
@@ -52,7 +48,6 @@ function PaymentProof({ paymentId, onSuccess }) {
     setSelectedFile(file);
     setError(null);
 
-    // Generate preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreviewUrl(reader.result);
@@ -73,7 +68,7 @@ function PaymentProof({ paymentId, onSuccess }) {
 
   /**
    * Uploads the payment proof to the server.
-   * First uploads the image, then submits the proof URL to the payment API.
+   * First uploads the image to Cloudinary via /api/upload, then submits the proof URL.
    */
   async function handleSubmit() {
     if (!selectedFile) {
@@ -99,23 +94,17 @@ function PaymentProof({ paymentId, onSuccess }) {
 
       // Create form data for image upload
       const formData = new FormData();
-      formData.append('image', selectedFile);
+      formData.append('images', selectedFile);
       formData.append('folder', 'payment-proofs');
 
-      // Upload image to Cloudinary or storage service
-      const uploadResponse = await fetch('/api/upload', {
+      // Upload image to Cloudinary via backend API
+      const uploadResponse = await api('/upload', {
         method: 'POST',
         body: formData,
       });
 
       clearInterval(progressInterval);
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload image. Please try again.');
-      }
-
-      const uploadData = await uploadResponse.json();
-      const imageUrl = uploadData.url || uploadData.data?.url;
+      const imageUrl = uploadResponse.data?.images?.[0]?.url;
 
       if (!imageUrl) {
         throw new Error('Failed to get image URL after upload.');
@@ -123,7 +112,7 @@ function PaymentProof({ paymentId, onSuccess }) {
 
       setUploadProgress(100);
 
-      // Submit proof to payment API
+      // Submit proof URL to payment API
       await apiClient.post(`/payments/${paymentId}/proof`, {
         proofImageUrl: imageUrl,
         notes: notes || null,
@@ -147,7 +136,7 @@ function PaymentProof({ paymentId, onSuccess }) {
   return (
     <div className="payment-proof">
       <h3 className="payment-proof__title">Upload Payment Receipt</h3>
-
+      
       {/* File Upload Area */}
       <div className="payment-proof__upload-area">
         {previewUrl ? (
@@ -184,7 +173,6 @@ function PaymentProof({ paymentId, onSuccess }) {
             <span className="payment-proof__upload-hint">JPEG, PNG, WebP (max 5MB)</span>
           </button>
         )}
-
         <input
           ref={fileInputRef}
           type="file"

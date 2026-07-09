@@ -1,93 +1,115 @@
 // packages/api/controllers/auth.controller.js
 // Authentication controller - handles HTTP requests for auth endpoints
-// Thin layer that parses requests, delegates to services, and sends responses
-
+// Sets and clears httpOnly cookies for secure token storage
 const userService = require('../../services/user.service');
 const { asyncHandler } = require('../../utils/asyncHandler');
+const { AuthError } = require('../../utils/errors');
 const logger = require('../../utils/logger');
 
+let config;
+try {
+  config = require('@roostay/config');
+} catch {
+  config = { auth: { cookies: { accessName: 'roostay_access_token', refreshName: 'roostay_refresh_token', secure: false, sameSite: 'lax', maxAgeAccess: 900000, maxAgeRefresh: 604800000, path: '/' } } };
+}
+
+/**
+ * Helper to set secure authentication cookies
+ */
+function setAuthCookies(res, tokens) {
+  const cookieConfig = config.auth.cookies;
+  
+  res.cookie(cookieConfig.accessName, tokens.accessToken, {
+    httpOnly: true,
+    secure: cookieConfig.secure,
+    sameSite: cookieConfig.sameSite,
+    maxAge: cookieConfig.maxAgeAccess,
+    path: cookieConfig.path,
+  });
+
+  res.cookie(cookieConfig.refreshName, tokens.refreshToken, {
+    httpOnly: true,
+    secure: cookieConfig.secure,
+    sameSite: cookieConfig.sameSite,
+    maxAge: cookieConfig.maxAgeRefresh,
+    path: cookieConfig.path,
+  });
+}
+
+/**
+ * Helper to clear authentication cookies
+ */
+function clearAuthCookies(res) {
+  const cookieConfig = config.auth.cookies;
+  res.clearCookie(cookieConfig.accessName, { path: cookieConfig.path });
+  res.clearCookie(cookieConfig.refreshName, { path: cookieConfig.path });
+}
+
 const authController = {
-  /**
-   * POST /api/auth/register
-   * Creates a new user account and returns authentication tokens.
-   * Body: { email, password, firstName, lastName, phoneNumber? }
-   */
   register: asyncHandler(async (req, res) => {
     const result = await userService.register(req.body);
-
-    logger.info('User registered via API', {
-      userId: result.user.id,
-      email: result.user.email,
-    });
-
+    setAuthCookies(res, result.tokens);
+    logger.info('User registered via API', { userId: result.user.id, email: result.user.email });
+    
     res.status(201).json({
       success: true,
       message: 'Account created successfully.',
-      data: result,
+      data: { user: result.user },
     });
   }),
 
-  /**
-   * POST /api/auth/login
-   * Authenticates a user with email and password.
-   * Body: { email, password }
-   */
   login: asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     const result = await userService.login(email, password);
-
-    logger.info('User logged in via API', {
-      userId: result.user.id,
-      role: result.user.role,
-    });
-
+    setAuthCookies(res, result.tokens);
+    logger.info('User logged in via API', { userId: result.user.id, role: result.user.role });
+    
     res.status(200).json({
       success: true,
       message: 'Logged in successfully.',
-      data: result,
+      data: { user: result.user },
     });
   }),
 
-  /**
-   * POST /api/auth/refresh-token
-   * Issues a new access token using a valid refresh token.
-   * Body: { refreshToken }
-   */
   refreshToken: asyncHandler(async (req, res) => {
-    const { refreshToken } = req.body;
+    // Read refresh token from httpOnly cookie
+    const refreshToken = req.cookies?.[config.auth.cookies.refreshName];
+    if (!refreshToken) {
+      throw new AuthError('Refresh token missing. Please log in again.');
+    }
+    
     const result = await userService.refreshToken(refreshToken);
-
+    setAuthCookies(res, result.tokens);
+    
     res.status(200).json({
       success: true,
       message: 'Token refreshed successfully.',
-      data: result,
+      data: { user: result.user },
     });
   }),
 
-  /**
-   * POST /api/auth/change-password
-   * Changes the authenticated user's password.
-   * Requires current password verification.
-   * Body: { currentPassword, newPassword, confirmPassword }
-   */
-  changePassword: asyncHandler(async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
-
-    await userService.changePassword(req.user.id, currentPassword, newPassword);
-
+  logout: asyncHandler(async (req, res) => {
+    clearAuthCookies(res);
+    logger.info('User logged out via API', { userId: req.user?.id });
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully.',
+      message: 'Logged out successfully.',
     });
   }),
 
-  /**
-   * GET /api/auth/me
-   * Returns the currently authenticated user's profile.
-   */
+  changePassword: asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    await userService.changePassword(req.user.id, currentPassword, newPassword);
+    clearAuthCookies(res);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully. Please log in again.',
+    });
+  }),
+
   getMe: asyncHandler(async (req, res) => {
     const profile = await userService.getProfile(req.user.id);
-
     res.status(200).json({
       success: true,
       data: { user: profile },

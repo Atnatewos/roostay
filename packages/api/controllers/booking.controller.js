@@ -1,7 +1,6 @@
 // packages/api/controllers/booking.controller.js
 // Booking controller - handles HTTP requests for booking endpoints
-// Supports booking creation, status management, and availability checks
-
+// Supports booking creation with payment, status management, and availability checks
 const bookingService = require('../../services/booking.service');
 const { asyncHandler } = require('../../utils/asyncHandler');
 const logger = require('../../utils/logger');
@@ -9,21 +8,22 @@ const logger = require('../../utils/logger');
 const bookingController = {
   /**
    * POST /api/bookings
-   * Creates a new booking for a listing.
-   * Body: { listingId, checkInDate, checkOutDate, guestCount, bookingType, specialRequests? }
+   * Creates a new booking with payment information.
+   * Body: { listingId, checkInDate, checkOutDate, guestCount, bookingType, paymentMethod, transactionNumber, specialRequests?, proofNotes? }
    */
   createBooking: asyncHandler(async (req, res) => {
     const result = await bookingService.createBooking(req.user.id, req.body);
-
+    
     logger.info('Booking created via API', {
       bookingId: result.booking.id,
+      paymentId: result.payment.id,
       guestId: req.user.id,
       listingId: req.body.listingId,
     });
-
+    
     res.status(201).json({
       success: true,
-      message: 'Booking created successfully. Awaiting confirmation.',
+      message: 'Booking created successfully. Payment is being processed.',
       data: result,
     });
   }),
@@ -39,7 +39,7 @@ const bookingController = {
       req.user.id,
       req.user.role
     );
-
+    
     res.status(200).json({
       success: true,
       data: { booking },
@@ -53,7 +53,6 @@ const bookingController = {
    */
   updateBookingStatus: asyncHandler(async (req, res) => {
     const { status, cancellationReason } = req.body;
-
     const booking = await bookingService.updateBookingStatus(
       req.params.id,
       req.user.id,
@@ -61,13 +60,13 @@ const bookingController = {
       status,
       cancellationReason
     );
-
+    
     logger.info('Booking status updated via API', {
       bookingId: req.params.id,
       newStatus: status,
       userId: req.user.id,
     });
-
+    
     res.status(200).json({
       success: true,
       message: `Booking ${status} successfully.`,
@@ -82,7 +81,7 @@ const bookingController = {
    */
   getGuestBookings: asyncHandler(async (req, res) => {
     const result = await bookingService.getUserBookings(req.user.id, 'guest', req.query);
-
+    
     res.status(200).json({
       success: true,
       data: result.bookings,
@@ -97,7 +96,7 @@ const bookingController = {
    */
   getHostBookings: asyncHandler(async (req, res) => {
     const result = await bookingService.getUserBookings(req.user.id, 'host', req.query);
-
+    
     res.status(200).json({
       success: true,
       data: result.bookings,
@@ -112,13 +111,12 @@ const bookingController = {
    */
   checkAvailability: asyncHandler(async (req, res) => {
     const { checkInDate, checkOutDate } = req.query;
-
     const result = await bookingService.checkAvailability(
       req.params.id,
       checkInDate,
       checkOutDate
     );
-
+    
     res.status(200).json({
       success: true,
       data: result,

@@ -1,10 +1,10 @@
 // packages/services/payment.service.js
-// Payment service - handles payment creation, proof upload, verification
+// Payment service - handles payment creation, proof upload, verification, and transaction validation
 // Supports manual bank transfer and Telebirr payment methods
 // All amounts in ETB with configurable service fees
-
-const { query, queryOne } = require('../database');
-const { NotFoundError, ValidationError, ForbiddenError, PaymentError } = require('../utils/errors');
+// Prevents duplicate transaction numbers across completed payments
+const { query, queryOne, beginTransaction, commitTransaction, rollbackTransaction } = require('../database');
+const { NotFoundError, ValidationError, ForbiddenError, ConflictError } = require('../utils/errors');
 const logger = require('../utils/logger');
 
 let config;
@@ -17,6 +17,9 @@ try {
       serviceFeePercent: 5,
       serviceFeeMin: 100,
       serviceFeeMax: 5000,
+      paymentTimeoutMinutes: 30,
+      requireTransactionNumber: true,
+      preventDuplicateTransactions: true,
       bankTransfer: {
         enabled: true,
         bankName: 'Commercial Bank of Ethiopia',
@@ -24,7 +27,14 @@ try {
         accountHolder: 'ROOSTAY PLC',
         referencePrefix: 'ROOSTAY',
         verificationTimeoutHours: 48,
-        instructions: 'Please transfer the total amount and upload your payment receipt.',
+        instructions: 'Please transfer the total amount and enter the transaction reference number.',
+      },
+      telebirr: {
+        enabled: true,
+        merchantId: '123456',
+        apiKey: 'test_key',
+        shortcode: '123456',
+        merchantName: 'ROOSTAY',
       },
     },
   };
@@ -32,9 +42,49 @@ try {
 
 const paymentService = {
   /**
+   * Validates that a transaction number has not been used in a completed payment.
+   * Prevents duplicate payments and fraud.
+   * 
+   * @param {string} transactionNumber - The transaction reference number to validate
+   * @returns {Promise<Object>} Validation result { valid: boolean, message: string }
+   */
+  async validateTransactionNumber(transactionNumber) {
+    if (!config.payment.preventDuplicateTransactions) {
+      return { valid: true, message: 'Transaction validation disabled in this environment.' };
+    }
+
+    // Check if transaction number exists in completed payments
+    const existingPayment = await queryOne(
+      `SELECT id, status, booking_id 
+       FROM payments 
+       WHERE transaction_reference = $1 
+       AND status IN ('completed', 'processing')`,
+      [transactionNumber]
+    );
+
+    if (existingPayment) {
+      logger.warn('Duplicate transaction number detected', {
+        transactionNumber,
+        existingPaymentId: existingPayment.id,
+        status: existingPayment.status,
+      });
+
+      return {
+        valid: false,
+        message: 'This transaction number has already been used. Please enter a different reference number.',
+      };
+    }
+
+    return {
+      valid: true,
+      message: 'Transaction number is valid and available.',
+    };
+  },
+
+  /**
    * Creates a payment record for a confirmed booking.
    * Generates payment instructions based on the selected method.
-   *
+   * 
    * @param {string} bookingId - The booking ID
    * @param {string} userId - The paying user ID
    * @param {string} paymentMethod - Payment method (bank_transfer, telebirr)
@@ -43,9 +93,9 @@ const paymentService = {
   async createPayment(bookingId, userId, paymentMethod = 'bank_transfer') {
     // Verify booking exists and belongs to the user
     const booking = await queryOne(
-      `SELECT b.*, l.title as listing_title
-       FROM bookings b
-       JOIN listings l ON b.listing_id = l.id
+      `SELECT b.*, l.title as listing_title 
+       FROM bookings b 
+       JOIN listings l ON b.listing_id = l.id 
        WHERE b.id = $1 AND b.guest_id = $2`,
       [bookingId, userId]
     );
@@ -120,6 +170,14 @@ const paymentService = {
         instructions: config.payment.bankTransfer.instructions,
         verificationTime: `${config.payment.bankTransfer.verificationTimeoutHours} hours`,
       };
+    } else if (paymentMethod === 'telebirr') {
+      instructions = {
+        method: 'telebirr',
+        merchantName: config.payment.telebirr.merchantName,
+        shortcode: config.payment.telebirr.shortcode,
+        amount: booking.total_amount,
+        currency: config.payment.currency,
+      };
     }
 
     logger.info('Payment created', {
@@ -137,8 +195,56 @@ const paymentService = {
   },
 
   /**
+   * Creates a payment with transaction number in a single atomic operation.
+   * Used in the new payment-first flow where transaction number is provided upfront.
+   * 
+   * @param {string} bookingId - The booking ID
+   * @param {string} userId - The paying user ID
+   * @param {string} paymentMethod - Payment method
+   * @param {string} transactionNumber - Transaction reference number
+   * @param {string} [proofNotes] - Optional notes about the payment
+   * @returns {Promise<Object>} Created payment with transaction reference
+   */
+  async createPaymentWithTransaction(bookingId, userId, paymentMethod, transactionNumber, proofNotes) {
+    // Validate transaction number uniqueness first
+    const validation = await this.validateTransactionNumber(transactionNumber);
+    if (!validation.valid) {
+      throw new ConflictError(validation.message);
+    }
+
+    // Create payment with transaction number
+    const payment = await queryOne(
+      `INSERT INTO payments (
+         booking_id, user_id, amount, currency, payment_method, 
+         transaction_reference, proof_notes, status
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'processing')
+       RETURNING *`,
+      [
+        bookingId,
+        userId,
+        (await queryOne('SELECT total_amount FROM bookings WHERE id = $1', [bookingId])).total_amount,
+        config.payment.currency || 'ETB',
+        paymentMethod,
+        transactionNumber,
+        proofNotes || null,
+      ]
+    );
+
+    logger.info('Payment created with transaction number', {
+      paymentId: payment.id,
+      bookingId,
+      userId,
+      transactionNumber,
+      method: paymentMethod,
+    });
+
+    return payment;
+  },
+
+  /**
    * Uploads payment proof (receipt/screenshot) for manual verification.
-   *
+   * 
    * @param {string} paymentId - The payment ID
    * @param {string} userId - The user uploading the proof
    * @param {string} proofImageUrl - URL of the uploaded proof image
@@ -181,7 +287,7 @@ const paymentService = {
 
   /**
    * Verifies or rejects a payment (admin only).
-   *
+   * 
    * @param {string} paymentId - The payment ID
    * @param {string} adminId - The admin user ID
    * @param {string} action - 'verify' or 'reject'
@@ -198,7 +304,7 @@ const paymentService = {
       throw new NotFoundError('Payment not found.');
     }
 
-    if (payment.status !== 'processing' && payment.status !== 'pending') {
+    if (payment.status !== 'processing' && payment.status !== 'pending' && payment.status !== 'pending_review') {
       throw new ValidationError(
         `Cannot ${action} a payment with status "${payment.status}".`
       );
@@ -214,7 +320,8 @@ const paymentService = {
         verified_at: new Date(),
       };
     } else if (action === 'reject') {
-      newStatus = 'failed';
+      // If rejection is due to invalid transaction, move to pending_review for manual check
+      newStatus = reason?.includes('review') ? 'pending_review' : 'failed';
       updatedFields = {
         status: newStatus,
         verified_by: adminId,
@@ -254,6 +361,7 @@ const paymentService = {
       paymentId,
       adminId,
       bookingId: payment.booking_id,
+      newStatus,
     });
 
     return updated;
@@ -261,16 +369,14 @@ const paymentService = {
 
   /**
    * Gets a payment by ID with booking details.
-   *
+   * 
    * @param {string} paymentId - The payment ID
    * @param {string} userId - The requesting user ID
    * @returns {Promise<Object>} Payment with booking info
    */
   async getPaymentById(paymentId, userId) {
     const payment = await queryOne(
-      `SELECT p.*, b.listing_id, b.check_in_date, b.check_out_date,
-              b.booking_type, b.status as booking_status,
-              l.title as listing_title
+      `SELECT p.*, b.listing_id, b.check_in_date, b.check_out_date, b.booking_type, b.status as booking_status, l.title as listing_title
        FROM payments p
        JOIN bookings b ON p.booking_id = b.id
        JOIN listings l ON b.listing_id = l.id
@@ -292,7 +398,7 @@ const paymentService = {
 
   /**
    * Lists payments with filters (admin only).
-   *
+   * 
    * @param {Object} filters - Filter and pagination options
    * @returns {Promise<Object>} Paginated payment list
    */

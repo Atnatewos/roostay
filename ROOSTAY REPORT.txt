@@ -1,0 +1,212 @@
+# ROOSTAY — Cookie Authentication Bug Fix Report
+
+## For: Qwen AI Assistant
+## From: Theron (Atnatewos) & DeepSeek Senior Engineering Team
+## Date: July 8, 2026
+## Issue: Login Loop — User Auto-Logout After Successful Authentication
+
+---
+
+## 1. PROBLEM SUMMARY
+
+After the Phase 1 security upgrade (httpOnly cookies, modular routes), the login flow broke entirely on local development. Users could successfully authenticate (POST /api/auth/login returned 200) but were immediately redirected back to the login page in an infinite loop.
+
+### Symptom Pattern (Server Logs)
+```
+POST /api/auth/login 200          ← Login succeeds
+GET /api/auth/me 401              ← Profile check fails (no auth detected)
+GET /api/auth/me 401              ← Second attempt also fails
+POST /api/auth/refresh-token 404  ← Refresh endpoint doesn't exist
+→ Redirect to /login              ← Loop repeats
+```
+
+---
+
+## 2. ROOT CAUSE ANALYSIS
+
+The bug was caused by a disconnect between the modular backend packages and the actual Vercel deployment handler. Three specific issues were identified:
+
+### Issue 1: authenticate() Middleware Only Read Authorization Header
+
+**File:** `frontend/pages/api/[...path].js` — The Vercel deployment handler
+
+**Problem:** The `authenticate()` middleware function only checked `req.headers.authorization` for the JWT token. It never read from `req.cookies`.
+
+**Old Code:**
+```javascript
+function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next(new AppError('Authentication required.', 401, 'AUTH_ERROR'));
+  }
+  // ... verify token from header only
+}
+```
+
+**Why This Broke:** The Phase 1 upgrade changed `frontend/lib/api.js` to use `credentials: 'include'` and removed the `Authorization` header. The browser was sending cookies correctly, but the backend never looked for them.
+
+### Issue 2: Missing /api/auth/refresh-token Endpoint
+
+**Problem:** The Phase 1 modular routes added `packages/api/routes/auth.routes.js` with a refresh-token endpoint, but the Vercel handler (`[...path].js`) was never updated. The handler still had the old monolithic route registration without this route.
+
+**Result:** When the frontend detected a 401 and tried to refresh, it got a 404, which triggered a redirect to `/login`.
+
+### Issue 3: Login/Register Didn't Set Cookies
+
+**Problem:** The `authController.login` and `authController.register` methods in the handler returned tokens in the JSON response body but never called `res.cookie()` to set httpOnly cookies.
+
+**Old Code (login response):**
+```javascript
+const tokens = generateTokens(user);
+res.json({
+  success: true,
+  data: {
+    user: { ... },
+    tokens,  // ← Tokens in body, but NO cookies set
+  },
+});
+```
+
+---
+
+## 3. FIXES APPLIED
+
+All fixes were applied to `frontend/pages/api/[...path].js` — the single file that actually runs on both local development and Vercel production.
+
+### Fix 1: Added Cookie Configuration to CONFIG
+
+Added a `cookies` section to `CONFIG.auth` with environment-aware settings:
+
+```javascript
+auth: {
+  // ... existing JWT config ...
+  cookies: {
+    accessName: 'roostay_access_token',
+    refreshName: 'roostay_refresh_token',
+    secure: process.env.NODE_ENV === 'production',  // false on localhost
+    sameSite: 'lax',
+    maxAgeAccess: 30 * 60 * 1000,        // 30 minutes
+    maxAgeRefresh: 7 * 24 * 60 * 60 * 1000, // 7 days
+  },
+},
+```
+
+### Fix 2: Added Cookie Helper Functions
+
+Created two new utility functions:
+
+- `setAuthCookies(res, accessToken, refreshToken)` — Sets both access and refresh tokens as httpOnly cookies
+- `clearAuthCookies(res)` — Clears both cookies (used for logout)
+
+### Fix 3: Updated authenticate() Middleware
+
+Rewrote the middleware to check cookies FIRST, then fall back to Authorization header:
+
+```javascript
+function authenticate(req, res, next) {
+  try {
+    let token = null;
+
+    // Priority 1: Read from httpOnly cookie (browser clients)
+    if (req.cookies && req.cookies[CONFIG.auth.cookies.accessName]) {
+      token = req.cookies[CONFIG.auth.cookies.accessName];
+    }
+
+    // Priority 2: Fallback to Authorization header (API clients)
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+      }
+    }
+
+    if (!token) throw new AppError('Authentication required.', 401, 'AUTH_ERROR');
+    // ... verify token ...
+  }
+}
+```
+
+### Fix 4: Updated login() and register() to Set Cookies
+
+Added `setAuthCookies()` calls in both auth methods and removed `tokens` from the JSON response body (tokens are now cookie-only):
+
+```javascript
+login: asyncHandler(async (req, res) => {
+  // ... validate credentials ...
+  const tokens = generateTokens(user);
+  setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+  res.json({
+    success: true,
+    data: { user: { ... } },  // No tokens in body — they're in cookies
+  });
+}),
+```
+
+### Fix 5: Added refreshToken and logout Controller Methods
+
+```javascript
+refreshToken: asyncHandler(async (req, res) => {
+  const refreshToken = req.cookies?.[CONFIG.auth.cookies.refreshName];
+  // ... verify refresh token, generate new pair, set new cookies ...
+}),
+
+logout: asyncHandler(async (req, res) => {
+  clearAuthCookies(res);
+  res.json({ success: true, message: 'Logged out successfully.' });
+}),
+```
+
+### Fix 6: Registered New Routes
+
+Added two new route registrations in the route section:
+
+```javascript
+app.post('/api/auth/refresh-token', authController.refreshToken);
+app.post('/api/auth/logout', authController.logout);
+```
+
+---
+
+## 4. VERIFICATION
+
+After applying all fixes, the login flow works correctly:
+
+```
+POST /api/auth/login 200          ← Login succeeds, cookies set
+GET /api/auth/me 200              ← Profile check passes (cookie read)
+GET /api/auth/me 304              ← Subsequent checks cached
+GET /api/listings 200             ← Protected routes work
+POST /api/bookings 201            ← Booking with payment works
+POST /api/auth/logout 200         ← Logout clears cookies
+GET /api/auth/me 401              ← Correctly rejected after logout
+POST /api/auth/refresh-token 401  ← Correctly rejected (no refresh cookie)
+```
+
+---
+
+## 5. KEY TAKEAWAYS FOR QWEN
+
+1. **The Vercel handler (`[...path].js`) is the single source of truth.** The modular backend in `packages/api/` is excellent for organization, but every change to routes, middleware, or controllers must be mirrored in the handler file.
+
+2. **Cookie-based auth requires three synchronized changes:**
+   - Backend must SET cookies on login/register
+   - Backend must READ cookies in authenticate middleware
+   - Frontend must use `credentials: 'include'` in fetch calls
+
+3. **Environment-aware cookie config is critical.** `secure: true` breaks localhost (no HTTPS). Use `secure: process.env.NODE_ENV === 'production'`.
+
+4. **Always add the refresh-token endpoint.** Without it, expired tokens force a full re-login instead of a silent refresh.
+
+---
+
+## 6. FILES MODIFIED
+
+| File | Changes |
+|------|---------|
+| `frontend/pages/api/[...path].js` | Added cookie config, setAuthCookies/clearAuthCookies helpers, updated authenticate middleware, updated login/register controllers, added refreshToken/logout controllers, registered new routes |
+
+**No other files were modified.** The frontend (`api.js`, `auth.js`, `useAuth.js`) and modular backend (`packages/api/`) remain exactly as Qwen designed them.
+
+---
+
+*End of Report*

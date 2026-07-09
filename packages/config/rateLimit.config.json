@@ -1,107 +1,32 @@
 {
   "development": {
-    "global": {
-      "windowMs": 900000,
-      "max": 500,
-      "message": "Too many requests, please try again later.",
-      "standardHeaders": true,
-      "legacyHeaders": false
-    },
-    "auth": {
-      "windowMs": 900000,
-      "max": 20,
-      "message": "Too many authentication attempts, please try again later.",
-      "skipSuccessfulRequests": false
-    },
-    "listing": {
-      "windowMs": 900000,
-      "max": 100,
-      "message": "Too many listing requests, please slow down."
-    },
-    "booking": {
-      "windowMs": 60000,
-      "max": 10,
-      "message": "Too many booking requests, please try again shortly."
-    },
-    "payment": {
-      "windowMs": 60000,
-      "max": 5,
-      "message": "Too many payment requests, please wait before trying again."
-    },
-    "upload": {
-      "windowMs": 60000,
-      "max": 30,
-      "message": "Upload limit reached, please wait before uploading more files."
-    }
+    "redisUrl": "UPSTASH_REDIS_REST_URL",
+    "redisToken": "UPSTASH_REDIS_REST_TOKEN",
+    "global": { "windowMs": 900000, "max": 500, "message": "Too many requests, please try again later." },
+    "auth": { "windowMs": 900000, "max": 20, "message": "Too many authentication attempts, please try again later." },
+    "listing": { "windowMs": 900000, "max": 100, "message": "Too many listing requests, please slow down." },
+    "booking": { "windowMs": 60000, "max": 10, "message": "Too many booking requests, please try again shortly." },
+    "payment": { "windowMs": 60000, "max": 5, "message": "Too many payment requests, please wait before trying again." },
+    "upload": { "windowMs": 60000, "max": 30, "message": "Upload limit reached, please wait before uploading more files." }
   },
   "production": {
-    "global": {
-      "windowMs": 900000,
-      "max": 200,
-      "message": "Too many requests, please try again later.",
-      "standardHeaders": true,
-      "legacyHeaders": false
-    },
-    "auth": {
-      "windowMs": 900000,
-      "max": 10,
-      "message": "Too many authentication attempts, please try again later.",
-      "skipSuccessfulRequests": false
-    },
-    "listing": {
-      "windowMs": 900000,
-      "max": 50,
-      "message": "Too many listing requests, please slow down."
-    },
-    "booking": {
-      "windowMs": 60000,
-      "max": 5,
-      "message": "Too many booking requests, please try again shortly."
-    },
-    "payment": {
-      "windowMs": 60000,
-      "max": 3,
-      "message": "Too many payment requests, please wait before trying again."
-    },
-    "upload": {
-      "windowMs": 60000,
-      "max": 15,
-      "message": "Upload limit reached, please wait before uploading more files."
-    }
+    "redisUrl": "UPSTASH_REDIS_REST_URL",
+    "redisToken": "UPSTASH_REDIS_REST_TOKEN",
+    "global": { "windowMs": 900000, "max": 200, "message": "Too many requests, please try again later." },
+    "auth": { "windowMs": 900000, "max": 10, "message": "Too many authentication attempts, please try again later." },
+    "listing": { "windowMs": 900000, "max": 50, "message": "Too many listing requests, please slow down." },
+    "booking": { "windowMs": 60000, "max": 5, "message": "Too many booking requests, please try again shortly." },
+    "payment": { "windowMs": 60000, "max": 3, "message": "Too many payment requests, please wait before trying again." },
+    "upload": { "windowMs": 60000, "max": 15, "message": "Upload limit reached, please wait before uploading more files." }
   },
   "test": {
-    "global": {
-      "windowMs": 60000,
-      "max": 1000,
-      "message": "Rate limit exceeded.",
-      "standardHeaders": true,
-      "legacyHeaders": false
-    },
-    "auth": {
-      "windowMs": 60000,
-      "max": 50,
-      "message": "Auth rate limit exceeded.",
-      "skipSuccessfulRequests": false
-    },
-    "listing": {
-      "windowMs": 60000,
-      "max": 200,
-      "message": "Listing rate limit exceeded."
-    },
-    "booking": {
-      "windowMs": 60000,
-      "max": 50,
-      "message": "Booking rate limit exceeded."
-    },
-    "payment": {
-      "windowMs": 60000,
-      "max": 20,
-      "message": "Payment rate limit exceeded."
-    },
-    "upload": {
-      "windowMs": 60000,
-      "max": 50,
-      "message": "Upload rate limit exceeded."
-    }
+    "redisUrl": "UPSTASH_REDIS_REST_URL",
+    "redisToken": "UPSTASH_REDIS_REST_TOKEN",
+    "global": { "windowMs": 60000, "max": 1000, "message": "Rate limit exceeded." },
+    "auth": { "windowMs": 60000, "max": 50, "message": "Auth rate limit exceeded." },
+    "listing": { "windowMs": 60000, "max": 200, "message": "Listing rate limit exceeded." },
+    "booking": { "windowMs": 60000, "max": 50, "message": "Booking rate limit exceeded." },
+    "payment": { "windowMs": 60000, "max": 20, "message": "Payment rate limit exceeded." },
+    "upload": { "windowMs": 60000, "max": 50, "message": "Upload rate limit exceeded." }
   }
 }
