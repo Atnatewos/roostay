@@ -1032,14 +1032,52 @@ const listingController = {
 
 // --------------------------------------------------------------------------
 // Booking Controller — reservation management with payment integration
+// Includes automated expiry logic for serverless environments
 // --------------------------------------------------------------------------
 const bookingController = {
+
+  /**
+   * SERVERLESS EXPIRY CHECK
+   * Finds and expires unpaid bookings that have exceeded their payment timeout.
+   * Called internally on booking fetches to keep data fresh without cron jobs.
+   */
+  async expireUnpaidBookings() {
+    try {
+      const now = new Date();
+      const expiredBookings = await query(
+        `SELECT id, listing_id, check_in_date, check_out_date 
+         FROM bookings 
+         WHERE status = 'pending' 
+         AND payment_expires_at IS NOT NULL 
+         AND payment_expires_at < $1`,
+        [now]
+      );
+
+      if (expiredBookings.rows.length === 0) return 0;
+
+      for (const b of expiredBookings.rows) {
+        await query("UPDATE bookings SET status = 'expired' WHERE id = $1", [b.id]);
+        await query(
+          `UPDATE listing_availability SET status = 'available' WHERE listing_id = $1 AND date >= $2 AND date < $3`,
+          [b.listing_id, b.check_in_date, b.check_out_date]
+        );
+        await query(
+          "UPDATE payments SET status = 'cancelled', failure_reason = 'Payment timeout expired' WHERE booking_id = $1",
+          [b.id]
+        );
+      }
+      return expiredBookings.rows.length;
+    } catch (err) {
+      console.error('Expiry check failed:', err.message);
+      return 0;
+    }
+  },
 
   /**
    * POST /api/bookings
    * Creates a new booking with availability check, pricing calculation,
    * and mandatory payment record with transaction number.
-   * The booking is created as 'pending' and a payment record is attached.
+   * Sets payment_expires_at for automated timeout tracking.
    */
   createBooking: asyncHandler(async (req, res) => {
     const {
@@ -1053,158 +1091,122 @@ const bookingController = {
       [listingId]
     );
     if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
-    if (listing.host_id === req.user.id) {
-      throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
-    }
+    if (listing.host_id === req.user.id) throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
 
+    // Final availability check (prevents race conditions)
     const conflict = await queryOne(
       `SELECT id FROM bookings
        WHERE listing_id = $1 AND status IN ('pending','confirmed')
        AND check_in_date < $3 AND check_out_date > $2`,
       [listingId, checkInDate, checkOutDate]
     );
-    if (conflict) throw new AppError('Dates are not available.', 409, 'CONFLICT');
+    if (conflict) throw new AppError('Dates are no longer available.', 409, 'CONFLICT');
 
+    // Validate transaction number uniqueness
     if (CONFIG.features.preventDuplicateTransactions && transactionNumber) {
       const existingTransaction = await queryOne(
-        `SELECT p.id, p.status, b.id as booking_id
-         FROM payments p
-         JOIN bookings b ON p.booking_id = b.id
-         WHERE p.transaction_reference = $1 AND p.status = 'completed'`,
+        `SELECT p.id FROM payments p
+         WHERE p.transaction_reference = $1 AND p.status IN ('completed', 'processing')`,
         [transactionNumber.trim()]
       );
       if (existingTransaction) {
-        throw new AppError(
-          'This transaction number has already been used for a verified payment. Please provide a different transaction number.',
-          409,
-          'DUPLICATE_TRANSACTION'
-        );
+        throw new AppError('This transaction number has already been used.', 409, 'DUPLICATE_TRANSACTION');
       }
     }
 
-    const nights = Math.ceil(
-      (new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24)
-    );
+    // Calculate pricing
+    const nights = Math.ceil((new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24));
     const baseAmount = parseFloat(listing.price_per_night) * nights;
     const cleaningFee = parseFloat(listing.cleaning_fee) || 0;
     const serviceFee = Math.min(
-      Math.max(
-        Math.round(baseAmount * (CONFIG.payment.serviceFeePercent / 100)),
-        CONFIG.payment.serviceFeeMin
-      ),
+      Math.max(Math.round(baseAmount * (CONFIG.payment.serviceFeePercent / 100)), CONFIG.payment.serviceFeeMin),
       CONFIG.payment.serviceFeeMax
     );
     const totalAmount = baseAmount + cleaningFee + serviceFee;
 
+    // Calculate payment expiry time
+    const expiryTime = new Date(Date.now() + CONFIG.features.paymentTimeoutMinutes * 60 * 1000);
+
+    // Create booking with payment expiry timestamp
     const booking = await queryOne(
       `INSERT INTO bookings (
         listing_id, guest_id, host_id, booking_type,
         check_in_date, check_out_date, guest_count,
         status, base_amount, cleaning_fee, service_fee,
-        security_deposit, total_amount, special_requests
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13)
+        security_deposit, total_amount, special_requests, payment_expires_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,$11,$12,$13,$14)
       RETURNING *`,
       [
         listingId, req.user.id, listing.host_id, bookingType,
         checkInDate, checkOutDate, guestCount,
         baseAmount, cleaningFee, serviceFee,
         0, totalAmount, specialRequests || null,
+        expiryTime,
       ]
     );
 
+    // Create payment record with transaction number (status: processing)
     const payment = await queryOne(
       `INSERT INTO payments (
         booking_id, user_id, amount, currency, payment_method,
         transaction_reference, proof_notes, status
-      ) VALUES ($1, $2, $3, 'ETB', $4, $5, $6, 'pending')
+      ) VALUES ($1, $2, $3, 'ETB', $4, $5, $6, 'processing')
       RETURNING *`,
       [
-        booking.id,
-        req.user.id,
-        totalAmount,
-        paymentMethod,
-        transactionNumber.trim(),
-        proofNotes || null,
+        booking.id, req.user.id, totalAmount,
+        paymentMethod, transactionNumber.trim(), proofNotes || null,
       ]
-    );
-
-    const expiryTime = new Date(
-      Date.now() + CONFIG.features.paymentTimeoutMinutes * 60 * 1000
     );
 
     res.status(201).json({
       success: true,
-      message: 'Booking created. Please complete payment within the time limit.',
+      message: 'Booking created. Payment is being processed.',
       data: {
         booking,
         payment,
-        pricing: {
-          baseAmount,
-          cleaningFee,
-          serviceFee,
-          securityDeposit: 0,
-          totalAmount,
-          currency: 'ETB',
-        },
-        paymentTimeout: {
-          minutes: CONFIG.features.paymentTimeoutMinutes,
-          expiresAt: expiryTime.toISOString(),
-        },
+        pricing: { baseAmount, cleaningFee, serviceFee, securityDeposit: 0, totalAmount, currency: 'ETB' },
+        paymentTimeout: { minutes: CONFIG.features.paymentTimeoutMinutes, expiresAt: expiryTime.toISOString() },
       },
     });
   }),
 
   /**
    * POST /api/payments/validate-transaction
-   * Checks whether a transaction number has already been used
-   * in a successfully completed payment. Returns availability status.
+   * Checks whether a transaction number has already been used.
    */
   validateTransaction: asyncHandler(async (req, res) => {
     const { transactionNumber } = req.body;
-
     if (!transactionNumber || transactionNumber.trim().length < 3) {
       throw new AppError('Please provide a valid transaction number.', 400, 'VALIDATION_ERROR');
     }
 
     const existing = await queryOne(
-      `SELECT p.id, p.status, p.created_at
-       FROM payments p
-       WHERE p.transaction_reference = $1 AND p.status = 'completed'`,
+      `SELECT p.id FROM payments p WHERE p.transaction_reference = $1 AND p.status IN ('completed', 'processing')`,
       [transactionNumber.trim()]
     );
 
-    if (existing) {
-      res.json({
-        success: true,
-        data: {
-          valid: false,
-          message: 'This transaction number has already been used for a verified payment.',
-        },
-      });
-    } else {
-      res.json({
-        success: true,
-        data: {
-          valid: true,
-          message: 'Transaction number is available.',
-        },
-      });
-    }
+    res.json({
+      success: true,
+      data: {
+        valid: !existing,
+        message: existing ? 'This transaction number has already been used.' : 'Transaction number is available.',
+      },
+    });
   }),
 
   /**
    * GET /api/bookings/guest
    * Returns paginated bookings for the authenticated guest.
+   * Runs expiry check first to clean up timed-out bookings.
    */
   getGuestBookings: asyncHandler(async (req, res) => {
+    await bookingController.expireUnpaidBookings(); // Serverless expiry cleanup
+    
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const offset = (page - 1) * limit;
 
-    const count = await queryOne(
-      'SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1',
-      [req.user.id]
-    );
+    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE guest_id = $1', [req.user.id]);
     const bookings = await query(
       `SELECT b.*, l.title as listing_title, l.city,
               p.status as payment_status, p.transaction_reference
@@ -1219,28 +1221,23 @@ const bookingController = {
     res.json({
       success: true,
       data: bookings.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
+      pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) },
     });
   }),
 
   /**
    * GET /api/bookings/host
    * Returns paginated bookings for the authenticated host's listings.
+   * Runs expiry check first to clean up timed-out bookings.
    */
   getHostBookings: asyncHandler(async (req, res) => {
+    await bookingController.expireUnpaidBookings(); // Serverless expiry cleanup
+
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const offset = (page - 1) * limit;
 
-    const count = await queryOne(
-      'SELECT COUNT(*) as total FROM bookings WHERE host_id = $1',
-      [req.user.id]
-    );
+    const count = await queryOne('SELECT COUNT(*) as total FROM bookings WHERE host_id = $1', [req.user.id]);
     const bookings = await query(
       `SELECT b.*, l.title as listing_title, l.city,
               gu.first_name as guest_first_name, gu.last_name as guest_last_name,
@@ -1257,12 +1254,7 @@ const bookingController = {
     res.json({
       success: true,
       data: bookings.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(count.total),
-        totalPages: Math.ceil(parseInt(count.total) / limit),
-      },
+      pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) },
     });
   }),
 
@@ -1287,12 +1279,7 @@ const bookingController = {
     );
 
     if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
-
-    if (
-      booking.guest_id !== req.user.id &&
-      booking.host_id !== req.user.id &&
-      req.user.role !== 'admin'
-    ) {
+    if (booking.guest_id !== req.user.id && booking.host_id !== req.user.id && req.user.role !== 'admin') {
       throw new AppError('You do not have permission to view this booking.', 403, 'FORBIDDEN');
     }
 
@@ -1301,13 +1288,11 @@ const bookingController = {
 
   /**
    * PATCH /api/bookings/:id/status
-   * Updates the status of a booking. Validates status transitions
-   * based on current status and user role.
+   * Updates the status of a booking.
    */
   updateBookingStatus: asyncHandler(async (req, res) => {
     const { status, cancellationReason } = req.body;
     const booking = await queryOne('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
-
     if (!booking) throw new AppError('Booking not found.', 404, 'NOT_FOUND');
 
     const validTransitions = {
@@ -1316,40 +1301,28 @@ const bookingController = {
     };
 
     const allowedRoles = validTransitions[booking.status]?.[status];
-    if (!allowedRoles) {
-      throw new AppError(
-        `Cannot change status from "${booking.status}" to "${status}".`,
-        400, 'VALIDATION_ERROR'
-      );
-    }
-
+    if (!allowedRoles) throw new AppError(`Cannot change status from "${booking.status}" to "${status}".`, 400, 'VALIDATION_ERROR');
     if (!allowedRoles.includes('system') && !allowedRoles.includes(req.user.role)) {
       throw new AppError('You do not have permission to perform this action.', 403, 'FORBIDDEN');
     }
 
     const updates = { status };
-    if (status === 'cancelled') {
-      updates.cancelled_by = req.user.id;
-      updates.cancelled_at = new Date();
-      updates.cancellation_reason = cancellationReason || null;
-    }
+    if (status === 'cancelled') { updates.cancelled_by = req.user.id; updates.cancelled_at = new Date(); updates.cancellation_reason = cancellationReason || null; }
     if (status === 'confirmed') updates.confirmed_at = new Date();
     if (status === 'completed') updates.completed_at = new Date();
 
     const setClauses = [];
     const params = [];
     let p = 1;
-    for (const [key, value] of Object.entries(updates)) {
-      setClauses.push(`${key} = $${p}`);
-      params.push(value);
-      p++;
-    }
+    for (const [key, value] of Object.entries(updates)) { setClauses.push(`${key} = $${p}`); params.push(value); p++; }
     params.push(req.params.id);
 
-    const updated = await queryOne(
-      `UPDATE bookings SET ${setClauses.join(', ')} WHERE id = $${p} RETURNING *`,
-      params
-    );
+    const updated = await queryOne(`UPDATE bookings SET ${setClauses.join(', ')} WHERE id = $${p} RETURNING *`, params);
+    
+    // Release dates if cancelled/rejected
+    if (status === 'cancelled' || status === 'rejected') {
+      await query(`UPDATE listing_availability SET status = 'available' WHERE listing_id = $1 AND date >= $2 AND date < $3`, [booking.listing_id, booking.check_in_date, booking.check_out_date]);
+    }
 
     res.json({ success: true, message: `Booking ${status}.`, data: { booking: updated } });
   }),
@@ -1539,15 +1512,40 @@ const adminController = {
     res.json({ success: true, data: payments.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
   }),
 
+  /**
+   * PATCH /api/admin/payments/:id/verify
+   * Verifies, rejects, or flags a payment for manual review (admin only).
+   * Supports 'verify', 'reject', and 'review' actions.
+   * Body: { action: 'verify'|'reject'|'review', reason? }
+   */
   verifyPayment: asyncHandler(async (req, res) => {
-    const { action } = req.body;
-    const newStatus = action === 'verify' ? 'completed' : 'failed';
-    const payment = await queryOne(
-      'UPDATE payments SET status = $1, verified_by = $2, verified_at = NOW() WHERE id = $3 RETURNING *',
-      [newStatus, req.user.id, req.params.id]
-    );
-    if (!payment) throw new AppError('Payment not found.', 404, 'NOT_FOUND');
+    const { action, reason } = req.body;
+    
+    // Determine new status based on the admin's action
+    let newStatus;
+    if (action === 'verify') {
+      newStatus = 'completed';
+    } else if (action === 'review') {
+      newStatus = 'pending_review'; // Flag for further manual admin review
+    } else {
+      newStatus = 'failed'; // Default for 'reject' or unknown actions
+    }
 
+    // Update the payment record
+    // Only allows updating payments that are in a verifiable state
+    const payment = await queryOne(
+      `UPDATE payments 
+       SET status = $1, verified_by = $2, verified_at = NOW(), failure_reason = $3 
+       WHERE id = $4 AND status IN ('processing', 'pending', 'pending_review') 
+       RETURNING *`,
+      [newStatus, req.user.id, reason || null, req.params.id]
+    );
+    
+    if (!payment) {
+      throw new AppError('Payment not found or already processed.', 404, 'NOT_FOUND');
+    }
+
+    // If the payment is verified, automatically confirm the associated booking
     if (newStatus === 'completed') {
       await query(
         "UPDATE bookings SET status = 'confirmed', confirmed_at = NOW() WHERE id = $1 AND status = 'pending'",

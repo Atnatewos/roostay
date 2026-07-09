@@ -1,17 +1,49 @@
 -- packages/database/schema.sql
--- ROOSTAY complete database schema
--- All tables use IF NOT EXISTS for idempotent migrations
--- UUIDs as primary keys for distributed-friendliness
--- Timestamps with timezone for proper internationalization
--- Includes payment expiry tracking for automated booking expiry
+-- ============================================================================
+-- ROOSTAY Complete Database Schema
+-- ============================================================================
+-- Ethiopian Home Rental Platform
+-- Author: Theron (Atnatewos Getasew Sahlu)
+-- Version: 2.0.0 (Phase 2 - Payment Flow & Automated Expiry)
+-- ============================================================================
+--
+-- DESIGN PRINCIPLES:
+-- - All tables use IF NOT EXISTS for idempotent migrations
+-- - UUIDs as primary keys for distributed-friendliness
+-- - Timestamps with timezone for proper internationalization
+-- - Parameterized constraints for data integrity
+-- - Partial indexes for query optimization
+-- - Includes payment expiry tracking for automated booking expiry
+--
+-- TABLE OVERVIEW (15 tables):
+-- 1. users                    - User accounts (guest, host, admin)
+-- 2. refresh_tokens           - JWT refresh token storage
+-- 3. user_verifications       - ID verification for trust & safety
+-- 4. listings                 - Property listings
+-- 5. listing_images           - Property photos
+-- 6. listing_amenities        - Property amenities
+-- 7. listing_availability     - Date-level availability tracking
+-- 8. bookings                 - Reservation records
+-- 9. payments                 - Payment records with transaction tracking
+-- 10. withdrawals             - Host payout requests
+-- 11. reviews                 - Guest reviews with 5-category ratings
+-- 12. favorites               - Saved listings (wishlist)
+-- 13. notifications           - User notifications
+-- 14. messages                - Guest-host messaging
+-- 15. audit_logs              - Admin action audit trail
+--
+-- ============================================================================
 
--- Enable UUID generation
+-- Enable UUID generation extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
 -- USERS & AUTHENTICATION
 -- ============================================================================
 
+-- Users table: stores all platform users (guests, hosts, admins)
+-- Supports both email and phone authentication
+-- Includes account lockout protection for brute-force prevention
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE,
@@ -33,6 +65,8 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Refresh tokens: stores JWT refresh tokens for silent session renewal
+-- Supports token revocation and device tracking
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -44,6 +78,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- User verifications: ID verification for trust & safety
+-- Stores ID document images and verification status
 CREATE TABLE IF NOT EXISTS user_verifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -65,6 +101,9 @@ CREATE TABLE IF NOT EXISTS user_verifications (
 -- LISTINGS
 -- ============================================================================
 
+-- Listings: property listings with full details and pricing
+-- Supports short-term (per night), long-term (per month), or both
+-- Includes location data, amenities, and approval workflow
 CREATE TABLE IF NOT EXISTS listings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -113,6 +152,8 @@ CREATE TABLE IF NOT EXISTS listings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Listing images: property photos with sort order and primary flag
+-- Supports Cloudinary URLs with optional thumbnails
 CREATE TABLE IF NOT EXISTS listing_images (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
@@ -124,6 +165,8 @@ CREATE TABLE IF NOT EXISTS listing_images (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Listing amenities: property amenities with categorization
+-- Unique constraint prevents duplicate amenities per listing
 CREATE TABLE IF NOT EXISTS listing_amenities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
@@ -134,6 +177,9 @@ CREATE TABLE IF NOT EXISTS listing_amenities (
     UNIQUE(listing_id, amenity_name)
 );
 
+-- Listing availability: date-level availability tracking
+-- Status can be 'available', 'booked', or 'blocked'
+-- Supports custom pricing for specific dates
 CREATE TABLE IF NOT EXISTS listing_availability (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
@@ -148,9 +194,12 @@ CREATE TABLE IF NOT EXISTS listing_availability (
 
 -- ============================================================================
 -- BOOKINGS
--- Includes payment_expires_at for automated expiry of unpaid bookings
 -- ============================================================================
 
+-- Bookings: reservation records with full pricing breakdown
+-- Includes payment_expires_at for automated expiry of unpaid bookings
+-- Status transitions: pending → confirmed → completed
+--                   pending → cancelled / rejected / expired
 CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     listing_id UUID NOT NULL REFERENCES listings(id),
@@ -187,6 +236,14 @@ CREATE TABLE IF NOT EXISTS bookings (
 -- PAYMENTS
 -- ============================================================================
 
+-- Payments: payment records with transaction tracking
+-- Supports manual bank transfer and Telebirr payment methods
+-- Status transitions:
+--   pending → processing → completed (verified by admin)
+--   pending → processing → failed (rejected by admin)
+--   pending → processing → pending_review (flagged for manual review)
+--   pending → cancelled (booking expired or cancelled)
+-- Includes transaction_reference for duplicate prevention
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL UNIQUE REFERENCES bookings(id),
@@ -215,6 +272,8 @@ CREATE TABLE IF NOT EXISTS payments (
 -- WITHDRAWALS (Host Payouts)
 -- ============================================================================
 
+-- Withdrawals: host payout requests with bank/Telebirr details
+-- Status transitions: pending → processing → completed / failed / cancelled
 CREATE TABLE IF NOT EXISTS withdrawals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id),
@@ -242,6 +301,9 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 -- REVIEWS
 -- ============================================================================
 
+-- Reviews: guest reviews with 5-category rating system
+-- Automatically calculates overall rating via trigger
+-- Supports host responses
 CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL UNIQUE REFERENCES bookings(id),
@@ -266,6 +328,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 -- FAVORITES
 -- ============================================================================
 
+-- Favorites: saved listings (wishlist)
+-- Unique constraint prevents duplicate favorites per user
 CREATE TABLE IF NOT EXISTS favorites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -278,6 +342,8 @@ CREATE TABLE IF NOT EXISTS favorites (
 -- NOTIFICATIONS
 -- ============================================================================
 
+-- Notifications: user notifications with read status tracking
+-- Supports various notification types (booking, payment, system)
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -295,6 +361,8 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- MESSAGES
 -- ============================================================================
 
+-- Messages: guest-host messaging system
+-- Supports booking-specific conversations
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID REFERENCES bookings(id),
@@ -310,6 +378,8 @@ CREATE TABLE IF NOT EXISTS messages (
 -- ADMIN AUDIT LOG
 -- ============================================================================
 
+-- Audit logs: admin action audit trail
+-- Records all admin actions with old/new values for accountability
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admin_id UUID NOT NULL REFERENCES users(id),
@@ -347,6 +417,10 @@ CREATE INDEX IF NOT EXISTS idx_bookings_guest ON bookings(guest_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_host ON bookings(host_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_dates ON bookings(check_in_date, check_out_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+
+-- Partial index for efficient automated expiry queries
+-- Only indexes pending bookings that have an expiry time set
+-- Dramatically reduces index size and improves query performance
 CREATE INDEX IF NOT EXISTS idx_bookings_payment_expires 
     ON bookings(payment_expires_at) 
     WHERE status = 'pending' AND payment_expires_at IS NOT NULL;
@@ -355,6 +429,10 @@ CREATE INDEX IF NOT EXISTS idx_bookings_payment_expires
 CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+
+-- Partial index for fast transaction reference uniqueness checks
+-- Only indexes rows where a transaction reference actually exists
+-- Enables O(1) duplicate transaction detection
 CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments(transaction_reference) 
     WHERE transaction_reference IS NOT NULL;
 
@@ -389,6 +467,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 -- ============================================================================
 
 -- Function to automatically update updated_at timestamp
+-- Applied to all tables with an updated_at column
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -419,7 +498,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Function to calculate overall rating
+-- Function to calculate overall rating from 5 category ratings
+-- Automatically computes the average and rounds to 2 decimal places
 CREATE OR REPLACE FUNCTION calculate_overall_rating()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -432,6 +512,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Apply overall rating calculation trigger to reviews table
 DROP TRIGGER IF EXISTS trg_reviews_overall ON reviews;
 CREATE TRIGGER trg_reviews_overall
     BEFORE INSERT OR UPDATE ON reviews
@@ -439,21 +520,5 @@ CREATE TRIGGER trg_reviews_overall
     EXECUTE FUNCTION calculate_overall_rating();
 
 -- ============================================================================
--- MIGRATION: Add payment_expires_at to existing bookings table
--- Run this if the table already exists
+-- END OF SCHEMA
 -- ============================================================================
-
--- ALTER TABLE bookings 
--- ADD COLUMN IF NOT EXISTS payment_expires_at TIMESTAMPTZ;
-
--- CREATE INDEX IF NOT EXISTS idx_bookings_payment_expires 
--- ON bookings(payment_expires_at) 
--- WHERE status = 'pending' AND payment_expires_at IS NOT NULL;
-
--- ALTER TABLE payments 
--- ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'
---     CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled', 'pending_review'));
-
--- CREATE INDEX IF NOT EXISTS idx_payments_transaction 
--- ON payments(transaction_reference) 
--- WHERE transaction_reference IS NOT NULL;
