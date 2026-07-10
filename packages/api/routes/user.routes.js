@@ -5,7 +5,7 @@ const express = require('express');
 const router = express.Router();
 
 // Middleware
-const { authenticate } = require('../middleware');
+const { authenticate, authorize } = require('../middleware');
 const validateRequest = require('../middleware/validate');
 
 // Validators & Controllers
@@ -32,6 +32,16 @@ router.get(
   '/users/:id',
   authenticate,
   userController.getUserById
+);
+
+// ============================================================================
+// HOST UPGRADE ROUTE
+// ============================================================================
+router.post(
+  '/users/become-host',
+  authenticate,
+  authorize('guest'), // Only guests can upgrade themselves
+  userController.becomeHost
 );
 
 module.exports = router;

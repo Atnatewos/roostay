@@ -2,7 +2,6 @@
 // Guest Dashboard — overview of bookings, favorites, and quick actions
 // Fetches user profile and recent bookings from the API
 // Author: Theron
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,7 +11,7 @@ import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
-import { apiClient, getStoredUser } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
@@ -36,13 +35,8 @@ export default function GuestDashboardPage() {
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        // Retrieve stored user from localStorage for immediate display
-        const storedUser = getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
-        }
-
-        // Fetch bookings in parallel with user data for better performance
+        // Fetch all data in parallel for better performance
+        // No localStorage — user data comes exclusively from the API
         const [userResponse, bookingsResponse, favoritesResponse] = await Promise.all([
           apiClient.get('/auth/me'),
           apiClient.get('/bookings/guest?limit=5'),
@@ -66,7 +60,7 @@ export default function GuestDashboardPage() {
         });
       } catch (err) {
         // Handle authentication errors — user may need to log in
-        if (err.status === 401) {
+        if (err instanceof ApiError && err.status === 401) {
           setError('Please log in to view your dashboard.');
         } else {
           setError('Unable to load dashboard data. Please try again.');
@@ -82,7 +76,7 @@ export default function GuestDashboardPage() {
   /**
    * Returns the appropriate status badge variant for a booking status.
    * Maps booking statuses to color-coded badge variants for visual clarity.
-   *
+   * 
    * @param {string} status - The booking status
    * @returns {string} Badge variant name
    */
@@ -100,7 +94,7 @@ export default function GuestDashboardPage() {
 
   /**
    * Formats an ISO date string into a human-readable format.
-   *
+   * 
    * @param {string} dateStr - ISO date string
    * @returns {string} Formatted date (e.g., "Jul 14, 2026")
    */
@@ -154,7 +148,6 @@ export default function GuestDashboardPage() {
   return (
     <>
       <Header />
-
       <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
         {/* Welcome Header */}
         <div style={{ marginBottom: '2.5rem' }}>
@@ -176,7 +169,6 @@ export default function GuestDashboardPage() {
               {stats.totalBookings}
             </p>
           </Card>
-
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Active Stays
@@ -185,7 +177,6 @@ export default function GuestDashboardPage() {
               {stats.activeBookings}
             </p>
           </Card>
-
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Saved Favorites
@@ -265,7 +256,6 @@ export default function GuestDashboardPage() {
           )}
         </div>
       </main>
-
       <Footer />
     </>
   );

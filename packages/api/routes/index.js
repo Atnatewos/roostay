@@ -1,5 +1,6 @@
 // packages/api/routes/index.js
 // Central route aggregator for the ROOSTAY API
+// Mounts all modular route files
 const express = require('express');
 
 const healthRoutes = require('./health.routes');
@@ -14,11 +15,12 @@ const favoriteRoutes = require('./favorite.routes');
 const notificationRoutes = require('./notification.routes');
 const uploadRoutes = require('./upload.routes');
 const adminRoutes = require('./admin.routes');
+const messageRoutes = require('./message.routes'); 
+const hostApplicationRoutes = require('./hostApplication.routes');
 
 const router = express.Router();
 
 function createRoutes() {
-  // Mount all modular routes at the root path
   router.use('/', healthRoutes);
   router.use('/', authRoutes);
   router.use('/', userRoutes);
@@ -31,6 +33,8 @@ function createRoutes() {
   router.use('/', notificationRoutes);
   router.use('/', uploadRoutes);
   router.use('/', adminRoutes);
+  router.use('/', messageRoutes); 
+  router.use('/', hostApplicationRoutes);
 
   return router;
 }

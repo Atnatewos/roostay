@@ -4,7 +4,7 @@
 -- ============================================================================
 -- Ethiopian Home Rental Platform
 -- Author: Theron (Atnatewos Getasew Sahlu)
--- Version: 2.0.0 (Phase 2 - Payment Flow & Automated Expiry)
+-- Version: 3.0.0 
 -- ============================================================================
 --
 -- DESIGN PRINCIPLES:
@@ -14,11 +14,12 @@
 -- - Parameterized constraints for data integrity
 -- - Partial indexes for query optimization
 -- - Includes payment expiry tracking for automated booking expiry
+-- - Includes host application fields for guest-to-host upgrades
 --
 -- TABLE OVERVIEW (15 tables):
 -- 1. users                    - User accounts (guest, host, admin)
 -- 2. refresh_tokens           - JWT refresh token storage
--- 3. user_verifications       - ID verification for trust & safety
+-- 3. user_verifications       - ID verification & host applications
 -- 4. listings                 - Property listings
 -- 5. listing_images           - Property photos
 -- 6. listing_amenities        - Property amenities
@@ -80,10 +81,14 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 
 -- User verifications: ID verification for trust & safety
 -- Stores ID document images and verification status
+-- Extended to support host applications with experience and motivation data
+-- Guests submit applications here; admins review and approve/reject
+-- When approved, the user's role is updated to 'host' in the users table
 CREATE TABLE IF NOT EXISTS user_verifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    id_type VARCHAR(50) NOT NULL,
+    id_type VARCHAR(50) NOT NULL
+        CHECK (id_type IN ('kebele_id', 'passport', 'drivers_license', 'national_id')),
     id_number VARCHAR(100) NOT NULL,
     id_front_image_url TEXT NOT NULL,
     id_back_image_url TEXT,
@@ -93,6 +98,13 @@ CREATE TABLE IF NOT EXISTS user_verifications (
     reviewed_by UUID REFERENCES users(id),
     review_notes TEXT,
     reviewed_at TIMESTAMPTZ,
+    -- Host application fields (Phase 3 - Bucket 1)
+    -- These fields capture the guest's intent to become a host
+    hosting_experience VARCHAR(20)
+        CHECK (hosting_experience IN ('yes', 'no')),
+    property_count VARCHAR(20)
+        CHECK (property_count IN ('1-2', '3-5', '5+')),
+    motivation TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -461,6 +473,13 @@ CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals(status);
 CREATE INDEX IF NOT EXISTS idx_audit_admin ON audit_logs(admin_id);
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
+
+-- User verifications indexes (Phase 3 - Bucket 1)
+-- Partial index for efficient admin review queries
+-- Only indexes pending applications to speed up the admin dashboard
+CREATE INDEX IF NOT EXISTS idx_user_verifications_status 
+    ON user_verifications(status) 
+    WHERE status = 'pending';
 
 -- ============================================================================
 -- TRIGGERS

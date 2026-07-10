@@ -1,56 +1,59 @@
 {
   "development": {
     "currency": "ETB",
+    "currencySymbol": "Br",
     "serviceFeePercent": 5,
     "serviceFeeMin": 100,
     "serviceFeeMax": 5000,
-    "paymentTimeoutMinutes": 30,
+    "paymentTimeoutMinutes": "PAYMENT_TIMEOUT_MINUTES",
     "requireTransactionNumber": true,
     "preventDuplicateTransactions": true,
     "bankTransfer": {
       "enabled": true,
-      "bankName": "BANK_NAME",
-      "accountNumber": "BANK_ACCOUNT_NUMBER",
-      "accountHolder": "BANK_ACCOUNT_HOLDER",
+      "bankName": "Commercial Bank of Ethiopia",
+      "accountNumber": "1000457856",
+      "accountHolder": "ROOSTAY PLC",
       "referencePrefix": "ROOSTAY",
       "verificationTimeoutHours": 48,
-      "instructions": "Please transfer the total amount and enter the transaction reference number."
+      "instructions": "Please transfer the total amount and enter the transaction reference number from your confirmation SMS."
     },
     "telebirr": {
       "enabled": true,
       "merchantId": "TELEBIRR_MERCHANT_ID",
       "apiKey": "TELEBIRR_API_KEY",
-      "shortcode": "TELEBIRR_SHORTCODE",
+      "shortcode": "123456",
       "merchantName": "ROOSTAY"
     }
   },
   "production": {
     "currency": "ETB",
+    "currencySymbol": "Br",
     "serviceFeePercent": 5,
     "serviceFeeMin": 100,
     "serviceFeeMax": 5000,
-    "paymentTimeoutMinutes": 30,
+    "paymentTimeoutMinutes": "PAYMENT_TIMEOUT_MINUTES",
     "requireTransactionNumber": true,
     "preventDuplicateTransactions": true,
     "bankTransfer": {
       "enabled": true,
-      "bankName": "BANK_NAME",
-      "accountNumber": "BANK_ACCOUNT_NUMBER",
-      "accountHolder": "BANK_ACCOUNT_HOLDER",
+      "bankName": "Commercial Bank of Ethiopia",
+      "accountNumber": "1000457856",
+      "accountHolder": "ROOSTAY PLC",
       "referencePrefix": "ROOSTAY",
       "verificationTimeoutHours": 48,
-      "instructions": "Please transfer the total amount and enter the transaction reference number."
+      "instructions": "Please transfer the total amount and enter the transaction reference number from your confirmation SMS."
     },
     "telebirr": {
       "enabled": true,
       "merchantId": "TELEBIRR_MERCHANT_ID",
       "apiKey": "TELEBIRR_API_KEY",
-      "shortcode": "TELEBIRR_SHORTCODE",
+      "shortcode": "123456",
       "merchantName": "ROOSTAY"
     }
   },
   "test": {
     "currency": "ETB",
+    "currencySymbol": "Br",
     "serviceFeePercent": 5,
     "serviceFeeMin": 100,
     "serviceFeeMax": 5000,
@@ -61,7 +64,7 @@
       "enabled": true,
       "bankName": "Test Bank",
       "accountNumber": "1234567890",
-      "accountHolder": "TEST",
+      "accountHolder": "TEST ACCOUNT",
       "referencePrefix": "TEST",
       "verificationTimeoutHours": 1,
       "instructions": "Test instructions"

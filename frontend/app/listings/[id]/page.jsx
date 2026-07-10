@@ -1,4 +1,9 @@
+// frontend/app/listings/[id]/page.jsx
+// Listing Detail Page — displays full property information, image gallery, amenities, and reviews
+// Integrates BookingCard for the reservation flow
+// Author: Theron
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Header from '@/components/layout/Header';
@@ -7,25 +12,44 @@ import ImageGallery from '@/components/listing/ImageGallery';
 import AmenitiesList from '@/components/listing/AmenitiesList';
 import BookingCard from '@/components/booking/BookingCard';
 import ReviewCard from '@/components/review/ReviewCard';
+import EmptyState from '@/components/ui/EmptyState';
 import StarRating from '@/components/ui/StarRating';
 import Avatar from '@/components/ui/Avatar';
 import Skeleton from '@/components/ui/Skeleton';
-import useApi from '@/hooks/useApi';
 import { apiClient } from '@/lib/api';
-import constants from '@/lib/constants';
 
 export default function ListingDetailPage() {
   const params = useParams();
-  const { data, isLoading, execute } = useApi();
   const [listing, setListing] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    execute(() => apiClient.get(`/listings/${params.id}`));
-  }, [params.id, execute]);
+    async function fetchData() {
+      try {
+        const [listingRes, reviewsRes] = await Promise.all([
+          apiClient.get(`/listings/${params.id}`),
+          apiClient.get(`/listings/${params.id}/reviews`),
+        ]);
 
-  useEffect(() => {
-    if (data?.data?.listing) setListing(data.data.listing);
-  }, [data]);
+        if (listingRes?.data?.listing) {
+          setListing(listingRes.data.listing);
+        }
+
+        if (reviewsRes?.data) {
+          setReviewSummary(reviewsRes.data.summary);
+          setReviews(reviewsRes.data.reviews || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch listing data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (params.id) fetchData();
+  }, [params.id]);
 
   if (isLoading || !listing) {
     return (
@@ -54,8 +78,8 @@ export default function ListingDetailPage() {
           <div>
             <h1 className="listing-detail__title">{listing.title}</h1>
             <div className="listing-detail__meta">
-              <StarRating rating={listing.reviews?.avgRating || 0} size="sm" showValue />
-              <span>{listing.reviews?.total || 0} reviews</span>
+              <StarRating rating={reviewSummary?.avgRating || listing.reviews?.avgRating || 0} size="sm" showValue />
+              <span>{reviewSummary?.totalReviews || listing.reviews?.total || 0} reviews</span>
               <span>{listing.location?.city}, {listing.location?.subcity}</span>
             </div>
           </div>
@@ -69,7 +93,7 @@ export default function ListingDetailPage() {
               <div className="listing-detail__host">
                 <Avatar name={`${listing.host?.firstName || ''} ${listing.host?.lastName || ''}`} size="lg" src={listing.host?.imageUrl} />
                 <div className="listing-detail__host-info">
-              <span className="listing-detail__host-name">Hosted by {listing.host?.firstName} {listing.host?.lastName}</span>
+                  <span className="listing-detail__host-name">Hosted by {listing.host?.firstName} {listing.host?.lastName}</span>
                 </div>
               </div>
             </div>
@@ -81,6 +105,42 @@ export default function ListingDetailPage() {
             <div className="listing-detail__section">
               <h3 className="listing-detail__section-title">Amenities</h3>
               <AmenitiesList amenities={listing.amenities || []} />
+            </div>
+
+            {/* Reviews Section */}
+            <div className="listing-detail__section" style={{ marginTop: '3rem' }}>
+              <h3 className="listing-detail__section-title">
+                Reviews {reviewSummary?.totalReviews > 0 && `(${reviewSummary.totalReviews})`}
+              </h3>
+              
+              {reviewSummary?.totalReviews > 0 && (
+                <div style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1rem' }}>
+                  <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                    <p style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>{reviewSummary.avgRating}</p>
+                    <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>Overall</p>
+                  </div>
+                  {Object.entries(reviewSummary.ratings).map(([key, value]) => (
+                    <div key={key} style={{ textAlign: 'center', padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <p style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>{value}</p>
+                      <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>{key}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {reviews.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {reviews.map(review => (
+                    <ReviewCard key={review.id} review={review} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState 
+                  icon="star" 
+                  title="No reviews yet" 
+                  description="Be the first to review this property after your stay!" 
+                />
+              )}
             </div>
           </div>
 

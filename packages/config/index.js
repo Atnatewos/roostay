@@ -2,7 +2,6 @@
 // Central configuration loader - loads and merges all config files
 // Reads environment variables and resolves uppercase placeholder values
 // Supports DATABASE_URL connection string pattern matching
-
 const path = require('path');
 
 /**
@@ -51,11 +50,13 @@ function loadConfig(filename) {
   const config = require(`./${filename}`);
   const env = process.env.NODE_ENV || 'development';
   const envConfig = config[env] || config;
-
   return resolveEnvVars(envConfig);
 }
 
-// Load all configuration modules
+// ============================================================================
+// LOAD ALL CONFIGURATION MODULES
+// Each module maps to a specific domain of the application
+// ============================================================================
 const app = loadConfig('app.config.json');
 const database = loadConfig('database.config.json');
 const auth = loadConfig('auth.config.json');
@@ -65,6 +66,7 @@ const cors = loadConfig('cors.config.json');
 const rateLimit = loadConfig('rateLimit.config.json');
 const upload = loadConfig('upload.config.json');
 const features = loadConfig('features.config.json');
+const booking = loadConfig('booking.config.json');
 
 module.exports = {
   app,
@@ -76,4 +78,5 @@ module.exports = {
   rateLimit,
   upload,
   features,
+  booking,
 };

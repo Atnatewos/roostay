@@ -2,7 +2,6 @@
 // Host Dashboard — overview of listings, bookings, earnings, and quick actions
 // Fetches aggregated statistics and recent activity for the authenticated host
 // Author: Theron
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,14 +12,12 @@ import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
-import { apiClient, getStoredUser, ApiError } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
  * Host Dashboard Page
  * Provides hosts with a comprehensive overview of their property management.
- * Displays key metrics (listings, bookings, earnings), recent booking activity,
- * and quick action buttons for common host operations.
  */
 export default function HostDashboardPage() {
   const [user, setUser] = useState(null);
@@ -37,43 +34,29 @@ export default function HostDashboardPage() {
 
   /**
    * Fetches all host dashboard data in parallel on component mount.
-   * Retrieves user profile, host listings, and host bookings.
-   * Aggregates statistics from the fetched data for display.
    */
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        // Load stored user for immediate display
-        const storedUser = getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
-        }
-
-        // Fetch host-specific data in parallel for performance
         const [userResponse, bookingsResponse] = await Promise.all([
           apiClient.get('/auth/me'),
           apiClient.get('/bookings/host?limit=10'),
         ]);
 
-        // Update user data from API response
         if (userResponse?.data?.user) {
           setUser(userResponse.data.user);
         }
 
-        // Process booking data for statistics and recent activity
         const allBookings = bookingsResponse?.data || [];
         const pending = allBookings.filter((b) => b.status === 'pending').length;
         const confirmed = allBookings.filter((b) => b.status === 'confirmed').length;
         const completed = allBookings.filter((b) => b.status === 'completed');
 
-        // Calculate total earnings from completed bookings
         const earnings = completed.reduce(
           (sum, b) => sum + (parseFloat(b.total_amount) || 0),
           0
         );
 
-        // Fetch listings count from the listings search (scoped to host)
-        // In a full implementation, this would be a dedicated host endpoint
         setStats({
           totalListings: bookingsResponse?.pagination?.totalListings || 0,
           activeListings: bookingsResponse?.pagination?.activeListings || 0,
@@ -81,7 +64,6 @@ export default function HostDashboardPage() {
           confirmedBookings: confirmed,
           totalEarnings: earnings,
         });
-
         setRecentBookings(allBookings.slice(0, 5));
       } catch (err) {
         if (err instanceof ApiError) {
@@ -103,13 +85,6 @@ export default function HostDashboardPage() {
     fetchDashboardData();
   }, []);
 
-  /**
-   * Returns the appropriate badge variant for a booking status.
-   * Uses color-coded badges for visual status identification.
-   *
-   * @param {string} status - Booking status string
-   * @returns {string} CSS badge variant name
-   */
   function getStatusBadge(status) {
     const variantMap = {
       pending: 'warning',
@@ -122,12 +97,6 @@ export default function HostDashboardPage() {
     return variantMap[status] || 'default';
   }
 
-  /**
-   * Formats an ISO date string for display.
-   *
-   * @param {string} dateStr - ISO date string
-   * @returns {string} Human-readable date
-   */
   function formatDate(dateStr) {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -137,7 +106,6 @@ export default function HostDashboardPage() {
     });
   }
 
-  // Loading state — skeleton cards while data loads
   if (isLoading) {
     return (
       <>
@@ -155,7 +123,6 @@ export default function HostDashboardPage() {
     );
   }
 
-  // Error state with recovery options
   if (error) {
     return (
       <>
@@ -176,7 +143,6 @@ export default function HostDashboardPage() {
   return (
     <>
       <Header />
-
       <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
         {/* Welcome Header */}
         <div style={{ marginBottom: '2.5rem' }}>
@@ -190,7 +156,6 @@ export default function HostDashboardPage() {
 
         {/* Statistics Cards Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
-          {/* Total Listings */}
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Total Listings
@@ -199,8 +164,6 @@ export default function HostDashboardPage() {
               {stats.totalListings}
             </p>
           </Card>
-
-          {/* Pending Bookings */}
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Pending Bookings
@@ -209,8 +172,6 @@ export default function HostDashboardPage() {
               {stats.pendingBookings}
             </p>
           </Card>
-
-          {/* Confirmed Bookings */}
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Active Stays
@@ -219,8 +180,6 @@ export default function HostDashboardPage() {
               {stats.confirmedBookings}
             </p>
           </Card>
-
-          {/* Total Earnings */}
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Total Earnings
@@ -229,8 +188,6 @@ export default function HostDashboardPage() {
               {constants.CURRENCY_SYMBOL} {stats.totalEarnings.toLocaleString()}
             </p>
           </Card>
-
-          {/* Active Listings */}
           <Card padding="lg" hoverable>
             <p style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
               Active Listings
@@ -287,7 +244,6 @@ export default function HostDashboardPage() {
               {recentBookings.map((booking) => (
                 <Card key={booking.id} padding="lg" hoverable>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    {/* Booking Information */}
                     <div style={{ flex: 1, minWidth: '200px' }}>
                       <p style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: '0.25rem' }}>
                         {booking.listing_title || 'Property'}
@@ -299,8 +255,6 @@ export default function HostDashboardPage() {
                         {formatDate(booking.check_in_date)} — {formatDate(booking.check_out_date)}
                       </p>
                     </div>
-
-                    {/* Booking Amount and Status */}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <p style={{ fontWeight: 'var(--font-weight-bold)', marginBottom: '0.5rem' }}>
                         {constants.CURRENCY_SYMBOL} {Number(booking.total_amount).toLocaleString()}
@@ -310,8 +264,6 @@ export default function HostDashboardPage() {
                       </Badge>
                     </div>
                   </div>
-
-                  {/* Action buttons for pending bookings */}
                   {booking.status === 'pending' && (
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border-light)' }}>
                       <Button variant="primary" size="sm">
@@ -328,7 +280,6 @@ export default function HostDashboardPage() {
           )}
         </div>
       </main>
-
       <Footer />
     </>
   );

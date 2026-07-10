@@ -1,7 +1,6 @@
 // packages/api/controllers/user.controller.js
 // User controller - handles HTTP requests for user profile endpoints
-// Supports profile retrieval, updates, and admin user management
-
+// Supports profile retrieval, updates, admin user management, and host upgrades
 const userService = require('../../services/user.service');
 const { asyncHandler } = require('../../utils/asyncHandler');
 const logger = require('../../utils/logger');
@@ -13,7 +12,6 @@ const userController = {
    */
   getProfile: asyncHandler(async (req, res) => {
     const profile = await userService.getProfile(req.user.id);
-
     res.status(200).json({
       success: true,
       data: { user: profile },
@@ -27,7 +25,6 @@ const userController = {
    */
   updateProfile: asyncHandler(async (req, res) => {
     const updated = await userService.updateProfile(req.user.id, req.body);
-
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully.',
@@ -42,7 +39,6 @@ const userController = {
    */
   getUserById: asyncHandler(async (req, res) => {
     const profile = await userService.getProfile(req.params.id);
-
     res.status(200).json({
       success: true,
       data: { user: profile },
@@ -56,7 +52,6 @@ const userController = {
    */
   listUsers: asyncHandler(async (req, res) => {
     const result = await userService.listUsers(req.query);
-
     res.status(200).json({
       success: true,
       data: result.users,
@@ -71,13 +66,30 @@ const userController = {
    */
   toggleUserStatus: asyncHandler(async (req, res) => {
     const { isActive } = req.body;
-
     const updated = await userService.updateProfile(req.params.id, { isActive });
-
     res.status(200).json({
       success: true,
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully.`,
       data: { user: updated },
+    });
+  }),
+
+  /**
+   * POST /api/users/become-host
+   * Upgrades the authenticated guest user to a host role.
+   */
+  becomeHost: asyncHandler(async (req, res) => {
+    const updatedUser = await userService.becomeHost(req.user.id);
+    
+    logger.info('User became a host via API', {
+      userId: req.user.id,
+      newRole: updatedUser.role,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Congratulations! You are now a host.',
+      data: { user: updatedUser },
     });
   }),
 };

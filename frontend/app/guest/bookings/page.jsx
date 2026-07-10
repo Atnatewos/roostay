@@ -1,261 +1,180 @@
 // frontend/app/guest/bookings/page.jsx
-// Guest Bookings Page — lists all bookings with status filters and pagination
-// Allows guests to view, filter, and manage their booking history
+// Guest Bookings Page — displays all bookings for the authenticated guest
+// Includes a "Leave a Review" prompt for completed bookings
 // Author: Theron
-
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import Pagination from '@/components/ui/Pagination';
 import Skeleton from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import Modal from '@/components/ui/Modal';
+import ReviewForm from '@/components/review/ReviewForm';
 import { apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
-/**
- * Guest Bookings Page
- * Displays a paginated list of the authenticated guest's bookings.
- * Supports filtering by booking status (pending, confirmed, completed, cancelled).
- * Each booking card shows property details, dates, amount, and status.
- */
 export default function GuestBookingsPage() {
   const [bookings, setBookings] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, totalItems: 0 });
-  const [statusFilter, setStatusFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
 
-  /**
-   * Fetches bookings from the API with current pagination and filter settings.
-   * Wrapped in useCallback to allow retry on error.
-   */
-  const fetchBookings = useCallback(async (page = 1, status = statusFilter) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('limit', '10');
-      if (status) params.set('status', status);
-
-      const response = await apiClient.get(`/bookings/guest?${params.toString()}`);
-
-      setBookings(response?.data || []);
-      if (response?.pagination) {
-        setPagination(response.pagination);
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError('Failed to load bookings. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [statusFilter]);
-
-  // Fetch bookings on mount and when filters change
   useEffect(() => {
-    fetchBookings(1, statusFilter);
-  }, [statusFilter, fetchBookings]);
+    async function fetchBookings() {
+      try {
+        const response = await apiClient.get('/bookings/guest');
+        setBookings(response.data || []);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          setError('Please log in to view your bookings.');
+        } else {
+          setError('Unable to load bookings. Please try again.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchBookings();
+  }, []);
 
-  /**
-   * Handles page change from the Pagination component.
-   *
-   * @param {number} page - The new page number
-   */
-  function handlePageChange(page) {
-    fetchBookings(page, statusFilter);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  /**
-   * Handles status filter change. Resets to page 1 on filter change.
-   *
-   * @param {string} status - The selected status filter
-   */
-  function handleStatusChange(status) {
-    setStatusFilter(status);
-  }
-
-  /**
-   * Returns the appropriate badge variant for a booking status.
-   *
-   * @param {string} status - Booking status
-   * @returns {string} Badge variant name
-   */
   function getStatusBadge(status) {
     const variantMap = {
-      pending: 'warning',
-      confirmed: 'success',
-      cancelled: 'danger',
-      completed: 'info',
-      rejected: 'danger',
-      expired: 'default',
+      pending: 'warning', confirmed: 'success', cancelled: 'danger',
+      completed: 'info', rejected: 'danger', expired: 'default',
     };
     return variantMap[status] || 'default';
   }
 
-  /**
-   * Formats a date string into a readable format.
-   *
-   * @param {string} dateStr - ISO date string
-   * @returns {string} Formatted date
-   */
   function formatDate(dateStr) {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  /**
-   * Calculates the number of nights between two dates.
-   *
-   * @param {string} checkIn - Check-in date
-   * @param {string} checkOut - Check-out date
-   * @returns {number} Number of nights
-   */
-  function calculateNights(checkIn, checkOut) {
-    if (!checkIn || !checkOut) return 0;
-    return Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24));
+  function handleReviewClick(bookingId) {
+    setSelectedBookingId(bookingId);
+    setReviewModalOpen(true);
   }
 
-  // Filter tabs configuration
-  const filters = [
-    { value: '', label: 'All' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'confirmed', label: 'Confirmed' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' },
-  ];
+  function handleReviewSuccess() {
+    setReviewModalOpen(false);
+    setSelectedBookingId(null);
+    // Refresh bookings to update UI if needed
+    window.location.reload();
+  }
+
+  if (isLoading) {
+    return (
+      <>
+        <Header />
+        <div className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
+          <Skeleton type="rect" height="40px" width="200px" />
+          <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {[1, 2, 3].map((i) => <Skeleton key={i} type="card" />)}
+          </div>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header />
+        <div className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem', textAlign: 'center' }}>
+          <h1 style={{ marginBottom: '1rem' }}>My Bookings</h1>
+          <p style={{ color: 'var(--color-error)', marginBottom: '2rem' }}>{error}</p>
+          <Link href={constants.ROUTES.LOGIN} className="btn btn--primary">Sign In</Link>
+        </div>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
       <Header />
-
-      <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
-        {/* Page Header */}
-        <div style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: '0.5rem' }}>
-            My Bookings
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)' }}>
-            Track and manage all your property bookings in one place.
-          </p>
+      <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem', maxWidth: '800px' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)' }}>My Bookings</h1>
+          <p style={{ color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>Manage your upcoming and past stays.</p>
         </div>
 
-        {/* Status Filter Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-          {filters.map((f) => (
-            <button
-              key={f.value}
-              className={`btn btn--sm ${statusFilter === f.value ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => handleStatusChange(f.value)}
-            >
-              {f.label}
-              {f.value === '' && pagination.totalItems > 0 && ` (${pagination.totalItems})`}
-            </button>
-          ))}
-        </div>
-
-        {/* Error State */}
-        {error && (
-          <Card padding="lg" style={{ marginBottom: '2rem', borderLeft: '3px solid var(--color-error)' }}>
-            <p style={{ color: 'var(--color-error)', marginBottom: '1rem' }}>{error}</p>
-            <Button variant="outline" size="sm" onClick={() => fetchBookings(1, statusFilter)}>
-              Try Again
-            </Button>
-          </Card>
-        )}
-
-        {/* Loading State */}
-        {isLoading ? (
+        {bookings.length === 0 ? (
+          <EmptyState 
+            icon="calendar" 
+            title="No bookings yet" 
+            description="Start exploring listings to book your first stay!" 
+            actionLabel="Browse Listings" 
+            actionHref={constants.ROUTES.LISTINGS} 
+          />
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} type="rect" height="100px" />
+            {bookings.map((booking) => (
+              <Card key={booking.id} padding="lg">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <Link href={`/listings/${booking.listing_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                      <p style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: '0.25rem', fontSize: 'var(--font-size-lg)' }}>
+                        {booking.listing_title || 'Property'}
+                      </p>
+                    </Link>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                      {booking.city || ''}
+                    </p>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-light)', marginTop: '0.5rem' }}>
+                      {formatDate(booking.check_in_date)} — {formatDate(booking.check_out_date)}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontWeight: 'var(--font-weight-bold)', marginBottom: '0.5rem' }}>
+                      {constants.CURRENCY_SYMBOL} {Number(booking.total_amount).toLocaleString()}
+                    </p>
+                    <Badge variant={getStatusBadge(booking.status)} size="sm">
+                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Leave a Review Button for Completed Bookings */}
+                {booking.status === 'completed' && (
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border-light)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleReviewClick(booking.id)}
+                    >
+                      Leave a Review
+                    </Button>
+                  </div>
+                )}
+              </Card>
             ))}
           </div>
-        ) : bookings.length === 0 ? (
-          /* Empty State */
-          <Card padding="lg">
-            <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-              <p style={{ fontSize: 'var(--font-size-lg)', color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-                {statusFilter
-                  ? `No ${statusFilter} bookings found.`
-                  : 'You haven\'t made any bookings yet.'}
-              </p>
-              <Link href={constants.ROUTES.LISTINGS} className="btn btn--primary">
-                Browse Listings
-              </Link>
-            </div>
-          </Card>
-        ) : (
-          <>
-            {/* Bookings List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-              {bookings.map((booking) => (
-                <Card key={booking.id} padding="lg" hoverable>
-                  <Link
-                    href={`/guest/bookings/${booking.id}`}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', textDecoration: 'none', color: 'inherit' }}
-                  >
-                    {/* Booking Details */}
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                      <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '0.5rem' }}>
-                        {booking.listing_title || 'Property'}
-                      </h3>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '0.25rem' }}>
-                        {booking.city || 'Location not specified'}
-                      </p>
-                      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-light)' }}>
-                        {formatDate(booking.check_in_date)} — {formatDate(booking.check_out_date)}
-                        <span style={{ marginLeft: '0.5rem' }}>
-                          ({calculateNights(booking.check_in_date, booking.check_out_date)} nights)
-                        </span>
-                      </p>
-                      {booking.special_requests && (
-                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-light)', marginTop: '0.25rem', fontStyle: 'italic' }}>
-                          Note: {booking.special_requests.substring(0, 100)}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Price and Status */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <p style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-lg)', marginBottom: '0.5rem' }}>
-                        {constants.CURRENCY_SYMBOL} {Number(booking.total_amount).toLocaleString()}
-                      </p>
-                      <Badge variant={getStatusBadge(booking.status)} size="sm">
-                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                      </Badge>
-                    </div>
-                  </Link>
-                </Card>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <Pagination
-                currentPage={pagination.page}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
-                showInfo
-              />
-            )}
-          </>
         )}
       </main>
+
+      {/* Review Modal */}
+      <Modal 
+        isOpen={reviewModalOpen} 
+        onClose={() => setReviewModalOpen(false)}
+        title="Write a Review"
+        size="md"
+      >
+        {selectedBookingId && (
+          <ReviewForm 
+            bookingId={selectedBookingId} 
+            onSuccess={handleReviewSuccess} 
+            onCancel={() => setReviewModalOpen(false)} 
+          />
+        )}
+      </Modal>
 
       <Footer />
     </>

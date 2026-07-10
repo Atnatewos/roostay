@@ -3,6 +3,7 @@
 // Handles all API routes: auth, listings, bookings, payments, admin, etc.
 // Uses httpOnly cookies for XSS-safe authentication
 // Uses native PostgreSQL driver with parameterized queries
+// Integrates Cloudinary for secure image uploads
 // Author: Theron
 
 const express = require('express');
@@ -14,6 +15,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Joi = require('joi');
+const cloudinary = require('cloudinary').v2;
 
 // ============================================================================
 // CONFIGURATION
@@ -68,7 +70,23 @@ const CONFIG = {
     serviceFeeMin: 100,
     serviceFeeMax: 5000,
   },
+  upload: {
+    maxFileSizeBytes: 5 * 1024 * 1024, // 5MB
+    allowedFormats: ['jpg', 'jpeg', 'png', 'webp', 'avif'],
+    rootFolder: 'roostay',
+  },
 };
+
+// ============================================================================
+// CLOUDINARY CONFIGURATION
+// Configures Cloudinary SDK using environment variables
+// Used for secure image uploads (listings, verifications, payment proofs)
+// ============================================================================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // ============================================================================
 // DATABASE POOL
@@ -445,6 +463,41 @@ const schemas = {
   updateBookingStatus: Joi.object({
     status: Joi.string().valid('confirmed', 'cancelled', 'completed', 'rejected', 'expired').required(),
     cancellationReason: Joi.string().max(1000).optional().allow(null, ''),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Host application schema
+  // Validates identity and experience data for guest-to-host upgrades
+  // ------------------------------------------------------------------------
+  hostApplication: Joi.object({
+    idType: Joi.string().valid('kebele_id', 'passport', 'drivers_license', 'national_id').required(),
+    idNumber: Joi.string().trim().min(3).max(100).required(),
+    idFrontImageUrl: Joi.string().uri().required(),
+    idBackImageUrl: Joi.string().uri().optional().allow(null, ''),
+    hostingExperience: Joi.string().valid('yes', 'no').required(),
+    propertyCount: Joi.string().valid('1-2', '3-5', '5+').required(),
+    motivation: Joi.string().trim().max(2000).optional().allow(null, ''),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Image upload schema
+  // Validates base64 image data and destination folder for Cloudinary uploads
+  // ------------------------------------------------------------------------
+  uploadImage: Joi.object({
+    image: Joi.string()
+      .pattern(/^data:image\/(jpeg|png|webp|avif);base64,/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Image must be a valid base64 data URL (JPEG, PNG, WebP, or AVIF).',
+        'any.required': 'Image data is required.',
+      }),
+    folder: Joi.string()
+      .trim()
+      .valid('listings', 'verifications', 'payment_proofs', 'profiles', 'general')
+      .default('general')
+      .messages({
+        'any.only': 'Folder must be one of: listings, verifications, payment_proofs, profiles, general.',
+      }),
   }),
 };
 
@@ -1588,6 +1641,228 @@ const adminController = {
   }),
 };
 
+// --------------------------------------------------------------------------
+// User Controller — user profile management and host upgrades
+// --------------------------------------------------------------------------
+const userController = {
+  /**
+   * POST /api/users/become-host
+   * Upgrades the authenticated guest user to a host role.
+   * Validates that the user exists and is not already a host or admin.
+   * Only accessible to users with the 'guest' role via the authorize middleware.
+   */
+  becomeHost: asyncHandler(async (req, res) => {
+    // Fetch the current user to verify their existence and role
+    const user = await queryOne('SELECT id, role FROM users WHERE id = $1', [req.user.id]);
+    
+    if (!user) {
+      throw new AppError('User not found.', 404, 'NOT_FOUND');
+    }
+    
+    // Prevent hosts or admins from calling this endpoint redundantly
+    if (user.role === 'host' || user.role === 'admin') {
+      throw new AppError(`User is already a ${user.role}.`, 400, 'VALIDATION_ERROR');
+    }
+
+    // Update the user's role to 'host' and return the updated record
+    const updated = await queryOne(
+      'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, role, first_name, last_name',
+      ['host', req.user.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Congratulations! You are now a host.',
+      data: { user: updated },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Host Application Controller — handles guest-to-host upgrade requests
+// --------------------------------------------------------------------------
+const hostApplicationController = {
+  /**
+   * POST /api/users/apply-host
+   * Submits a new host application for the authenticated guest user.
+   * Validates that the user is not already a host and has no pending applications.
+   */
+  apply: asyncHandler(async (req, res) => {
+    const { idType, idNumber, idFrontImageUrl, idBackImageUrl, hostingExperience, propertyCount, motivation } = req.body;
+
+    // Verify user exists and check current role
+    const user = await queryOne('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
+    if (user.role === 'host' || user.role === 'admin') {
+      throw new AppError(`You are already a ${user.role}.`, 409, 'CONFLICT');
+    }
+
+    // Check for existing pending application
+    const existingPending = await queryOne(
+      "SELECT id FROM user_verifications WHERE user_id = $1 AND status = 'pending'",
+      [req.user.id]
+    );
+    if (existingPending) {
+      throw new AppError('You already have a pending application. Please wait for admin review.', 409, 'CONFLICT');
+    }
+
+    // Insert the application into the user_verifications table
+    const application = await queryOne(
+      `INSERT INTO user_verifications (
+        user_id, id_type, id_number, id_front_image_url, id_back_image_url,
+        status, hosting_experience, property_count, motivation
+      ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)
+      RETURNING id, user_id, status, created_at`,
+      [
+        req.user.id, idType, idNumber, idFrontImageUrl, idBackImageUrl || null,
+        hostingExperience, propertyCount, motivation || null,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Your application has been submitted successfully. We will review it within 24-48 hours.',
+      data: { application },
+    });
+  }),
+
+  /**
+   * GET /api/users/host-application-status
+   * Retrieves the latest application status for the authenticated user.
+   */
+  getStatus: asyncHandler(async (req, res) => {
+    const application = await queryOne(
+      `SELECT id, id_type, status, review_notes, reviewed_at, created_at 
+       FROM user_verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [req.user.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: { application },
+    });
+  }),
+};
+
+// --------------------------------------------------------------------------
+// Upload Controller — handles image uploads to Cloudinary
+// Accepts base64 encoded images from the frontend and returns secure URLs
+// All uploads are authenticated and organized into typed folders
+// --------------------------------------------------------------------------
+const uploadController = {
+  /**
+   * POST /api/upload
+   * Uploads a base64 encoded image to Cloudinary.
+   * Body: { image: string (base64 data URL), folder: string }
+   * 
+   * The folder parameter determines the Cloudinary destination:
+   * - listings: Property photos uploaded by hosts
+   * - verifications: ID documents for host applications
+   * - payment_proofs: Bank transfer receipts
+   * - profiles: User avatar images
+   * - general: Fallback for miscellaneous uploads
+   */
+  uploadImage: asyncHandler(async (req, res) => {
+    const { image, folder = 'general' } = req.body;
+
+    // Validate that the image is a valid base64 data URL
+    if (!image || !image.startsWith('data:image')) {
+      throw new AppError('Invalid image data. Please provide a valid base64 image.', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate file size (approximate — base64 is ~33% larger than binary)
+    const estimatedSizeBytes = (image.length * 3) / 4;
+    if (estimatedSizeBytes > CONFIG.upload.maxFileSizeBytes) {
+      throw new AppError(
+        `Image too large. Maximum size is ${CONFIG.upload.maxFileSizeBytes / (1024 * 1024)}MB.`,
+        400,
+        'FILE_TOO_LARGE'
+      );
+    }
+
+    try {
+      // Build the full folder path under the root folder
+      const fullFolder = `${CONFIG.upload.rootFolder}/${folder}`;
+
+      // Upload the base64 image to Cloudinary with automatic optimization
+      const result = await cloudinary.uploader.upload(image, {
+        folder: fullFolder,
+        resource_type: 'image',
+        // Automatically optimize quality and format for web delivery
+        transformation: [
+          { quality: 'auto', fetch_format: 'auto' },
+        ],
+        // Generate responsive breakpoints for different screen sizes
+        responsive_breakpoints: [
+          {
+            create_derived: true,
+            bytes_step: 20000,
+            min_width: 200,
+            max_width: 1000,
+            max_images: 5,
+          },
+        ],
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Image uploaded successfully.',
+        data: {
+          url: result.secure_url,
+          publicId: result.public_id,
+          width: result.width,
+          height: result.height,
+          format: result.format,
+          bytes: result.bytes,
+          folder: fullFolder,
+        },
+      });
+    } catch (err) {
+      console.error('Cloudinary upload error:', err.message);
+      throw new AppError('Failed to upload image to cloud storage.', 500, 'UPLOAD_ERROR');
+    }
+  }),
+
+  /**
+   * DELETE /api/upload
+   * Deletes an image from Cloudinary by public ID.
+   * Body: { publicId: string }
+   * 
+   * Only the user who uploaded the image or an admin can delete it.
+   * Used when hosts remove listing photos or users change avatars.
+   */
+  deleteImage: asyncHandler(async (req, res) => {
+    const { publicId } = req.body;
+
+    if (!publicId || typeof publicId !== 'string') {
+      throw new AppError('Invalid public ID. Please provide a valid Cloudinary public ID.', 400, 'VALIDATION_ERROR');
+    }
+
+    // Ensure the public ID is within our root folder (prevents deletion of other assets)
+    if (!publicId.startsWith(`${CONFIG.upload.rootFolder}/`)) {
+      throw new AppError('Access denied. Cannot delete assets outside the application folder.', 403, 'FORBIDDEN');
+    }
+
+    try {
+      const result = await cloudinary.uploader.destroy(publicId);
+
+      if (result.result !== 'ok' && result.result !== 'not found') {
+        throw new AppError('Failed to delete image from cloud storage.', 500, 'DELETE_ERROR');
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Image deleted successfully.',
+        data: { publicId, result: result.result },
+      });
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      console.error('Cloudinary delete error:', err.message);
+      throw new AppError('Failed to delete image from cloud storage.', 500, 'DELETE_ERROR');
+    }
+  }),
+};
+
 // ============================================================================
 // EXPRESS APPLICATION
 // ============================================================================
@@ -1672,6 +1947,21 @@ app.patch('/api/admin/payments/:id/verify', authenticate, authorize('admin'), ad
 app.get('/api/admin/withdrawals', authenticate, authorize('admin'), adminController.listWithdrawals);
 app.patch('/api/admin/withdrawals/:id/process', authenticate, authorize('admin'), adminController.processWithdrawal);
 
+// ---- User Routes ----
+// Upgrades a guest account to a host account. Protected by 'guest' role authorization.
+app.post('/api/users/become-host', authenticate, authorize('guest'), userController.becomeHost);
+
+// ---- Host Application Routes ----
+// Allows guests to submit a verification application to become a host
+app.post('/api/users/apply-host', authenticate, validateBody(schemas.hostApplication), hostApplicationController.apply);
+app.get('/api/users/host-application-status', authenticate, hostApplicationController.getStatus);
+
+// ---- Upload Routes ----
+// Handles image uploads to Cloudinary. Requires authentication.
+// MUST BE REGISTERED BEFORE THE 404 CATCH-ALL HANDLER
+app.post('/api/upload', authenticate, validateBody(schemas.uploadImage), uploadController.uploadImage);
+app.delete('/api/upload', authenticate, uploadController.deleteImage);
+
 // ---- Root ----
 app.get('/', (req, res) => {
   res.json({ success: true, name: 'ROOSTAY API', version: '1.0.0', environment: CONFIG.app.env });
@@ -1679,6 +1969,7 @@ app.get('/', (req, res) => {
 
 // ---- 404 Handler ----
 // Uses a regex pattern instead of wildcard for path-to-regexp v8 compatibility
+// MUST BE THE LAST ROUTE (before the error handler)
 app.all(/.*/, (req, res) => {
   res.status(404).json({
     success: false,
@@ -1690,6 +1981,7 @@ app.all(/.*/, (req, res) => {
 });
 
 // ---- Global Error Handler ----
+// MUST BE THE ABSOLUTE LAST MIDDLEWARE
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Internal server error';

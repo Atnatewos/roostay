@@ -1,6 +1,6 @@
 // packages/services/user.service.js
 // User service - handles all user-related business logic
-// Registration, authentication, profile management, verification
+// Registration, authentication, profile management, verification, and role upgrades
 // All database queries use parameterized statements for SQL injection prevention
 const bcrypt = require('bcryptjs');
 const { query, queryOne, queryExists } = require('../database');
@@ -13,12 +13,27 @@ try {
   config = require('@roostay/config');
 } catch {
   config = {
-    auth: { bcryptSaltRounds: 12, passwordMinLength: 8, maxLoginAttempts: 5, lockoutDurationMinutes: 15 },
-    features: { registrationEnabled: true },
+    auth: {
+      bcryptSaltRounds: 12,
+      passwordMinLength: 8,
+      maxLoginAttempts: 5,
+      lockoutDurationMinutes: 15,
+    },
+    features: {
+      registrationEnabled: true,
+    },
   };
 }
 
 const userService = {
+  /**
+   * Registers a new user account.
+   * Validates input, hashes password, and creates the user record.
+   * Returns tokens for immediate authentication after registration.
+   * 
+   * @param {Object} userData - Registration data { email, password, firstName, lastName, phoneNumber }
+   * @returns {Promise<Object>} Created user with tokens
+   */
   async register(userData) {
     if (!config.features.registrationEnabled) {
       throw new ValidationError('New account registration is currently disabled.');
@@ -42,14 +57,7 @@ const userService = {
       `INSERT INTO users (email, phone_number, password_hash, first_name, last_name, role)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, email, phone_number, first_name, last_name, role, is_verified, created_at`,
-      [
-        email ? email.toLowerCase().trim() : null,
-        phoneNumber || null,
-        passwordHash,
-        firstName.trim(),
-        lastName.trim(),
-        'guest',
-      ]
+      [email ? email.toLowerCase().trim() : null, phoneNumber || null, passwordHash, firstName.trim(), lastName.trim(), 'guest']
     );
 
     const tokens = generateTokenPair(newUser);
@@ -65,6 +73,14 @@ const userService = {
     };
   },
 
+  /**
+   * Authenticates a user with email and password.
+   * Implements login attempt tracking and account lockout protection.
+   * 
+   * @param {string} email - User email
+   * @param {string} password - User password
+   * @returns {Promise<Object>} Authenticated user with tokens
+   */
   async login(email, password) {
     const user = await queryOne(
       `SELECT id, email, phone_number, first_name, last_name, password_hash, role, is_verified, is_active, login_attempts, locked_until 
@@ -110,6 +126,12 @@ const userService = {
     };
   },
 
+  /**
+   * Refreshes an expired access token using a valid refresh token.
+   * 
+   * @param {string} refreshToken - The refresh token
+   * @returns {Promise<Object>} New token pair
+   */
   async refreshToken(refreshToken) {
     const decoded = verifyRefreshToken(refreshToken);
     const user = await queryOne('SELECT id, email, role, is_active FROM users WHERE id = $1', [decoded.sub]);
@@ -120,10 +142,15 @@ const userService = {
     const tokens = generateTokenPair({ id: user.id, email: user.email, role: user.role });
     logger.debug('Token refreshed', { userId: user.id });
     
-    // Return both tokens and the user object for the controller
-    return { tokens, user };
+    return { tokens };
   },
 
+  /**
+   * Retrieves a user by their ID.
+   * 
+   * @param {string} userId - The user ID
+   * @returns {Promise<Object>} User profile data
+   */
   async getProfile(userId) {
     const user = await queryOne(
       `SELECT id, email, phone_number, first_name, last_name, profile_image_url, role, is_verified, created_at 
@@ -139,6 +166,13 @@ const userService = {
     };
   },
 
+  /**
+   * Updates a user's profile information.
+   * 
+   * @param {string} userId - The user ID
+   * @param {Object} updates - Fields to update { firstName, lastName, phoneNumber, profileImageUrl }
+   * @returns {Promise<Object>} Updated user profile
+   */
   async updateProfile(userId, updates) {
     const allowedFields = ['first_name', 'last_name', 'phone_number', 'profile_image_url'];
     const setClauses = [];
@@ -177,6 +211,13 @@ const userService = {
     };
   },
 
+  /**
+   * Changes a user's password.
+   * 
+   * @param {string} userId - The user ID
+   * @param {string} currentPassword - Current password for verification
+   * @param {string} newPassword - New password to set
+   */
   async changePassword(userId, currentPassword, newPassword) {
     const user = await queryOne('SELECT password_hash FROM users WHERE id = $1', [userId]);
     if (!user) throw new NotFoundError('User not found.');
@@ -189,6 +230,12 @@ const userService = {
     logger.info('Password changed successfully', { userId });
   },
 
+  /**
+   * Lists users with pagination (admin only).
+   * 
+   * @param {Object} options - Query options { page, limit, role, isVerified, isActive, search }
+   * @returns {Promise<Object>} Paginated user list with metadata
+   */
   async listUsers(options = {}) {
     const { page = 1, limit = 20, role, isVerified, isActive, search } = options;
     const offset = (page - 1) * limit;
@@ -226,6 +273,33 @@ const userService = {
         totalPages: Math.ceil(parseInt(countResult.total, 10) / limit),
       },
     };
+  },
+
+  /**
+   * Upgrades a guest user to a host role.
+   * Validates that the user exists and is not already a host or admin.
+   * 
+   * @param {string} userId - The user ID to upgrade
+   * @returns {Promise<Object>} Updated user record
+   */
+  async becomeHost(userId) {
+    const user = await queryOne('SELECT id, role FROM users WHERE id = $1', [userId]);
+    
+    if (!user) {
+      throw new NotFoundError('User not found.');
+    }
+    
+    if (user.role === 'host' || user.role === 'admin') {
+      throw new ValidationError(`User is already a ${user.role}.`);
+    }
+
+    const updated = await queryOne(
+      'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, role, first_name, last_name',
+      ['host', userId]
+    );
+
+    logger.info('User upgraded to host', { userId, newRole: 'host' });
+    return updated;
   },
 };
 
