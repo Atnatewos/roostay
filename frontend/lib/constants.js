@@ -104,7 +104,7 @@ const constants = {
     GUEST_FAVORITES: '/guest/favorites',
     GUEST_PROFILE: '/guest/profile',
     HOST_DASHBOARD: '/host/dashboard',
-    HOST_LISTINGS: '/host/listings',
+    HOST_LISTINGS: '/host/my-listings',
     HOST_LISTINGS_CREATE: '/host/listings/create',
     HOST_BOOKINGS: '/host/bookings',
     HOST_WITHDRAWALS: '/host/withdrawals',

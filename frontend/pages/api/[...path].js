@@ -427,12 +427,60 @@ const schemas = {
     instantBook: Joi.boolean().default(false),
     minNights: Joi.number().integer().min(1).default(1),
     cancellationPolicy: Joi.string().valid('flexible', 'moderate', 'strict').default('flexible'),
+    images: Joi.array()
+      .items(
+        Joi.object({
+          url: Joi.string().uri().required(),
+          sortOrder: Joi.number().integer().min(0).default(0),
+          isPrimary: Joi.boolean().default(false),
+        })
+      )
+      .max(15)
+      .optional()
+      .default([]),
+  }),
+
+  // ------------------------------------------------------------------------
+  // Update listing schema
+  // All fields optional — only provided fields will be updated
+  // ------------------------------------------------------------------------
+  updateListing: Joi.object({
+    title: Joi.string().trim().min(5).max(255).optional(),
+    description: Joi.string().trim().min(20).max(5000).optional(),
+    listingType: Joi.string().valid('short_term', 'long_term', 'both').optional(),
+    propertyType: Joi.string()
+      .valid('apartment', 'house', 'villa', 'condo', 'guest_house', 'shared_room', 'serviced_apartment')
+      .optional(),
+    bedrooms: Joi.number().integer().min(0).max(50).optional(),
+    bathrooms: Joi.number().integer().min(1).max(50).optional(),
+    maxGuests: Joi.number().integer().min(1).max(100).optional(),
+    bedsCount: Joi.number().integer().min(1).max(100).optional(),
+    pricePerNight: Joi.number().positive().precision(2).optional().allow(null),
+    pricePerMonth: Joi.number().positive().precision(2).optional().allow(null),
+    cleaningFee: Joi.number().min(0).precision(2).optional(),
+    securityDeposit: Joi.number().min(0).precision(2).optional(),
+    streetAddress: Joi.string().trim().min(5).max(500).optional(),
+    city: Joi.string().trim().min(2).max(100).optional(),
+    subcity: Joi.string().trim().max(100).optional().allow(null, ''),
+    amenities: Joi.array()
+      .items(
+        Joi.object({
+          name: Joi.string().required(),
+          category: Joi.string().optional(),
+          iconName: Joi.string().optional(),
+        })
+      )
+      .max(50)
+      .optional(),
+    instantBook: Joi.boolean().optional(),
+    minNights: Joi.number().integer().min(1).optional(),
+    cancellationPolicy: Joi.string().valid('flexible', 'moderate', 'strict').optional(),
+    houseRules: Joi.string().trim().max(2000).optional().allow(null, ''),
   }),
 
   // ------------------------------------------------------------------------
   // Booking with payment schema
   // Validates booking creation with mandatory transaction number
-  // The transactionNumber field is required when config demands it
   // ------------------------------------------------------------------------
   createBookingWithPayment: Joi.object({
     listingId: Joi.string().guid({ version: 'uuidv4' }).required(),
@@ -451,7 +499,6 @@ const schemas = {
 
   // ------------------------------------------------------------------------
   // Transaction validation schema
-  // Used to check if a transaction number has already been used
   // ------------------------------------------------------------------------
   validateTransaction: Joi.object({
     transactionNumber: Joi.string().trim().min(3).max(100).required(),
@@ -467,7 +514,6 @@ const schemas = {
 
   // ------------------------------------------------------------------------
   // Host application schema
-  // Validates identity and experience data for guest-to-host upgrades
   // ------------------------------------------------------------------------
   hostApplication: Joi.object({
     idType: Joi.string().valid('kebele_id', 'passport', 'drivers_license', 'national_id').required(),
@@ -481,11 +527,10 @@ const schemas = {
 
   // ------------------------------------------------------------------------
   // Image upload schema
-  // Validates base64 image data and destination folder for Cloudinary uploads
   // ------------------------------------------------------------------------
   uploadImage: Joi.object({
     image: Joi.string()
-      .pattern(/^data:image\/(jpeg|png|webp|avif);base64,/)
+      .pattern(/^data:image\/(jpeg|jpg|png|webp|avif);base64,/)
       .required()
       .messages({
         'string.pattern.base': 'Image must be a valid base64 data URL (JPEG, PNG, WebP, or AVIF).',
@@ -499,6 +544,23 @@ const schemas = {
         'any.only': 'Folder must be one of: listings, verifications, payment_proofs, profiles, general.',
       }),
   }),
+
+  // ------------------------------------------------------------------------
+  // Review schemas
+  // ------------------------------------------------------------------------
+  createReview: Joi.object({
+    bookingId: Joi.string().guid({ version: 'uuidv4' }).required(),
+    cleanliness: Joi.number().integer().min(1).max(5).required(),
+    accuracy: Joi.number().integer().min(1).max(5).required(),
+    communication: Joi.number().integer().min(1).max(5).required(),
+    location: Joi.number().integer().min(1).max(5).required(),
+    value: Joi.number().integer().min(1).max(5).required(),
+    reviewText: Joi.string().max(3000).optional().allow(null, ''),
+  }),
+
+  addHostResponse: Joi.object({
+    responseText: Joi.string().min(1).max(2000).required(),
+  }),
 };
 
 // ============================================================================
@@ -511,12 +573,6 @@ const schemas = {
 // Auth Controller — registration, login, profile retrieval, token refresh, logout
 // --------------------------------------------------------------------------
 const authController = {
-
-  /**
-   * POST /api/auth/register
-   * Creates a new user account with hashed password.
-   * Sets httpOnly cookies with access and refresh tokens on success.
-   */
   register: asyncHandler(async (req, res) => {
     const { email, password, firstName, lastName, phoneNumber } = req.body;
 
@@ -536,8 +592,6 @@ const authController = {
     );
 
     const tokens = generateTokens(user);
-
-    // Set httpOnly cookies for XSS-safe authentication
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     res.status(201).json({
@@ -556,12 +610,6 @@ const authController = {
     });
   }),
 
-  /**
-   * POST /api/auth/login
-   * Authenticates user with email and password.
-   * Implements account lockout after repeated failed attempts.
-   * Sets httpOnly cookies with access and refresh tokens on success.
-   */
   login: asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
@@ -599,8 +647,6 @@ const authController = {
     );
 
     const tokens = generateTokens(user);
-
-    // Set httpOnly cookies for XSS-safe authentication
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     res.json({
@@ -619,11 +665,6 @@ const authController = {
     });
   }),
 
-  /**
-   * GET /api/auth/me
-   * Returns the authenticated user's profile information.
-   * Authentication is verified via httpOnly cookie by the authenticate middleware.
-   */
   getMe: asyncHandler(async (req, res) => {
     const user = await queryOne(
       `SELECT id, email, phone_number, first_name, last_name, profile_image_url, role, is_verified
@@ -649,12 +690,6 @@ const authController = {
     });
   }),
 
-  /**
-   * POST /api/auth/refresh-token
-   * Reads the refresh token from httpOnly cookie and issues new token pair.
-   * Called automatically by the frontend when the access token expires.
-   * The refresh cookie is only sent to this specific endpoint.
-   */
   refreshToken: asyncHandler(async (req, res) => {
     const refreshToken = req.cookies?.[CONFIG.auth.cookies.refreshName];
 
@@ -669,7 +704,6 @@ const authController = {
         throw new AppError('Invalid token type.', 401, 'AUTH_ERROR');
       }
 
-      // Verify the user still exists and is active
       const user = await queryOne(
         'SELECT id, email, role, is_active FROM users WHERE id = $1',
         [decoded.sub]
@@ -678,7 +712,6 @@ const authController = {
       if (!user) throw new AppError('User not found.', 401, 'AUTH_ERROR');
       if (!user.is_active) throw new AppError('Account deactivated.', 401, 'AUTH_ERROR');
 
-      // Generate new token pair and set new cookies
       const tokens = generateTokens(user);
       setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
@@ -687,7 +720,6 @@ const authController = {
         message: 'Token refreshed successfully.',
       });
     } catch (err) {
-      // Clear invalid cookies on any error
       clearAuthCookies(res);
 
       if (err instanceof AppError) throw err;
@@ -698,11 +730,6 @@ const authController = {
     }
   }),
 
-  /**
-   * POST /api/auth/logout
-   * Clears httpOnly cookies to log the user out.
-   * No authentication required — simply removes the cookies.
-   */
   logout: asyncHandler(async (req, res) => {
     clearAuthCookies(res);
     res.json({
@@ -716,12 +743,9 @@ const authController = {
 // Listing Controller — property CRUD and search
 // --------------------------------------------------------------------------
 const listingController = {
-  /**
-   * POST /api/listings
-   * Creates a new property listing for the authenticated host.
-   */
   createListing: asyncHandler(async (req, res) => {
     const d = req.body;
+    
     const listing = await queryOne(
       `INSERT INTO listings (
         host_id, title, description, listing_type, property_type,
@@ -754,13 +778,40 @@ const listingController = {
       }
     }
 
-    res.status(201).json({ success: true, message: 'Listing created.', data: { listing } });
+    if (d.images && d.images.length > 0) {
+      for (let i = 0; i < d.images.length; i++) {
+        const img = d.images[i];
+        await query(
+          `INSERT INTO listing_images (listing_id, image_url, sort_order, is_primary)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            listing.id,
+            img.url,
+            img.sortOrder || i,
+            img.isPrimary || i === 0,
+          ]
+        );
+      }
+    }
+
+    const images = await query(
+      `SELECT id, image_url, sort_order, is_primary 
+       FROM listing_images 
+       WHERE listing_id = $1 
+       ORDER BY sort_order`,
+      [listing.id]
+    );
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Listing created successfully.', 
+      data: { 
+        listing,
+        images: images.rows 
+      } 
+    });
   }),
 
-  /**
-   * GET /api/listings
-   * Searches and filters property listings with pagination.
-   */
   searchListings: asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(
@@ -844,10 +895,6 @@ const listingController = {
     });
   }),
 
-  /**
-   * GET /api/listings/:id
-   * Returns full listing details with host info, amenities, and images.
-   */
   getListingById: asyncHandler(async (req, res) => {
     const listing = await queryOne(
       `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name,
@@ -906,12 +953,6 @@ const listingController = {
     });
   }),
 
-  // =========================================================================
-  // GET /api/listings/:id/blocked-dates
-  // Returns all blocked date ranges for a listing with status labels.
-  // Groups consecutive dates into ranges with status (booked/pending).
-  // Used by the DatePicker to show unavailable dates with context.
-  // =========================================================================
   getBlockedDates: asyncHandler(async (req, res) => {
     const listingId = req.params.id;
 
@@ -1000,12 +1041,6 @@ const listingController = {
     });
   }),
 
-  // =========================================================================
-  // GET /api/listings/:id/similar
-  // Returns similar listings based on city, property type, and price range.
-  // Excludes the current listing from results.
-  // Used to suggest alternatives when a listing is fully booked.
-  // =========================================================================
   getSimilarListings: asyncHandler(async (req, res) => {
     const listingId = req.params.id;
     const limit = Math.min(parseInt(req.query.limit) || 6, 20);
@@ -1081,19 +1116,122 @@ const listingController = {
       },
     });
   }),
+
+  getHostListings: asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(
+      parseInt(req.query.limit) || CONFIG.features.paginationDefaultLimit,
+      CONFIG.features.paginationMaxLimit
+    );
+    const offset = (page - 1) * limit;
+
+    const count = await queryOne(
+      'SELECT COUNT(*) as total FROM listings WHERE host_id = $1',
+      [req.user.id]
+    );
+    
+    const listings = await query(
+      `SELECT l.id, l.title, l.listing_type, l.property_type,
+              l.bedrooms, l.bathrooms, l.max_guests,
+              l.price_per_night, l.price_per_month,
+              l.street_address, l.city, l.subcity,
+              l.is_active, l.is_approved, l.approval_status,
+              l.created_at,
+              (SELECT image_url FROM listing_images WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
+       FROM listings l
+       WHERE l.host_id = $1
+       ORDER BY l.created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: listings.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(count.total),
+        totalPages: Math.ceil(parseInt(count.total) / limit),
+      },
+    });
+  }),
+
+  updateListing: asyncHandler(async (req, res) => {
+    const d = req.body;
+    
+    const existing = await queryOne(
+      'SELECT id, host_id FROM listings WHERE id = $1',
+      [req.params.id]
+    );
+    if (!existing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+    if (existing.host_id !== req.user.id && req.user.role !== 'admin') {
+      throw new AppError('You do not have permission to update this listing.', 403, 'FORBIDDEN');
+    }
+
+    const updated = await queryOne(
+      `UPDATE listings SET
+        title = COALESCE($1, title), description = COALESCE($2, description),
+        listing_type = COALESCE($3, listing_type), property_type = COALESCE($4, property_type),
+        bedrooms = COALESCE($5, bedrooms), bathrooms = COALESCE($6, bathrooms),
+        max_guests = COALESCE($7, max_guests), beds_count = COALESCE($8, beds_count),
+        price_per_night = COALESCE($9, price_per_night), price_per_month = COALESCE($10, price_per_month),
+        cleaning_fee = COALESCE($11, cleaning_fee), security_deposit = COALESCE($12, security_deposit),
+        street_address = COALESCE($13, street_address), city = COALESCE($14, city),
+        subcity = COALESCE($15, subcity), instant_book = COALESCE($16, instant_book),
+        min_nights = COALESCE($17, min_nights), cancellation_policy = COALESCE($18, cancellation_policy),
+        house_rules = COALESCE($19, house_rules)
+       WHERE id = $20 RETURNING *`,
+      [
+        d.title, d.description, d.listingType, d.propertyType,
+        d.bedrooms, d.bathrooms, d.maxGuests, d.bedsCount,
+        d.pricePerNight, d.pricePerMonth,
+        d.cleaningFee, d.securityDeposit,
+        d.streetAddress, d.city, d.subcity,
+        d.instantBook, d.minNights,
+        d.cancellationPolicy, d.houseRules,
+        req.params.id,
+      ]
+    );
+
+    if (d.amenities !== undefined) {
+      await query('DELETE FROM listing_amenities WHERE listing_id = $1', [req.params.id]);
+      if (d.amenities && d.amenities.length > 0) {
+        for (const a of d.amenities) {
+          await query(
+            `INSERT INTO listing_amenities (listing_id, amenity_name, category, icon_name)
+             VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+            [req.params.id, a.name, a.category || null, a.iconName || null]
+          );
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Listing updated successfully.', data: { listing: updated } });
+  }),
+
+  deleteListing: asyncHandler(async (req, res) => {
+    const existing = await queryOne(
+      'SELECT id, host_id FROM listings WHERE id = $1',
+      [req.params.id]
+    );
+    if (!existing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
+    if (existing.host_id !== req.user.id && req.user.role !== 'admin') {
+      throw new AppError('You do not have permission to delete this listing.', 403, 'FORBIDDEN');
+    }
+
+    await query(
+      'UPDATE listings SET is_active = false WHERE id = $1',
+      [req.params.id]
+    );
+
+    res.json({ success: true, message: 'Listing deleted successfully.' });
+  }),
 };
 
 // --------------------------------------------------------------------------
 // Booking Controller — reservation management with payment integration
-// Includes automated expiry logic for serverless environments
 // --------------------------------------------------------------------------
 const bookingController = {
-
-  /**
-   * SERVERLESS EXPIRY CHECK
-   * Finds and expires unpaid bookings that have exceeded their payment timeout.
-   * Called internally on booking fetches to keep data fresh without cron jobs.
-   */
   async expireUnpaidBookings() {
     try {
       const now = new Date();
@@ -1126,12 +1264,6 @@ const bookingController = {
     }
   },
 
-  /**
-   * POST /api/bookings
-   * Creates a new booking with availability check, pricing calculation,
-   * and mandatory payment record with transaction number.
-   * Sets payment_expires_at for automated timeout tracking.
-   */
   createBooking: asyncHandler(async (req, res) => {
     const {
       listingId, checkInDate, checkOutDate, guestCount,
@@ -1146,7 +1278,6 @@ const bookingController = {
     if (!listing) throw new AppError('Listing not found.', 404, 'NOT_FOUND');
     if (listing.host_id === req.user.id) throw new AppError('Cannot book your own listing.', 400, 'VALIDATION_ERROR');
 
-    // Final availability check (prevents race conditions)
     const conflict = await queryOne(
       `SELECT id FROM bookings
        WHERE listing_id = $1 AND status IN ('pending','confirmed')
@@ -1155,7 +1286,6 @@ const bookingController = {
     );
     if (conflict) throw new AppError('Dates are no longer available.', 409, 'CONFLICT');
 
-    // Validate transaction number uniqueness
     if (CONFIG.features.preventDuplicateTransactions && transactionNumber) {
       const existingTransaction = await queryOne(
         `SELECT p.id FROM payments p
@@ -1167,7 +1297,6 @@ const bookingController = {
       }
     }
 
-    // Calculate pricing
     const nights = Math.ceil((new Date(checkOutDate) - new Date(checkInDate)) / (1000 * 60 * 60 * 24));
     const baseAmount = parseFloat(listing.price_per_night) * nights;
     const cleaningFee = parseFloat(listing.cleaning_fee) || 0;
@@ -1177,10 +1306,8 @@ const bookingController = {
     );
     const totalAmount = baseAmount + cleaningFee + serviceFee;
 
-    // Calculate payment expiry time
     const expiryTime = new Date(Date.now() + CONFIG.features.paymentTimeoutMinutes * 60 * 1000);
 
-    // Create booking with payment expiry timestamp
     const booking = await queryOne(
       `INSERT INTO bookings (
         listing_id, guest_id, host_id, booking_type,
@@ -1198,7 +1325,6 @@ const bookingController = {
       ]
     );
 
-    // Create payment record with transaction number (status: processing)
     const payment = await queryOne(
       `INSERT INTO payments (
         booking_id, user_id, amount, currency, payment_method,
@@ -1223,10 +1349,6 @@ const bookingController = {
     });
   }),
 
-  /**
-   * POST /api/payments/validate-transaction
-   * Checks whether a transaction number has already been used.
-   */
   validateTransaction: asyncHandler(async (req, res) => {
     const { transactionNumber } = req.body;
     if (!transactionNumber || transactionNumber.trim().length < 3) {
@@ -1247,13 +1369,8 @@ const bookingController = {
     });
   }),
 
-  /**
-   * GET /api/bookings/guest
-   * Returns paginated bookings for the authenticated guest.
-   * Runs expiry check first to clean up timed-out bookings.
-   */
   getGuestBookings: asyncHandler(async (req, res) => {
-    await bookingController.expireUnpaidBookings(); // Serverless expiry cleanup
+    await bookingController.expireUnpaidBookings();
     
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
@@ -1278,13 +1395,8 @@ const bookingController = {
     });
   }),
 
-  /**
-   * GET /api/bookings/host
-   * Returns paginated bookings for the authenticated host's listings.
-   * Runs expiry check first to clean up timed-out bookings.
-   */
   getHostBookings: asyncHandler(async (req, res) => {
-    await bookingController.expireUnpaidBookings(); // Serverless expiry cleanup
+    await bookingController.expireUnpaidBookings();
 
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
@@ -1311,10 +1423,6 @@ const bookingController = {
     });
   }),
 
-  /**
-   * GET /api/bookings/:id
-   * Returns a single booking with payment information.
-   */
   getBookingById: asyncHandler(async (req, res) => {
     const booking = await queryOne(
       `SELECT b.*, l.title as listing_title, l.street_address, l.city,
@@ -1339,10 +1447,6 @@ const bookingController = {
     res.json({ success: true, data: { booking } });
   }),
 
-  /**
-   * PATCH /api/bookings/:id/status
-   * Updates the status of a booking.
-   */
   updateBookingStatus: asyncHandler(async (req, res) => {
     const { status, cancellationReason } = req.body;
     const booking = await queryOne('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
@@ -1372,7 +1476,6 @@ const bookingController = {
 
     const updated = await queryOne(`UPDATE bookings SET ${setClauses.join(', ')} WHERE id = $${p} RETURNING *`, params);
     
-    // Release dates if cancelled/rejected
     if (status === 'cancelled' || status === 'rejected') {
       await query(`UPDATE listing_availability SET status = 'available' WHERE listing_id = $1 AND date >= $2 AND date < $3`, [booking.listing_id, booking.check_in_date, booking.check_out_date]);
     }
@@ -1565,27 +1668,18 @@ const adminController = {
     res.json({ success: true, data: payments.rows, pagination: { page, limit, totalItems: parseInt(count.total), totalPages: Math.ceil(parseInt(count.total) / limit) } });
   }),
 
-  /**
-   * PATCH /api/admin/payments/:id/verify
-   * Verifies, rejects, or flags a payment for manual review (admin only).
-   * Supports 'verify', 'reject', and 'review' actions.
-   * Body: { action: 'verify'|'reject'|'review', reason? }
-   */
   verifyPayment: asyncHandler(async (req, res) => {
     const { action, reason } = req.body;
     
-    // Determine new status based on the admin's action
     let newStatus;
     if (action === 'verify') {
       newStatus = 'completed';
     } else if (action === 'review') {
-      newStatus = 'pending_review'; // Flag for further manual admin review
+      newStatus = 'pending_review';
     } else {
-      newStatus = 'failed'; // Default for 'reject' or unknown actions
+      newStatus = 'failed';
     }
 
-    // Update the payment record
-    // Only allows updating payments that are in a verifiable state
     const payment = await queryOne(
       `UPDATE payments 
        SET status = $1, verified_by = $2, verified_at = NOW(), failure_reason = $3 
@@ -1598,7 +1692,6 @@ const adminController = {
       throw new AppError('Payment not found or already processed.', 404, 'NOT_FOUND');
     }
 
-    // If the payment is verified, automatically confirm the associated booking
     if (newStatus === 'completed') {
       await query(
         "UPDATE bookings SET status = 'confirmed', confirmed_at = NOW() WHERE id = $1 AND status = 'pending'",
@@ -1645,26 +1738,17 @@ const adminController = {
 // User Controller — user profile management and host upgrades
 // --------------------------------------------------------------------------
 const userController = {
-  /**
-   * POST /api/users/become-host
-   * Upgrades the authenticated guest user to a host role.
-   * Validates that the user exists and is not already a host or admin.
-   * Only accessible to users with the 'guest' role via the authorize middleware.
-   */
   becomeHost: asyncHandler(async (req, res) => {
-    // Fetch the current user to verify their existence and role
     const user = await queryOne('SELECT id, role FROM users WHERE id = $1', [req.user.id]);
     
     if (!user) {
       throw new AppError('User not found.', 404, 'NOT_FOUND');
     }
     
-    // Prevent hosts or admins from calling this endpoint redundantly
     if (user.role === 'host' || user.role === 'admin') {
       throw new AppError(`User is already a ${user.role}.`, 400, 'VALIDATION_ERROR');
     }
 
-    // Update the user's role to 'host' and return the updated record
     const updated = await queryOne(
       'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, role, first_name, last_name',
       ['host', req.user.id]
@@ -1682,22 +1766,15 @@ const userController = {
 // Host Application Controller — handles guest-to-host upgrade requests
 // --------------------------------------------------------------------------
 const hostApplicationController = {
-  /**
-   * POST /api/users/apply-host
-   * Submits a new host application for the authenticated guest user.
-   * Validates that the user is not already a host and has no pending applications.
-   */
   apply: asyncHandler(async (req, res) => {
     const { idType, idNumber, idFrontImageUrl, idBackImageUrl, hostingExperience, propertyCount, motivation } = req.body;
 
-    // Verify user exists and check current role
     const user = await queryOne('SELECT role FROM users WHERE id = $1', [req.user.id]);
     if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
     if (user.role === 'host' || user.role === 'admin') {
       throw new AppError(`You are already a ${user.role}.`, 409, 'CONFLICT');
     }
 
-    // Check for existing pending application
     const existingPending = await queryOne(
       "SELECT id FROM user_verifications WHERE user_id = $1 AND status = 'pending'",
       [req.user.id]
@@ -1706,7 +1783,6 @@ const hostApplicationController = {
       throw new AppError('You already have a pending application. Please wait for admin review.', 409, 'CONFLICT');
     }
 
-    // Insert the application into the user_verifications table
     const application = await queryOne(
       `INSERT INTO user_verifications (
         user_id, id_type, id_number, id_front_image_url, id_back_image_url,
@@ -1726,10 +1802,6 @@ const hostApplicationController = {
     });
   }),
 
-  /**
-   * GET /api/users/host-application-status
-   * Retrieves the latest application status for the authenticated user.
-   */
   getStatus: asyncHandler(async (req, res) => {
     const application = await queryOne(
       `SELECT id, id_type, status, review_notes, reviewed_at, created_at 
@@ -1746,31 +1818,15 @@ const hostApplicationController = {
 
 // --------------------------------------------------------------------------
 // Upload Controller — handles image uploads to Cloudinary
-// Accepts base64 encoded images from the frontend and returns secure URLs
-// All uploads are authenticated and organized into typed folders
 // --------------------------------------------------------------------------
 const uploadController = {
-  /**
-   * POST /api/upload
-   * Uploads a base64 encoded image to Cloudinary.
-   * Body: { image: string (base64 data URL), folder: string }
-   * 
-   * The folder parameter determines the Cloudinary destination:
-   * - listings: Property photos uploaded by hosts
-   * - verifications: ID documents for host applications
-   * - payment_proofs: Bank transfer receipts
-   * - profiles: User avatar images
-   * - general: Fallback for miscellaneous uploads
-   */
   uploadImage: asyncHandler(async (req, res) => {
     const { image, folder = 'general' } = req.body;
 
-    // Validate that the image is a valid base64 data URL
     if (!image || !image.startsWith('data:image')) {
       throw new AppError('Invalid image data. Please provide a valid base64 image.', 400, 'VALIDATION_ERROR');
     }
 
-    // Validate file size (approximate — base64 is ~33% larger than binary)
     const estimatedSizeBytes = (image.length * 3) / 4;
     if (estimatedSizeBytes > CONFIG.upload.maxFileSizeBytes) {
       throw new AppError(
@@ -1781,18 +1837,14 @@ const uploadController = {
     }
 
     try {
-      // Build the full folder path under the root folder
       const fullFolder = `${CONFIG.upload.rootFolder}/${folder}`;
 
-      // Upload the base64 image to Cloudinary with automatic optimization
       const result = await cloudinary.uploader.upload(image, {
         folder: fullFolder,
         resource_type: 'image',
-        // Automatically optimize quality and format for web delivery
         transformation: [
           { quality: 'auto', fetch_format: 'auto' },
         ],
-        // Generate responsive breakpoints for different screen sizes
         responsive_breakpoints: [
           {
             create_derived: true,
@@ -1823,14 +1875,6 @@ const uploadController = {
     }
   }),
 
-  /**
-   * DELETE /api/upload
-   * Deletes an image from Cloudinary by public ID.
-   * Body: { publicId: string }
-   * 
-   * Only the user who uploaded the image or an admin can delete it.
-   * Used when hosts remove listing photos or users change avatars.
-   */
   deleteImage: asyncHandler(async (req, res) => {
     const { publicId } = req.body;
 
@@ -1838,7 +1882,6 @@ const uploadController = {
       throw new AppError('Invalid public ID. Please provide a valid Cloudinary public ID.', 400, 'VALIDATION_ERROR');
     }
 
-    // Ensure the public ID is within our root folder (prevents deletion of other assets)
     if (!publicId.startsWith(`${CONFIG.upload.rootFolder}/`)) {
       throw new AppError('Access denied. Cannot delete assets outside the application folder.', 403, 'FORBIDDEN');
     }
@@ -1863,6 +1906,156 @@ const uploadController = {
   }),
 };
 
+// --------------------------------------------------------------------------
+// Review Controller — handles guest reviews and host responses
+// --------------------------------------------------------------------------
+const reviewController = {
+  createReview: asyncHandler(async (req, res) => {
+    const { bookingId, cleanliness, accuracy, communication, location, value, reviewText } = req.body;
+
+    const booking = await queryOne(
+      `SELECT * FROM bookings WHERE id = $1 AND guest_id = $2`,
+      [bookingId, req.user.id]
+    );
+
+    if (!booking) {
+      throw new AppError('Booking not found or you are not the guest for this booking.', 404, 'NOT_FOUND');
+    }
+
+    if (booking.status !== 'completed') {
+      throw new AppError('You can only review completed bookings.', 400, 'VALIDATION_ERROR');
+    }
+
+    const existingReview = await queryOne(
+      'SELECT id FROM reviews WHERE booking_id = $1',
+      [bookingId]
+    );
+
+    if (existingReview) {
+      throw new AppError('You have already reviewed this booking.', 409, 'CONFLICT');
+    }
+
+    const review = await queryOne(
+      `INSERT INTO reviews (
+        booking_id, listing_id, reviewer_id, reviewee_id,
+        rating_cleanliness, rating_accuracy, rating_communication,
+        rating_location, rating_value, review_text
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        bookingId,
+        booking.listing_id,
+        req.user.id,
+        booking.host_id,
+        cleanliness,
+        accuracy,
+        communication,
+        location,
+        value,
+        reviewText || null,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Review submitted successfully.',
+      data: { review },
+    });
+  }),
+
+  addHostResponse: asyncHandler(async (req, res) => {
+    const { responseText } = req.body;
+
+    const review = await queryOne(
+      'SELECT * FROM reviews WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (!review) {
+      throw new AppError('Review not found.', 404, 'NOT_FOUND');
+    }
+
+    if (review.reviewee_id !== req.user.id) {
+      throw new AppError('You can only respond to reviews on your own listings.', 403, 'FORBIDDEN');
+    }
+
+    if (review.host_response) {
+      throw new AppError('You have already responded to this review.', 400, 'VALIDATION_ERROR');
+    }
+
+    const updated = await queryOne(
+      `UPDATE reviews SET host_response = $1, host_response_at = NOW()
+       WHERE id = $2 RETURNING *`,
+      [responseText, req.params.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Response added successfully.',
+      data: { review: updated },
+    });
+  }),
+
+  getListingReviews: asyncHandler(async (req, res) => {
+    const listingId = req.params.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const offset = (page - 1) * limit;
+
+    const summary = await queryOne(
+      `SELECT COUNT(*) as total_reviews,
+              ROUND(AVG(rating_overall)::numeric, 1) as avg_rating,
+              ROUND(AVG(rating_cleanliness)::numeric, 1) as avg_cleanliness,
+              ROUND(AVG(rating_accuracy)::numeric, 1) as avg_accuracy,
+              ROUND(AVG(rating_communication)::numeric, 1) as avg_communication,
+              ROUND(AVG(rating_location)::numeric, 1) as avg_location,
+              ROUND(AVG(rating_value)::numeric, 1) as avg_value
+       FROM reviews WHERE listing_id = $1`,
+      [listingId]
+    );
+
+    const countResult = await queryOne(
+      'SELECT COUNT(*) as total FROM reviews WHERE listing_id = $1',
+      [listingId]
+    );
+
+    const reviews = await query(
+      `SELECT r.*, u.first_name as reviewer_first_name, u.last_name as reviewer_last_name,
+              u.profile_image_url as reviewer_image_url
+       FROM reviews r
+       JOIN users u ON r.reviewer_id = u.id
+       WHERE r.listing_id = $1
+       ORDER BY r.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [listingId, limit, offset]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalReviews: parseInt(summary.total_reviews, 10),
+          avgRating: parseFloat(summary.avg_rating) || 0,
+          ratings: {
+            cleanliness: parseFloat(summary.avg_cleanliness) || 0,
+            accuracy: parseFloat(summary.avg_accuracy) || 0,
+            communication: parseFloat(summary.avg_communication) || 0,
+            location: parseFloat(summary.avg_location) || 0,
+            value: parseFloat(summary.avg_value) || 0,
+          },
+        },
+        reviews: reviews.rows,
+      },
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(countResult.total, 10),
+        totalPages: Math.ceil(parseInt(countResult.total, 10) / limit),
+      },
+    });
+  }),
+};
+
 // ============================================================================
 // EXPRESS APPLICATION
 // ============================================================================
@@ -1883,7 +2076,7 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'ROOSTAY API is running.', timestamp: new Date().toISOString(), environment: CONFIG.app.env });
 });
 
-// ---- Auth Routes (with httpOnly cookie support) ----
+// ---- Auth Routes ----
 app.post('/api/auth/register', validateBody(schemas.register), authController.register);
 app.post('/api/auth/login', validateBody(schemas.login), authController.login);
 app.get('/api/auth/me', authenticate, authController.getMe);
@@ -1895,16 +2088,20 @@ app.post('/api/listings', authenticate, authorize('host', 'admin'), validateBody
 app.get('/api/listings', listingController.searchListings);
 app.get('/api/listings/:id', listingController.getListingById);
 
+// ---- Host Listing Management Routes ----
+app.get('/api/listings/host', authenticate, authorize('host', 'admin'), listingController.getHostListings);
+app.put('/api/listings/:id', authenticate, authorize('host', 'admin'), validateBody(schemas.updateListing), listingController.updateListing);
+app.delete('/api/listings/:id', authenticate, authorize('host', 'admin'), listingController.deleteListing);
+
 // ---- Blocked dates and similar listings routes ----
-// These endpoints provide availability data and alternatives for fully booked listings
 app.get('/api/listings/:id/blocked-dates', listingController.getBlockedDates);
 app.get('/api/listings/:id/similar', listingController.getSimilarListings);
 
-// ---- Booking Routes (with payment integration) ----
+// ---- Booking Routes ----
 app.post(
   '/api/bookings',
   authenticate,
-  authorize('guest', 'admin'),
+  authorize('guest', 'host', 'admin'),
   validateBody(schemas.createBookingWithPayment),
   bookingController.createBooking
 );
@@ -1948,19 +2145,20 @@ app.get('/api/admin/withdrawals', authenticate, authorize('admin'), adminControl
 app.patch('/api/admin/withdrawals/:id/process', authenticate, authorize('admin'), adminController.processWithdrawal);
 
 // ---- User Routes ----
-// Upgrades a guest account to a host account. Protected by 'guest' role authorization.
 app.post('/api/users/become-host', authenticate, authorize('guest'), userController.becomeHost);
 
 // ---- Host Application Routes ----
-// Allows guests to submit a verification application to become a host
 app.post('/api/users/apply-host', authenticate, validateBody(schemas.hostApplication), hostApplicationController.apply);
 app.get('/api/users/host-application-status', authenticate, hostApplicationController.getStatus);
 
 // ---- Upload Routes ----
-// Handles image uploads to Cloudinary. Requires authentication.
-// MUST BE REGISTERED BEFORE THE 404 CATCH-ALL HANDLER
 app.post('/api/upload', authenticate, validateBody(schemas.uploadImage), uploadController.uploadImage);
 app.delete('/api/upload', authenticate, uploadController.deleteImage);
+
+// ---- Review Routes ----
+app.post('/api/reviews', authenticate, validateBody(schemas.createReview), reviewController.createReview);
+app.post('/api/reviews/:id/response', authenticate, validateBody(schemas.addHostResponse), reviewController.addHostResponse);
+app.get('/api/listings/:id/reviews', reviewController.getListingReviews);
 
 // ---- Root ----
 app.get('/', (req, res) => {
@@ -1968,8 +2166,6 @@ app.get('/', (req, res) => {
 });
 
 // ---- 404 Handler ----
-// Uses a regex pattern instead of wildcard for path-to-regexp v8 compatibility
-// MUST BE THE LAST ROUTE (before the error handler)
 app.all(/.*/, (req, res) => {
   res.status(404).json({
     success: false,
@@ -1981,7 +2177,6 @@ app.all(/.*/, (req, res) => {
 });
 
 // ---- Global Error Handler ----
-// MUST BE THE ABSOLUTE LAST MIDDLEWARE
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Internal server error';

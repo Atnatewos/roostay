@@ -3,7 +3,6 @@
 // Displays listings with status indicators, quick actions (edit, toggle active, delete)
 // Supports pagination for hosts with many properties
 // Author: Theron
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -40,7 +39,7 @@ export default function MyListingsPage() {
 
   /**
    * Fetches paginated listings belonging to the authenticated host.
-   *
+   * 
    * @param {number} [page=1] - Page number to fetch
    */
   const fetchListings = useCallback(async (page = 1) => {
@@ -48,10 +47,9 @@ export default function MyListingsPage() {
     setError(null);
 
     try {
-      // In production, this would be a dedicated /host/listings endpoint
-      // Currently using the public search with a host-specific approach
-      const response = await apiClient.get(`/listings?limit=10&page=${page}`);
-
+      // Fetch ONLY the authenticated host's listings using the dedicated endpoint
+      const response = await apiClient.get(`/listings/host?limit=10&page=${page}`);
+      
       setListings(response?.data || []);
       if (response?.pagination) {
         setPagination(response.pagination);
@@ -80,7 +78,7 @@ export default function MyListingsPage() {
 
   /**
    * Handles page changes from the Pagination component.
-   *
+   * 
    * @param {number} page - New page number
    */
   function handlePageChange(page) {
@@ -90,7 +88,7 @@ export default function MyListingsPage() {
 
   /**
    * Opens the delete confirmation modal for a listing.
-   *
+   * 
    * @param {string} listingId - The listing ID to delete
    * @param {string} listingTitle - The listing title for the confirmation message
    */
@@ -116,14 +114,14 @@ export default function MyListingsPage() {
 
     try {
       await apiClient.delete(`/listings/${deleteModal.listingId}`);
-
+      
       // Remove the deleted listing from state immediately
       setListings((prev) => prev.filter((l) => l.id !== deleteModal.listingId));
       setPagination((prev) => ({
         ...prev,
         totalItems: prev.totalItems - 1,
       }));
-
+      
       closeDeleteModal();
     } catch (err) {
       console.error('Failed to delete listing:', err.message);
@@ -134,7 +132,7 @@ export default function MyListingsPage() {
 
   /**
    * Formats price display based on listing type.
-   *
+   * 
    * @param {Object} listing - Listing data object
    * @returns {string} Formatted price string
    */
@@ -187,7 +185,6 @@ export default function MyListingsPage() {
   return (
     <>
       <Header />
-
       <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
         {/* Page Header with Create button */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem' }}>
@@ -277,7 +274,6 @@ export default function MyListingsPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          // Toggle active status — in production this calls the API
                           console.log('Toggle active for:', listing.id);
                         }}
                       >

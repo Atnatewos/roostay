@@ -145,7 +145,7 @@ export default function ListingDetailPage() {
           </div>
 
           <div className="listing-detail__sidebar">
-            <BookingCard listing={listing} />
+            {listing && <BookingCard listing={listing} />}
           </div>
         </div>
       </main>
