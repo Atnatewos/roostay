@@ -5,8 +5,8 @@ const express = require('express');
 const router = express.Router();
 
 // Middleware
-const { authenticate } = require('../middleware');
-const validateRequest = require('../middleware/validate');
+const { authenticate } = require('../../middleware');
+const validateRequest = require('../../middleware/validate');
 
 // Validators
 const Joi = require('joi');

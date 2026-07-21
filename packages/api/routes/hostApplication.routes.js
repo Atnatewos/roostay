@@ -4,8 +4,8 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticate } = require('../middleware');
-const validateRequest = require('../middleware/validate');
+const { authenticate } = require('../../middleware');
+const validateRequest = require('../../middleware/validate');
 const hostApplicationValidator = require('../validators/hostApplication.validator');
 const hostApplicationController = require('../controllers/hostApplication.controller');
 

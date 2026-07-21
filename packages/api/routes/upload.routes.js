@@ -5,8 +5,8 @@ const express = require('express');
 const router = express.Router();
 
 // Middleware
-const { authenticate } = require('../middleware');
-const { uploadMultiple } = require('../middleware/upload');
+const { authenticate } = require('../../middleware');
+const { uploadMultiple } = require('../../middleware/upload');
 
 // Controllers
 const uploadController = require('../controllers/upload.controller');

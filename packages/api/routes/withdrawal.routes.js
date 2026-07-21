@@ -5,9 +5,9 @@ const express = require('express');
 const router = express.Router();
 
 // Middleware
-const { authenticate, authorize } = require('../middleware');
-const validateRequest = require('../middleware/validate');
-const rateLimiter = require('../middleware/rateLimiter');
+const { authenticate, authorize } = require('../../middleware');
+const validateRequest = require('../../middleware/validate');
+const rateLimiter = require('../../middleware/rateLimiter');
 
 // Validators & Controllers
 const withdrawalValidator = require('../validators/withdrawal.validator');

@@ -3,9 +3,9 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticate } = require('../middleware');
-const validateRequest = require('../middleware/validate');
-const rateLimiter = require('../middleware/rateLimiter');
+const { authenticate } = require('../../middleware');
+const validateRequest = require('../../middleware/validate');
+const rateLimiter = require('../../middleware/rateLimiter');
 
 const authValidator = require('../validators/auth.validator');
 const authController = require('../controllers/auth.controller');

@@ -5,9 +5,9 @@ const express = require('express');
 const router = express.Router();
 
 // Middleware
-const { authenticate, authorize } = require('../middleware');
-const validateRequest = require('../middleware/validate');
-const rateLimiter = require('../middleware/rateLimiter');
+const { authenticate, authorize } = require('../../middleware');
+const validateRequest = require('../../middleware/validate');
+const rateLimiter = require('../../middleware/rateLimiter');
 
 // Validators & Controllers
 const bookingValidator = require('../validators/booking.validator');
@@ -19,7 +19,7 @@ const bookingController = require('../controllers/booking.controller');
 router.post(
   '/bookings',
   authenticate,
-  authorize('guest', 'admin'),
+  authorize('guest', 'host', 'admin'),
   rateLimiter('booking'),
   validateRequest({ body: bookingValidator.createBooking }),
   bookingController.createBooking
@@ -28,7 +28,7 @@ router.post(
 router.get(
   '/bookings/guest',
   authenticate,
-  authorize('guest', 'admin'),
+  authorize('guest', 'host', 'admin'),
   validateRequest({ query: bookingValidator.getUserBookings }),
   bookingController.getGuestBookings
 );
