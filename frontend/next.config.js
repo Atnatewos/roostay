@@ -2,6 +2,8 @@
 // Next.js configuration for ROOSTAY frontend
 // Configures API proxy, image domains, and build settings
 
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -31,7 +33,7 @@ const nextConfig = {
   },
 
   // =========================================================================
-  // MONOREPO CONFIGURATION — Transpile local packages from packages/
+  // MONOREPO — Transpile local packages
   // =========================================================================
   transpilePackages: [
     '@roostay/config',
@@ -42,49 +44,67 @@ const nextConfig = {
   ],
 
   // =========================================================================
-  // SERVER-ONLY PACKAGES — Don't bundle these into client JS
-  // Webpack will leave them as external `require()` calls for Node.js runtime
-  // This is CRITICAL for Vercel + Express monorepo deployments
+  // WEBPACK — Externalize all server-only Node.js packages
+  // This prevents Webpack from trying to bundle express, pg, etc.
+  // into the client-side build. These stay as Node.js require() calls.
   // =========================================================================
-  serverExternalPackages: [
-    'express',
-    'helmet',
-    'cors',
-    'cookie-parser',
-    'jsonwebtoken',
-    'bcryptjs',
-    'pg',
-    'joi',
-    'multer',
-    'morgan',
-    'cloudinary',
-    'node-cron',
-    '@upstash/redis',
-  ],
-
-  // Webpack configuration for monorepo compatibility
   webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Exclude all server-only packages from bundling on the server side too
-      // This ensures native modules like 'pg' work correctly in serverless
-      config.externals = [
-        ...config.externals,
-        'pg',
-        'pg-native',
-        'bcryptjs',
-      ];
-    }
+    // Path to the root node_modules where express, pg, etc. are installed
+    const rootNodeModules = path.resolve(__dirname, '../node_modules');
 
-    // Resolve packages/ directory as if it's a node_modules package
-    // This allows require('@roostay/config') to resolve from anywhere
+    // Resolve packages/ directory aliases
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@roostay/config': require('path').resolve(__dirname, '../packages/config'),
-      '@roostay/database': require('path').resolve(__dirname, '../packages/database'),
-      '@roostay/middleware': require('path').resolve(__dirname, '../packages/middleware'),
-      '@roostay/services': require('path').resolve(__dirname, '../packages/services'),
-      '@roostay/utils': require('path').resolve(__dirname, '../packages/utils'),
+      '@roostay/config': path.resolve(__dirname, '../packages/config'),
+      '@roostay/database': path.resolve(__dirname, '../packages/database'),
+      '@roostay/middleware': path.resolve(__dirname, '../packages/middleware'),
+      '@roostay/services': path.resolve(__dirname, '../packages/services'),
+      '@roostay/utils': path.resolve(__dirname, '../packages/utils'),
     };
+
+    // Tell Webpack to look in root node_modules for server deps
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      rootNodeModules,
+      path.resolve(__dirname, 'node_modules'),
+    ];
+
+    if (isServer) {
+      // Externalize ALL server-only packages so they're not bundled
+      // This is the equivalent of serverExternalPackages for Next.js 14.2
+      const serverPackages = [
+        'express',
+        'helmet',
+        'cors',
+        'cookie-parser',
+        'jsonwebtoken',
+        'bcryptjs',
+        'pg',
+        'pg-native',
+        'joi',
+        'multer',
+        'morgan',
+        'cloudinary',
+        'node-cron',
+        '@upstash/redis',
+        'dotenv',
+      ];
+
+      // Add each package to webpack externals
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : []),
+        ...serverPackages,
+        // Also match sub-paths like 'express/lib/...'
+        ({ request }, callback) => {
+          for (const pkg of serverPackages) {
+            if (request === pkg || request.startsWith(pkg + '/')) {
+              return callback(null, 'commonjs ' + request);
+            }
+          }
+          callback();
+        },
+      ];
+    }
 
     return config;
   },
