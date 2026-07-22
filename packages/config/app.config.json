@@ -3,7 +3,6 @@
     "name": "ROOSTAY",
     "env": "development",
     "port": 3000,
-    "baseUrl": "http://localhost:3000",
     "apiPrefix": "/api",
     "debug": true,
     "logLevel": "debug"
@@ -12,7 +11,6 @@
     "name": "ROOSTAY",
     "env": "production",
     "port": 8080,
-    "baseUrl": "https://roostay.vercel.app",
     "apiPrefix": "/api",
     "debug": false,
     "logLevel": "error"
@@ -21,7 +19,6 @@
     "name": "ROOSTAY-TEST",
     "env": "test",
     "port": 3001,
-    "baseUrl": "http://localhost:3001",
     "apiPrefix": "/api",
     "debug": true,
     "logLevel": "debug"

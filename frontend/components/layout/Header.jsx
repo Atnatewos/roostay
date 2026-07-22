@@ -1,7 +1,8 @@
 // frontend/components/layout/Header.jsx
 // Main navigation header with responsive hamburger menu
 // All navigation items are driven by navigation.config.json via useConfig()
-// Feature flags control visibility of "Become a Host" and other links
+// Feature flags control visibility of links — zero hardcoded values
+// Logo image is loaded from branding.config.json via useConfig()
 // Author: Theron
 'use client';
 
@@ -18,11 +19,15 @@ import constants from '@/lib/constants';
  * Main navigation bar with responsive design.
  * Navigation items are rendered from config — no hardcoded links.
  * Feature flags control which links appear for each role.
+ * Logo image is config-driven from branding.config.json.
  */
 export default function Header() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  const { navigation, isEnabled } = useConfig();
+  const { navigation, branding, isEnabled } = useConfig();
+
+  // Derive logo path from branding config, with fallback to text-based logo
+  const headerLogoPath = branding?.logos?.header || null;
 
   // Local UI state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -88,7 +93,6 @@ export default function Header() {
    * @returns {Array} Array of navigation item objects
    */
   function getNavItems() {
-    // Load navigation config from the centralized config system
     const headerConfig = navigation?.header || {};
 
     if (!isAuthenticated || !user) {
@@ -135,15 +139,24 @@ export default function Header() {
   return (
     <header className="header" ref={headerRef}>
       <div className="header__container">
-        {/* Logo */}
+        {/* Logo — config-driven: image if available, text fallback if not */}
         <Link href={constants.ROUTES.HOME} className="header__logo">
-          ROOSTAY
+          {headerLogoPath ? (
+            <img
+              src={headerLogoPath}
+              alt={constants.APP_NAME}
+              className="header__logo-image"
+              width="140"
+              height="40"
+            />
+          ) : (
+            <span className="header__logo-text">{constants.APP_NAME}</span>
+          )}
         </Link>
 
         {/* Desktop Navigation — dynamically rendered from config */}
         <nav className="header__nav" aria-label="Main navigation">
           {navItems.map((item) => {
-            // Skip items that have a feature flag requirement that is not met
             if (item.featureFlag && !isEnabled(item.featureFlag)) {
               return null;
             }
@@ -170,7 +183,6 @@ export default function Header() {
 
         {/* Right Side: Notifications + User Menu */}
         <div className="header__actions">
-          {/* Notification Bell — only rendered when the feature is enabled */}
           {isEnabled('notificationsEnabled') && (
             <NotificationBell
               isAuthenticated={isAuthenticated}
@@ -219,7 +231,6 @@ export default function Header() {
 
                   <div className="header__dropdown-menu">
                     {dropdownItems.map((item) => {
-                      // Skip items with unmet feature flag requirements
                       if (item.featureFlag && !isEnabled(item.featureFlag)) {
                         return null;
                       }
@@ -243,7 +254,6 @@ export default function Header() {
                         </Link>
                       );
                     })}
-                    {/* Profile Settings is always available for authenticated users */}
                     <Link
                       href={constants.ROUTES.GUEST_PROFILE}
                       className="header__dropdown-link"

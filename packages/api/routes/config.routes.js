@@ -1,6 +1,6 @@
 // packages/api/routes/config.routes.js
 // Configuration API route — serves resolved config to the frontend
-// Provides feature flags, content strings, and all public configuration
+// Provides feature flags, content strings, branding, and all public configuration
 // Filters out sensitive values (secrets, API keys) before sending to client
 // Author: Theron
 
@@ -25,12 +25,13 @@ try {
  * Returns the full resolved configuration for the current environment.
  * Sensitive values (secrets, API keys, connection strings) are filtered out.
  * This endpoint is public — no authentication required.
- * The frontend uses this to get feature flags, content strings, and settings.
+ * The frontend uses this to get feature flags, content strings, branding, and settings.
  */
 router.get('/config', (req, res) => {
   // Build a public-safe config object by selecting only non-sensitive modules
   const publicConfig = {
     app: config.app || {},
+    branding: config.branding || {},
     features: config.features || {},
     content: config.content || {},
     navigation: config.navigation || {},

@@ -1,0 +1,89 @@
+{
+  "development": {
+    "logos": {
+      "header": "/assets/logos/image.png",
+      "footer": "/assets/logos/image.png",
+      "favicon": "/assets/icons/favicon.ico",
+      "appleTouchIcon": "/assets/icons/apple-touch-icon.png",
+      "ogDefault": "/assets/images/og-default.jpg"
+    },
+    "placeholders": {
+      "listing": "/assets/placeholders/placeholder-listing.svg",
+      "avatar": "/assets/placeholders/placeholder-avatar.svg",
+      "userAvatar": "/assets/placeholders/placeholder-user.svg"
+    },
+    "colors": {
+      "primary": "#2563EB",
+      "primaryLight": "#DBEAFE",
+      "primaryDark": "#1D4ED8",
+      "secondary": "#F59E0B",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "typography": {
+      "fontFamily": "Inter, system-ui, sans-serif",
+      "fontFamilyMono": "JetBrains Mono, monospace",
+      "fontSizeBase": "16px"
+    }
+  },
+  "production": {
+    "logos": {
+      "header": "/assets/logos/logo.svg",
+      "footer": "/assets/logos/logo-white.svg",
+      "favicon": "/assets/icons/favicon.ico",
+      "appleTouchIcon": "/assets/icons/apple-touch-icon.png",
+      "ogDefault": "/assets/images/og-default.jpg"
+    },
+    "placeholders": {
+      "listing": "/assets/placeholders/placeholder-listing.svg",
+      "avatar": "/assets/placeholders/placeholder-avatar.svg",
+      "userAvatar": "/assets/placeholders/placeholder-user.svg"
+    },
+    "colors": {
+      "primary": "#2563EB",
+      "primaryLight": "#DBEAFE",
+      "primaryDark": "#1D4ED8",
+      "secondary": "#F59E0B",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "typography": {
+      "fontFamily": "Inter, system-ui, sans-serif",
+      "fontFamilyMono": "JetBrains Mono, monospace",
+      "fontSizeBase": "16px"
+    }
+  },
+  "test": {
+    "logos": {
+      "header": "/assets/logos/logo-test.svg",
+      "footer": "/assets/logos/logo-white.svg",
+      "favicon": "/assets/icons/favicon.ico",
+      "appleTouchIcon": "/assets/icons/apple-touch-icon.png",
+      "ogDefault": "/assets/images/og-default.jpg"
+    },
+    "placeholders": {
+      "listing": "/assets/placeholders/placeholder-listing.svg",
+      "avatar": "/assets/placeholders/placeholder-avatar.svg",
+      "userAvatar": "/assets/placeholders/placeholder-user.svg"
+    },
+    "colors": {
+      "primary": "#2563EB",
+      "primaryLight": "#DBEAFE",
+      "primaryDark": "#1D4ED8",
+      "secondary": "#F59E0B",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "typography": {
+      "fontFamily": "Inter, system-ui, sans-serif",
+      "fontFamilyMono": "JetBrains Mono, monospace",
+      "fontSizeBase": "16px"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 // frontend/hooks/useConfig.js
 // React hook for accessing configuration in client components
-// Fetches config once on mount and provides feature flags and content strings
+// Fetches config once on mount and provides feature flags, content strings, and branding
 // Works alongside the existing useAuth hook for role-based feature toggling
 // Author: Theron
 
@@ -10,19 +10,22 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchConfig, isFeatureEnabled, getContentString } from '@/lib/config';
 
 /**
- * Configuration hook providing feature flags, content strings, and app settings.
+ * Configuration hook providing feature flags, content strings, branding, and app settings.
  * Fetches the resolved config from the API on component mount.
  * Results are cached across the application via the config module.
  *
  * @returns {Object} Config utilities and state
- * @returns {Object} config - The full resolved configuration object
- * @returns {boolean} isLoading - Whether the config is still being fetched
- * @returns {Function} t - Translation/content lookup function
+ * @returns {Object} config      - The full resolved configuration object
+ * @returns {boolean} isLoading  - Whether the config is still being fetched
+ * @returns {Function} t         - Translation/content lookup function
  * @returns {Function} isEnabled - Feature flag check function
- * @returns {Object} app - App-level configuration (name, URLs, etc.)
- * @returns {Object} payment - Payment configuration
- * @returns {Object} pricing - Pricing configuration
- * @returns {Object} features - Feature flags
+ * @returns {Object} app         - App-level configuration (name, URLs, etc.)
+ * @returns {Object} branding    - Branding assets (logos, placeholders, colors, typography)
+ * @returns {Object} payment     - Payment configuration
+ * @returns {Object} pricing     - Pricing configuration
+ * @returns {Object} features    - Feature flags
+ * @returns {Object} content     - Content strings
+ * @returns {Object} navigation  - Navigation structure
  */
 export default function useConfig() {
   const [config, setConfig] = useState(null);
@@ -62,7 +65,7 @@ export default function useConfig() {
    * Content string lookup with replacements.
    * Shorthand for getContentString with the loaded config.
    *
-   * @param {string} path - Dot-separated path to the content string
+   * @param {string} path           - Dot-separated path to the content string
    * @param {Object} [replacements] - Optional key-value pairs for string replacement
    * @returns {string} The content string
    */
@@ -95,6 +98,7 @@ export default function useConfig() {
     t,
     isEnabled,
     app: config?.app || {},
+    branding: config?.branding || {},
     payment: config?.payment || {},
     pricing: config?.pricing || {},
     features: config?.features || {},

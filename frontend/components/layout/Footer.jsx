@@ -1,6 +1,7 @@
 // frontend/components/layout/Footer.jsx
-// Site-wide footer with config-driven navigation columns
+// Site-wide footer with config-driven navigation columns and branding
 // All links and text come from content.config.json and navigation.config.json
+// Footer logo is loaded from branding.config.json via useConfig()
 // Zero hardcoded values — fully configurable per environment
 // Author: Theron
 'use client';
@@ -10,12 +11,13 @@ import useConfig from '@/hooks/useConfig';
 
 /**
  * Footer Component
- * Renders the site footer with dynamic navigation columns.
+ * Renders the site footer with dynamic navigation columns and branding.
  * All content strings are fetched from the centralized config system.
  * Navigation structure is driven by navigation.config.json.
+ * Logo image is config-driven from branding.config.json.
  */
 export default function Footer() {
-  const { navigation, content, app } = useConfig();
+  const { navigation, content, app, branding } = useConfig();
   const year = new Date().getFullYear();
 
   // Load footer columns from navigation config
@@ -24,15 +26,28 @@ export default function Footer() {
   // Load footer content strings from content config
   const footerContent = content?.footer || {};
 
+  // Derive footer logo path from branding config, with text fallback
+  const footerLogoPath = branding?.logos?.footer || null;
+
   return (
     <footer className="footer">
       <div className="container footer__container">
         {/* Brand Column */}
         <div className="footer__column footer__column--brand">
           <Link href="/" className="footer__logo">
-            <span className="footer__logo-text">
-              {app?.name || 'ROOSTAY'}
-            </span>
+            {footerLogoPath ? (
+              <img
+                src={footerLogoPath}
+                alt={app?.name || 'ROOSTAY'}
+                className="footer__logo-image"
+                width="130"
+                height="36"
+              />
+            ) : (
+              <span className="footer__logo-text">
+                {app?.name || 'ROOSTAY'}
+              </span>
+            )}
           </Link>
           <p className="footer__description">
             {footerContent.brandDescription || 'Find your perfect stay in Ethiopia.'}

@@ -1,9 +1,11 @@
 // frontend/lib/config.js
 // Frontend configuration loader — reads from the backend config system
-// Provides feature flags, content strings, and all configuration to React components
+// Provides feature flags, content strings, branding, and all configuration to React components
 // All values are environment-aware (development, production, test)
-// Zero hardcoded values — everything comes from packages/config/
+// Domain is auto-detected — zero hardcoded URLs
 // Author: Theron
+
+import { getBaseUrl } from './url';
 
 let cachedConfig = null;
 
@@ -42,6 +44,7 @@ async function fetchConfig() {
 /**
  * Provides minimal fallback configuration when the API is unavailable.
  * Ensures the app can still render basic UI even during outages.
+ * Domain is auto-detected — never hardcoded.
  *
  * @returns {Object} Minimal fallback configuration
  */
@@ -49,7 +52,31 @@ function getFallbackConfig() {
   return {
     app: {
       name: process.env.NEXT_PUBLIC_APP_NAME || 'ROOSTAY',
-      baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      baseUrl: getBaseUrl(),
+    },
+    branding: {
+      logos: {
+        header: '/assets/logos/logo.svg',
+        footer: '/assets/logos/logo-white.svg',
+        favicon: '/assets/icons/favicon.ico',
+        appleTouchIcon: '/assets/icons/apple-touch-icon.png',
+        ogDefault: '/assets/images/og-default.jpg',
+      },
+      placeholders: {
+        listing: '/assets/placeholders/placeholder-listing.svg',
+        avatar: '/assets/placeholders/placeholder-avatar.svg',
+        userAvatar: '/assets/placeholders/placeholder-user.svg',
+      },
+      colors: {
+        primary: '#2563EB',
+        primaryLight: '#DBEAFE',
+        primaryDark: '#1D4ED8',
+      },
+      typography: {
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontFamilyMono: 'JetBrains Mono, monospace',
+        fontSizeBase: '16px',
+      },
     },
     features: {},
     content: {
@@ -76,7 +103,7 @@ function getFallbackConfig() {
  * Checks if a feature flag is enabled.
  * Uses the cached config — call fetchConfig() first or use the hook.
  *
- * @param {Object} config - The full config object
+ * @param {Object} config      - The full config object
  * @param {string} featurePath - Dot-separated path to the feature flag
  * @returns {boolean} Whether the feature is enabled
  */
@@ -95,8 +122,8 @@ function isFeatureEnabled(config, featurePath) {
 /**
  * Retrieves a content string from the config.
  *
- * @param {Object} config - The full config object
- * @param {string} contentPath - Dot-separated path to the content string
+ * @param {Object} config       - The full config object
+ * @param {string} contentPath  - Dot-separated path to the content string
  * @param {Object} [replacements] - Optional key-value pairs for string replacement
  * @returns {string} The content string, or the path itself as fallback
  */
@@ -119,9 +146,4 @@ function getContentString(config, contentPath, replacements = {}) {
   return result;
 }
 
-export {
-  fetchConfig,
-  getFallbackConfig,
-  isFeatureEnabled,
-  getContentString,
-};
+export { fetchConfig, getFallbackConfig, isFeatureEnabled, getContentString };

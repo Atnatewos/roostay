@@ -1,10 +1,23 @@
 // frontend/app/layout.jsx
 // Root layout for the ROOSTAY application
-// Includes global metadata, viewport, and font optimizations
+// Includes global metadata, viewport, branding icons, and font optimizations
+// All brand assets read from branding.config.json — zero hardcoded paths
 // Author: Theron
 
 import '@/styles/main.css';
+import { getBaseUrl } from '@/lib/url';
 import constants from '@/lib/constants';
+
+// Load branding assets from config for favicon and touch icons
+const branding = (() => {
+  try {
+    const config = require('../../packages/config/branding.config.json');
+    const env = process.env.NODE_ENV || 'development';
+    return config[env] || config.development || {};
+  } catch {
+    return {};
+  }
+})();
 
 export const metadata = {
   title: {
@@ -12,17 +25,23 @@ export const metadata = {
     template: `%s | ${constants.APP_NAME}`,
   },
   description: constants.APP_DESCRIPTION,
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
-  keywords: ['Ethiopia rentals', 'Addis Ababa short term rental', 'Ethiopian home sharing', 'ROOSTAY', 'long term rental Ethiopia'],
-  authors: [{ name: 'Theron (Atnatewos)', url: process.env.NEXT_PUBLIC_APP_URL }],
+  metadataBase: new URL(getBaseUrl()),
+  keywords: [
+    'Ethiopia rentals',
+    'Addis Ababa short term rental',
+    'Ethiopian home sharing',
+    'ROOSTAY',
+    'long term rental Ethiopia',
+  ],
+  authors: [{ name: 'Theron (Atnatewos)', url: getBaseUrl() }],
   creator: 'ROOSTAY',
   publisher: 'ROOSTAY PLC',
   formatDetection: {
-    telephone: false, // Prevents iOS from auto-linking phone numbers
+    telephone: false,
   },
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: branding?.logos?.favicon || '/favicon.ico',
+    apple: branding?.logos?.appleTouchIcon || '/apple-touch-icon.png',
   },
 };
 
@@ -30,7 +49,7 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#2563EB', // Match your primary brand color
+  themeColor: branding?.colors?.primary || '#2563EB',
 };
 
 export default function RootLayout({ children }) {

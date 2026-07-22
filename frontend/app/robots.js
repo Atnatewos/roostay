@@ -1,16 +1,23 @@
 // frontend/app/robots.js
 // Instructs search engine crawlers on what to index
+// Base URL is auto-detected — works on any domain without configuration
 // Author: Theron
 
+import { getBaseUrl } from '@/lib/url';
+
 export default function robots() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  
+  const baseUrl = getBaseUrl();
+
   return {
     rules: [
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin/', '/guest/profile/edit', '/host/my-listings/create'], // Protect sensitive/user-specific routes
+        disallow: [
+          '/admin/',
+          '/guest/profile/edit',
+          '/host/my-listings/create',
+        ],
       },
       {
         userAgent: 'Googlebot',

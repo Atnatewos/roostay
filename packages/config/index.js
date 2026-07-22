@@ -3,6 +3,8 @@
 // Reads environment variables and resolves uppercase placeholder values
 // Supports DATABASE_URL connection string pattern matching
 // Provides feature flag evaluation and content string lookup utilities
+// Author: Theron
+
 const path = require('path');
 
 /**
@@ -25,7 +27,7 @@ function resolveEnvVars(config) {
   }
 
   if (Array.isArray(config)) {
-    return config.map(item => resolveEnvVars(item));
+    return config.map((item) => resolveEnvVars(item));
   }
 
   if (config !== null && typeof config === 'object') {
@@ -80,6 +82,7 @@ const booking = loadConfig('booking.config.json');
 const content = loadConfig('content.config.json');
 const navigation = loadConfig('navigation.config.json');
 const pricing = loadConfig('pricing.config.json');
+const branding = loadConfig('branding.config.json');
 
 // ============================================================================
 // FEATURE FLAG UTILITY
@@ -122,8 +125,8 @@ function isEnabled(featurePath) {
  *   getContent('booking.messages.bookingCreated')  // "Booking Created Successfully!"
  *   getContent('errors.unauthorized')               // "Please log in to continue."
  *
- * @param {string} contentPath - Dot-separated path to the content string
- * @param {Object} [replacements] - Optional key-value pairs to replace in the string
+ * @param {string} contentPath      - Dot-separated path to the content string
+ * @param {Object} [replacements]   - Optional key-value pairs to replace in the string
  * @returns {string} The content string with replacements applied
  */
 function getContent(contentPath, replacements = {}) {
@@ -168,6 +171,34 @@ function getContentGroup(groupPath) {
   return typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+// ============================================================================
+// BRANDING ASSET LOOKUP
+// Retrieves logo paths, placeholder images, colors, and typography
+// ============================================================================
+
+/**
+ * Retrieves a branding asset path by its dot-separated key.
+ *
+ * Usage:
+ *   getBranding('logos.header')           // "/images/logo.svg"
+ *   getBranding('placeholders.listing')   // "/images/placeholder-listing.svg"
+ *   getBranding('colors.primary')         // "#2563EB"
+ *
+ * @param {string} assetPath - Dot-separated path to the branding asset
+ * @returns {string} The asset value, or the path itself as fallback
+ */
+function getBranding(assetPath) {
+  const keys = assetPath.split('.');
+  let value = branding;
+
+  for (const key of keys) {
+    if (value === null || value === undefined) return assetPath;
+    value = value[key];
+  }
+
+  return value;
+}
+
 module.exports = {
   app,
   database,
@@ -182,8 +213,10 @@ module.exports = {
   content,
   navigation,
   pricing,
+  branding,
   getEnvironment,
   isEnabled,
   getContent,
   getContentGroup,
+  getBranding,
 };

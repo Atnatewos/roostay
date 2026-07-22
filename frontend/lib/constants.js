@@ -2,21 +2,18 @@
 // Centralized frontend constants — all values driven by environment variables
 // or loaded from the backend config system at runtime via useConfig() hook
 // For server components, use the config module directly
+// Domain is auto-detected via getBaseUrl() — zero hardcoded URLs
 // Author: Theron
 
-// ============================================================================
-// APPLICATION DEFAULTS
-// These are fallback values used when the config API is unavailable.
-// In normal operation, useConfig() provides the actual config from the backend.
-// ============================================================================
+import { getBaseUrl } from './url';
 
 const constants = {
   // ============================================================================
-  // APPLICATION CONFIGURATION (from environment variables)
+  // APPLICATION CONFIGURATION (from environment variables or auto-detected)
   // ============================================================================
   API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'ROOSTAY',
-  APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  APP_URL: getBaseUrl(),
   APP_DESCRIPTION: 'Find your perfect stay in Ethiopia.',
 
   // ============================================================================
@@ -39,8 +36,15 @@ const constants = {
   // Ethiopian cities — loaded from config in production via useConfig()
   // ============================================================================
   CITIES: [
-    'Addis Ababa', 'Adama', 'Bahir Dar', 'Dire Dawa',
-    'Gondar', 'Hawassa', 'Jimma', 'Mekelle', 'Shashamane',
+    'Addis Ababa',
+    'Adama',
+    'Bahir Dar',
+    'Dire Dawa',
+    'Gondar',
+    'Hawassa',
+    'Jimma',
+    'Mekelle',
+    'Shashamane',
   ],
 
   // ============================================================================

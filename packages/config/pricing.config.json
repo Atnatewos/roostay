@@ -3,7 +3,7 @@
     "currency": "ETB",
     "currencySymbol": "Br",
     "serviceFee": {
-      "percent": 5,
+      "percent": 10,
       "minAmount": 100,
       "maxAmount": 5000
     },

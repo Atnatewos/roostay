@@ -1,6 +1,7 @@
 {
   "development": {
-    "origin": ["http://localhost:3000", "http://localhost:3001"],
+    "autoDetect": true,
+    "fallbackOrigins": ["http://localhost:3000", "http://localhost:3001"],
     "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     "allowedHeaders": ["Content-Type", "Authorization", "X-Requested-With"],
     "exposedHeaders": ["X-Total-Count", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
@@ -8,7 +9,8 @@
     "maxAge": 86400
   },
   "production": {
-    "origin": ["https://roostay.vercel.app", "https://www.roostay.et"],
+    "autoDetect": true,
+    "fallbackOrigins": [],
     "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     "allowedHeaders": ["Content-Type", "Authorization", "X-Requested-With"],
     "exposedHeaders": ["X-Total-Count", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
@@ -16,7 +18,8 @@
     "maxAge": 86400
   },
   "test": {
-    "origin": ["http://localhost:3001"],
+    "autoDetect": true,
+    "fallbackOrigins": ["http://localhost:3001"],
     "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     "allowedHeaders": ["Content-Type", "Authorization"],
     "exposedHeaders": [],
