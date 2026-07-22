@@ -3,9 +3,11 @@
 // Reads environment variables and resolves uppercase placeholder values
 // Supports DATABASE_URL connection string pattern matching
 // Provides feature flag evaluation and content string lookup utilities
+// Content strings are now loaded from the i18n system with language support
 // Author: Theron
 
 const path = require('path');
+const i18n = require('./i18n');
 
 /**
  * Resolves environment variable placeholders in config objects.
@@ -17,7 +19,6 @@ const path = require('path');
  * @returns {Object} Configuration with environment variables resolved
  */
 function resolveEnvVars(config) {
-  // Direct string match for env var placeholders
   if (typeof config === 'string') {
     const upperPattern = /^[A-Z_][A-Z0-9_]*$/;
     if (upperPattern.test(config) && process.env[config] !== undefined) {
@@ -65,6 +66,16 @@ function getEnvironment() {
   return process.env.NODE_ENV || 'development';
 }
 
+/**
+ * Resolves the current language from multiple sources.
+ * Priority: LANG env var → default English
+ *
+ * @returns {string} ISO 639-1 language code
+ */
+function getCurrentLanguage() {
+  return process.env.LANG || process.env.LANGUAGE || i18n.DEFAULT_LANGUAGE;
+}
+
 // ============================================================================
 // LOAD ALL CONFIGURATION MODULES
 // Each module maps to a specific domain of the application
@@ -79,10 +90,13 @@ const rateLimit = loadConfig('rateLimit.config.json');
 const upload = loadConfig('upload.config.json');
 const features = loadConfig('features.config.json');
 const booking = loadConfig('booking.config.json');
-const content = loadConfig('content.config.json');
 const navigation = loadConfig('navigation.config.json');
 const pricing = loadConfig('pricing.config.json');
 const branding = loadConfig('branding.config.json');
+
+// Content is now loaded from the i18n system — environment-agnostic, language-aware
+const currentLanguage = getCurrentLanguage();
+const content = i18n.loadContent(currentLanguage);
 
 // ============================================================================
 // FEATURE FLAG UTILITY
@@ -92,10 +106,6 @@ const branding = loadConfig('branding.config.json');
 /**
  * Checks if a feature flag is enabled in the current environment.
  * Features can be toggled ON/OFF per environment via features.config.json.
- *
- * Usage:
- *   isEnabled('messagingEnabled')       // true/false
- *   isEnabled('ui.socialLinks.facebook') // checks nested paths
  *
  * @param {string} featurePath - Dot-separated path to the feature flag
  * @returns {boolean} Whether the feature is enabled
@@ -114,19 +124,15 @@ function isEnabled(featurePath) {
 
 // ============================================================================
 // CONTENT STRING LOOKUP
-// Retrieves user-facing strings from content.config.json
+// Retrieves user-facing strings from the i18n content system
 // ============================================================================
 
 /**
  * Retrieves a content string by its dot-separated path.
  * Falls back to the key name if the string is not found.
  *
- * Usage:
- *   getContent('booking.messages.bookingCreated')  // "Booking Created Successfully!"
- *   getContent('errors.unauthorized')               // "Please log in to continue."
- *
- * @param {string} contentPath      - Dot-separated path to the content string
- * @param {Object} [replacements]   - Optional key-value pairs to replace in the string
+ * @param {string} contentPath    - Dot-separated path to the content string
+ * @param {Object} [replacements] - Optional key-value pairs to replace in the string
  * @returns {string} The content string with replacements applied
  */
 function getContent(contentPath, replacements = {}) {
@@ -140,7 +146,6 @@ function getContent(contentPath, replacements = {}) {
 
   if (typeof value !== 'string') return contentPath;
 
-  // Apply any string replacements (e.g., {{appName}} → "ROOSTAY")
   let result = value;
   for (const [replaceKey, replaceValue] of Object.entries(replacements)) {
     result = result.replace(new RegExp(`{{${replaceKey}}}`, 'g'), replaceValue);
@@ -151,10 +156,6 @@ function getContent(contentPath, replacements = {}) {
 
 /**
  * Retrieves a nested object of content strings by its dot-separated path.
- * Useful for getting a group of related strings (e.g., all booking messages).
- *
- * Usage:
- *   getContentGroup('booking.messages')  // Returns the entire messages object
  *
  * @param {string} groupPath - Dot-separated path to the content group
  * @returns {Object} The content group object, or empty object if not found
@@ -173,16 +174,10 @@ function getContentGroup(groupPath) {
 
 // ============================================================================
 // BRANDING ASSET LOOKUP
-// Retrieves logo paths, placeholder images, colors, and typography
 // ============================================================================
 
 /**
  * Retrieves a branding asset path by its dot-separated key.
- *
- * Usage:
- *   getBranding('logos.header')           // "/images/logo.svg"
- *   getBranding('placeholders.listing')   // "/images/placeholder-listing.svg"
- *   getBranding('colors.primary')         // "#2563EB"
  *
  * @param {string} assetPath - Dot-separated path to the branding asset
  * @returns {string} The asset value, or the path itself as fallback
@@ -215,8 +210,10 @@ module.exports = {
   pricing,
   branding,
   getEnvironment,
+  getCurrentLanguage,
   isEnabled,
   getContent,
   getContentGroup,
   getBranding,
+  i18n,
 };

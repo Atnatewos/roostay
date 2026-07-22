@@ -1,0 +1,132 @@
+{
+  "app": {
+    "name": "ROOSTAY",
+    "tagline": "በኢትዮጵያ ውስጥ ፍጹም የሆነ መቆያ ያግኙ።",
+    "description": "በኢትዮጵያ ውስጥ የአጭር ጊዜ እና የረጅም ጊዜ ኪራይ ቤቶችን ያስይዙ። አፓርታማዎችን፣ ቤቶችን፣ ቪላዎችን እና ሌሎችንም ያግኙ።"
+  },
+  "homepage": {
+    "heroTitle": "በኢትዮጵያ ውስጥ ፍጹም የሆነ መቆያ ያግኙ",
+    "heroSubtitle": "ከአጭር ጊዜ ሽርሽር እስከ ረጅም ጊዜ ኪራይ — በመላው ኢትዮጵያ አፓርታማዎችን፣ ቪላዎችን እና የእንግዳ ማረፊያ ቤቶችን ያግኙ።",
+    "searchPlaceholder": "በስም፣ ከተማ ይፈልጉ...",
+    "allCities": "ሁሉም ከተሞች",
+    "searchButton": "ፈልግ",
+    "popularStays": "ተወዳጅ መቆያዎች",
+    "viewAllListings": "ሁሉንም ዝርዝሮች ይመልከቱ",
+    "noListings": "እስካሁን ምንም ዝርዝሮች የሉም። ለማስተናገድ የመጀመሪያው ይሁኑ!",
+    "createListing": "ዝርዝር ይፍጠሩ",
+    "howItWorks": "ROOSTAY እንዴት እንደሚሰራ",
+    "steps": [
+      { "number": 1, "title": "ይፈልጉ", "description": "በኢትዮጵያ ከተሞች ውስጥ የተረጋገጡ ዝርዝሮችን ይቃኙ።" },
+      { "number": 2, "title": "ያስይዙ", "description": "ቀኖችዎን ይምረጡ እና ወዲያውኑ ያስይዙ።" },
+      { "number": 3, "title": "ይቆዩ", "description": "ቆይታዎን ይደሰቱ እና ግምገማ ይተዉ።" }
+    ]
+  },
+  "booking": {
+    "messages": {
+      "bookingCreated": "ቦኪንግ በተሳካ ሁኔታ ተፈጥሯል!",
+      "bookingAwaitingConfirmation": "የእርስዎ ቦኪንግ ቀርቧል እና ማረጋገጫ በመጠበቅ ላይ ነው። ክፍያዎ ሲረጋገጥ እናሳውቅዎታለን።",
+      "bookingReferenceLabel": "የቦኪንግ ማጣቀሻ",
+      "paymentExpired": "የክፍያ መስኮት አልፏል። እባክዎ ይህን ሞዳል ይዝጉ እና እንደገና ይሞክሩ።",
+      "completePaymentWithin": "ክፍያዎን በዚህ ጊዜ ውስጥ ያጠናቅቁ:",
+      "enterTransactionHint": "ክፍያ ከላኩ በኋላ፣ ከማረጋገጫ ኤስኤምኤስዎ የተገኘውን የማጣቀሻ ቁጥር ያስገቡ።",
+      "transactionVerified": "የግብይት ቁጥር ተረጋግጧል — ከዚህ በፊት ጥቅም ላይ አልዋለም።",
+      "transactionInvalid": "ይህ የግብይት ቁጥር አስቀድሞ ጥቅም ላይ ውሏል።",
+      "transactionRequired": "እባክዎ ትክክለኛ የግብይት ማጣቀሻ ቁጥር ያስገቡ።",
+      "transactionMustVerify": "ከማስገባትዎ በፊት እባክዎ የግብይት ቁጥርዎን ያረጋግጡ።",
+      "validationFailed": "የግብይት ቁጥር ማረጋገጥ አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
+      "bookingFailed": "ቦኪንግ መፍጠር አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
+      "additionalNotesLabel": "ተጨማሪ ማስታወሻዎች (አማራጭ)",
+      "additionalNotesPlaceholder": "ስለ ክፍያዎ ማንኛውም ተጨማሪ መረጃ...",
+      "submitAndBook": "አስገባ እና አስያዝ",
+      "cancel": "ሰርዝ",
+      "viewMyBookings": "የእኔን ቦኪንጎች ይመልከቱ",
+      "selectPaymentMethod": "የክፍያ ዘዴ ይምረጡ",
+      "bankTransfer": "የባንክ ዝውውር",
+      "telebirr": "ተሌብር",
+      "bankTransferDetails": "የባንክ ዝውውር ዝርዝሮች",
+      "telebirrDetails": "የተሌብር ክፍያ ዝርዝሮች",
+      "bankLabel": "ባንክ",
+      "accountNumberLabel": "የሂሳብ ቁጥር",
+      "accountHolderLabel": "የሂሳብ ባለቤት",
+      "amountToTransfer": "የሚተላለፈው መጠን",
+      "merchantLabel": "ነጋዴ",
+      "shortcodeLabel": "አጭር ኮድ",
+      "amountLabel": "መጠን",
+      "copied": "ተቀድቷል!",
+      "copy": "ቅዳ",
+      "transactionReferenceNumber": "የግብይት ማጣቀሻ ቁጥር",
+      "telebirrTransactionId": "የተሌብር ግብይት መታወቂያ",
+      "verify": "አረጋግጥ",
+      "importantNotice": "መጀመሪያ ክፍያውን ያጠናቅቁ፣ ከዚያም የግብይት ቁጥሩን ያስገቡ። ቦኪንግዎ የሚረጋገጠው ክፍያ ከተረጋገጠ በኋላ ነው።",
+      "transactionPlaceholderBank": "ለምሳሌ፣ FT1234567890",
+      "transactionPlaceholderTelebirr": "ለምሳሌ፣ TB123456789"
+    }
+  },
+  "errors": {
+    "generic": "የሆነ ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
+    "networkError": "የአውታረ መረብ ስህተት። እባክዎ ግንኙነትዎን ያረጋግጡ።",
+    "unauthorized": "ለመቀጠል እባክዎ ይግቡ።",
+    "forbidden": "ይህን እርምጃ ለማከናወን ፈቃድ የለዎትም።",
+    "notFound": "የተጠየቀው ሀብት አልተገኘም።",
+    "validationFailed": "እባክዎ ግብዓትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
+  },
+  "auth": {
+    "loginTitle": "እንኳን ደህና መጡ",
+    "loginSubtitle": "ወደ ROOSTAY መለያዎ ይግቡ",
+    "registerTitle": "መለያ ይፍጠሩ",
+    "registerSubtitle": "በኢትዮጵያ ውስጥ ቆይታዎችን ማስያዝ ለመጀመር ROOSTAY ይቀላቀሉ",
+    "emailLabel": "ኢሜይል",
+    "passwordLabel": "የይለፍ ቃል",
+    "firstNameLabel": "ስም",
+    "lastNameLabel": "የአባት ስም",
+    "phoneLabel": "ስልክ (አማራጭ)",
+    "phonePlaceholder": "0911223344",
+    "passwordHelperText": "ቢያንስ 8 ቁምፊዎች፣ 1 ትልቅ ፊደል፣ 1 ትንሽ ፊደል፣ 1 ቁጥር",
+    "signInButton": "ይግቡ",
+    "createAccountButton": "መለያ ይፍጠሩ",
+    "noAccount": "መለያ የሎትም?",
+    "hasAccount": "አስቀድሞ መለያ አለዎት?",
+    "signUpLink": "ይመዝገቡ",
+    "signInLink": "ይግቡ",
+    "loginFailed": "መግባት አልተሳካም",
+    "registrationFailed": "ምዝገባ አልተሳካም",
+    "logoutFailed": "መውጣት አልተሳካም"
+  },
+  "navigation": {
+    "browse": "ይቃኙ",
+    "search": "ይፈልጉ",
+    "becomeHost": "አስተናጋጅ ይሁኑ",
+    "dashboard": "ዳሽቦርድ",
+    "admin": "አስተዳዳሪ",
+    "myBookings": "የእኔ ቦኪንጎች",
+    "favorites": "ተወዳጆች",
+    "myListings": "የእኔ ዝርዝሮች",
+    "bookings": "ቦኪንጎች",
+    "profileSettings": "የመገለጫ ቅንብሮች",
+    "logout": "ውጣ",
+    "login": "ግባ",
+    "signUp": "ይመዝገቡ"
+  },
+  "footer": {
+    "brandDescription": "በኢትዮጵያ ውስጥ ፍጹም የሆነ መቆያ ያግኙ። በመላው አገሪቱ የአጭር ጊዜ ሽርሽር እና የረጅም ጊዜ ኪራይ።",
+    "copyright": "ROOSTAY። ሁሉም መብቶች የተጠበቁ ናቸው።",
+    "exploreHeading": "ያስሱ",
+    "hostHeading": "አስተናጋጅ",
+    "supportHeading": "ድጋፍ",
+    "browseListings": "ዝርዝሮችን ይቃኙ",
+    "listYourProperty": "ንብረትዎን ይዘርዝሩ",
+    "hostDashboard": "የአስተናጋጅ ዳሽቦርድ",
+    "helpCenter": "የእርዳታ ማዕከል",
+    "contactUs": "ያግኙን",
+    "madeInEthiopia": "በኢትዮጵያ የተሰራ"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "የአስተዳዳሪ ዳሽቦርድ",
+      "subtitle": "የመድረክ አጠቃላይ እይታ እና የስርዓት አስተዳደር።"
+    },
+    "reports": {
+      "lastUpdated": "መጨረሻ የተሻሻለው"
+    }
+  }
+}

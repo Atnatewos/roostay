@@ -1,17 +1,12 @@
 // packages/api/routes/config.routes.js
 // Configuration API route — serves resolved config to the frontend
 // Provides feature flags, content strings, branding, and all public configuration
+// Supports ?lang= query parameter for internationalization
 // Filters out sensitive values (secrets, API keys) before sending to client
 // Author: Theron
 
 const express = require('express');
 const router = express.Router();
-
-// ============================================================================
-// CONFIGURATION MODULES
-// Only public-safe modules are exposed to the frontend
-// Secrets like JWT secrets, API keys, and database URLs are NEVER sent
-// ============================================================================
 
 let config;
 try {
@@ -23,17 +18,30 @@ try {
 /**
  * GET /api/config
  * Returns the full resolved configuration for the current environment.
+ * Supports ?lang=am query parameter to load translated content.
  * Sensitive values (secrets, API keys, connection strings) are filtered out.
  * This endpoint is public — no authentication required.
- * The frontend uses this to get feature flags, content strings, branding, and settings.
  */
 router.get('/config', (req, res) => {
+  // Resolve language: query param → cookie → header → default
+  const lang =
+    req.query.lang ||
+    req.cookies?.roostay_lang ||
+    config.i18n?.detectLanguage(req) ||
+    config.i18n?.DEFAULT_LANGUAGE ||
+    'en';
+
+  // Load content in the requested language with English fallback
+  const content = config.i18n
+    ? config.i18n.loadContent(lang)
+    : config.content || {};
+
   // Build a public-safe config object by selecting only non-sensitive modules
   const publicConfig = {
     app: config.app || {},
     branding: config.branding || {},
     features: config.features || {},
-    content: config.content || {},
+    content,
     navigation: config.navigation || {},
     payment: {
       currency: config.payment?.currency || 'ETB',
@@ -69,6 +77,11 @@ router.get('/config', (req, res) => {
     cors: {
       origin: config.cors?.origin || '*',
     },
+    language: {
+      current: lang,
+      supported: config.i18n ? config.i18n.getSupportedLanguages() : [{ code: 'en', name: 'English', flag: '🇬🇧' }],
+      default: config.i18n?.DEFAULT_LANGUAGE || 'en',
+    },
     environment: config.getEnvironment ? config.getEnvironment() : process.env.NODE_ENV || 'development',
   };
 
@@ -77,6 +90,7 @@ router.get('/config', (req, res) => {
     data: publicConfig,
     meta: {
       environment: publicConfig.environment,
+      language: lang,
       timestamp: new Date().toISOString(),
     },
   });

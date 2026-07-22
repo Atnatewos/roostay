@@ -1,0 +1,132 @@
+{
+  "app": {
+    "name": "ROOSTAY",
+    "tagline": "Itoophiyaa keessatti bakka buufannaa mijataa argadhu.",
+    "description": "Itoophiyaa keessatti kireeffannaa yeroo gabaabaa fi yeroo dheeraa buufadhu. Apaartimentii, mana, viilaa fi kkf argadhu."
+  },
+  "homepage": {
+    "heroTitle": "Itoophiyaa Keessatti Bakka Buufannaa Mijataa Argadhu",
+    "heroSubtitle": "Yeroo gabaabaa irraa kaasee hanga yeroo dheeraatti — Itoophiyaa guutuu keessatti apaartimentii, viilaa fi mana keessummaa argadhu.",
+    "searchPlaceholder": "Maqaa, magaalaadhaan barbaadi...",
+    "allCities": "Magaaloota Hundaa",
+    "searchButton": "Barbaadi",
+    "popularStays": "Buufannaa Jaallatamoo",
+    "viewAllListings": "Tarreeffama hunda ilaali",
+    "noListings": "Ammallee tarreeffamni hin jiru. Keessummeessuuf kan jalqabaa ta'i!",
+    "createListing": "Tarreeffama Uumi",
+    "howItWorks": "ROOSTAY Akkamitti Akka Hojjetu",
+    "steps": [
+      { "number": 1, "title": "Barbaadi", "description": "Magaalota Itoophiyaa keessatti tarreeffamoota mirkaneeffaman sakatta'i." },
+      { "number": 2, "title": "Buufadhu", "description": "Guyyoota kee fili fi battalumatti buufadhu." },
+      { "number": 3, "title": "Turi", "description": "Buufannaa kee itti gammadiitii gamaaggamuu dhiisi." }
+    ]
+  },
+  "booking": {
+    "messages": {
+      "bookingCreated": "Buufannaan milkaa'inaan uumameera!",
+      "bookingAwaitingConfirmation": "Buufannaan kee galeera fi mirkanaa eeggachaa jira. Kaffaltiin kee yeroo mirkaneeffamu isin beeksifna.",
+      "bookingReferenceLabel": "Wabii Buufannaa",
+      "paymentExpired": "Daa'aan kaffaltii darbeera. Modaala kana cufiitii irra deebi'ii yaali.",
+      "completePaymentWithin": "Kaffaltii kee yeroo kana keessatti xumuri:",
+      "enterTransactionHint": "Kaffaltii erga ergitee booda, lakkoofsa wabii SMS mirkanaa kee irraa argame galchi.",
+      "transactionVerified": "Lakkoofsi daldalaa mirkaneeffameera — duraan hin fayyadamne.",
+      "transactionInvalid": "Lakkoofsi daldalaa kun duraan fayyadameera.",
+      "transactionRequired": "Lakkoofsa wabii daldalaa sirrii galchi.",
+      "transactionMustVerify": "Galchuu kee dura lakkoofsa daldalaa kee mirkaneeffadhu.",
+      "validationFailed": "Lakkoofsa daldalaa mirkaneeffachuun hin milkoofne. Irra deebi'ii yaali.",
+      "bookingFailed": "Buufannaa uumuun hin milkoofne. Irra deebi'ii yaali.",
+      "additionalNotesLabel": "Yaadannoo Dabalataa (filannoo)",
+      "additionalNotesPlaceholder": "Waa'ee kaffaltii kee odeeffannoo dabalataa kamiiyyuu...",
+      "submitAndBook": "Galiitii Buufadhu",
+      "cancel": "Haquu",
+      "viewMyBookings": "Buufannaa Koo Ilaali",
+      "selectPaymentMethod": "Mala Kaffaltii Fili",
+      "bankTransfer": "Tarkaanfii Baankii",
+      "telebirr": "Telebirr",
+      "bankTransferDetails": "Tarkaanfii Baankii Bal'inaan",
+      "telebirrDetails": "Kaffaltii Telebirr Bal'inaan",
+      "bankLabel": "Baankii",
+      "accountNumberLabel": "Lakkoofsa Herregaa",
+      "accountHolderLabel": "Abbaa Herregaa",
+      "amountToTransfer": "Hammi Dabarfamu",
+      "merchantLabel": "Daldalaa",
+      "shortcodeLabel": "Koodii Gabaabaa",
+      "amountLabel": "Hamma",
+      "copied": "Koppii ta'eera!",
+      "copy": "Koppii",
+      "transactionReferenceNumber": "Lakkoofsa Wabii Daldalaa",
+      "telebirrTransactionId": "Akkayyuu Daldalaa Telebirr",
+      "verify": "Mirkaneeffadhu",
+      "importantNotice": "Dura kaffaltii xumuri, sana booda lakkoofsa daldalaa galchi. Buufannaan kee kaffaltiin erga mirkaneeffamee booda mirkanaa argata.",
+      "transactionPlaceholderBank": "fkn, FT1234567890",
+      "transactionPlaceholderTelebirr": "fkn, TB123456789"
+    }
+  },
+  "errors": {
+    "generic": "Rakkoon uumameera. Irra deebi'ii yaali.",
+    "networkError": "Dogoggora networkii. Tolee quunnamtii kee mirkaneeffadhu.",
+    "unauthorized": "Itti fufuuf galmaa'i.",
+    "forbidden": "Gocha kana raawwachuuf hayyama hin qabdu.",
+    "notFound": "Qabeenyi gaafatame hin argamne.",
+    "validationFailed": "Tolee galtee kee mirkaneeffadhuutii irra deebi'ii yaali."
+  },
+  "auth": {
+    "loginTitle": "Deebitee Dhufuu Kee Bagaa Gammade",
+    "loginSubtitle": "Akkaawuntii ROOSTAY keetti galmaa'i",
+    "registerTitle": "Akkaawuntii Uumi",
+    "registerSubtitle": "Itoophiyaa keessatti buufannaa jalqabuuf ROOSTAY irratti galmaa'i",
+    "emailLabel": "Iimeelii",
+    "passwordLabel": "Jecha Darbii",
+    "firstNameLabel": "Maqaa",
+    "lastNameLabel": "Maqaa Abbaa",
+    "phoneLabel": "Bilbila (filannoo)",
+    "phonePlaceholder": "0911223344",
+    "passwordHelperText": "Qubee xiqqaa 8, qubee guddaa 1, qubee xiqqaa 1, lakkoofsa 1",
+    "signInButton": "Galmaa'i",
+    "createAccountButton": "Akkaawuntii Uumi",
+    "noAccount": "Akkaawuntii hin qabduu?",
+    "hasAccount": "Akkaawuntii qabduu?",
+    "signUpLink": "Galmaa'i",
+    "signInLink": "Seeni",
+    "loginFailed": "Galmaayuun hin milkoofne",
+    "registrationFailed": "Galmaayuun hin milkoofne",
+    "logoutFailed": "Ba'uun hin milkoofne"
+  },
+  "navigation": {
+    "browse": "Sakatta'i",
+    "search": "Barbaadi",
+    "becomeHost": "Keessummeessaa Ta'i",
+    "dashboard": "Daashboordii",
+    "admin": "Bulchaa",
+    "myBookings": "Buufannaa Koo",
+    "favorites": "Jaallatamoo",
+    "myListings": "Tarreeffama Koo",
+    "bookings": "Buufannaawwan",
+    "profileSettings": "Sajoo Proofaayilii",
+    "logout": "Ba'i",
+    "login": "Seeni",
+    "signUp": "Galmaa'i"
+  },
+  "footer": {
+    "brandDescription": "Itoophiyaa keessatti bakka buufannaa mijataa argadhu. Biyyattii guutuu keessatti yeroo gabaabaa fi yeroo dheeraaf.",
+    "copyright": "ROOSTAY. Mirgoonni hunduu eegamaa jiru.",
+    "exploreHeading": "Sakatta'i",
+    "hostHeading": "Keessummeessaa",
+    "supportHeading": "Deeggarsa",
+    "browseListings": "Tarreeffamoota Sakatta'i",
+    "listYourProperty": "Qabeenya Kee Tarreessi",
+    "hostDashboard": "Daashboordii Keessummeessaa",
+    "helpCenter": "Wiirtuu Gargaarsaa",
+    "contactUs": "Nu Quunnami",
+    "madeInEthiopia": "Itoophiyaa Keessatti Hojjetame"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Daashboordii Bulchaa",
+      "subtitle": "Mul'annoo waliigalaa fi bulchiinsa sirnaa."
+    },
+    "reports": {
+      "lastUpdated": "Dhumarratti kan haaromfame"
+    }
+  }
+}

@@ -3,6 +3,7 @@
 // All navigation items are driven by navigation.config.json via useConfig()
 // Feature flags control visibility of links — zero hardcoded values
 // Logo image is loaded from branding.config.json via useConfig()
+// Language switcher allows users to change the interface language
 // Author: Theron
 'use client';
 
@@ -20,11 +21,12 @@ import constants from '@/lib/constants';
  * Navigation items are rendered from config — no hardcoded links.
  * Feature flags control which links appear for each role.
  * Logo image is config-driven from branding.config.json.
+ * Language switcher for i18n support.
  */
 export default function Header() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  const { navigation, branding, isEnabled } = useConfig();
+  const { navigation, branding, language, switchLanguage, currentLanguage, isEnabled } = useConfig();
 
   // Derive logo path from branding config, with fallback to text-based logo
   const headerLogoPath = branding?.logos?.header || null;
@@ -33,40 +35,36 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const headerRef = useRef(null);
 
-  /**
-   * Closes all open dropdowns.
-   * Used when clicking outside the header or navigating away.
-   */
+  // Supported languages from config
+  const supportedLanguages = language?.supported || [{ code: 'en', name: 'English', flag: '🇬🇧' }];
+
   function closeAllDropdowns() {
     setIsUserMenuOpen(false);
     setIsNotificationOpen(false);
+    setIsLangMenuOpen(false);
   }
 
-  /**
-   * Toggles the user menu dropdown.
-   * Closes the notification dropdown if open (mutual exclusion).
-   */
   function handleUserMenuToggle() {
     setIsNotificationOpen(false);
+    setIsLangMenuOpen(false);
     setIsUserMenuOpen((prev) => !prev);
   }
 
-  /**
-   * Handles notification dropdown toggle from NotificationBell.
-   * Closes the user menu if open (mutual exclusion).
-   *
-   * @param {boolean} isOpen - Whether the notification dropdown is now open
-   */
   function handleNotificationToggle(isOpen) {
     setIsUserMenuOpen(false);
+    setIsLangMenuOpen(false);
     setIsNotificationOpen(isOpen);
   }
 
-  /**
-   * Closes all dropdowns when clicking outside the header.
-   */
+  function handleLangMenuToggle() {
+    setIsUserMenuOpen(false);
+    setIsNotificationOpen(false);
+    setIsLangMenuOpen((prev) => !prev);
+  }
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (headerRef.current && !headerRef.current.contains(event.target)) {
@@ -77,21 +75,11 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  /**
-   * Logs out and redirects to the home page.
-   */
   async function handleLogout() {
     await logout();
     router.push(constants.ROUTES.HOME);
   }
 
-  /**
-   * Determines which navigation items to show based on the user's role.
-   * Falls back to public navigation if the user is not authenticated.
-   * Feature flags are checked via isEnabled() from config.
-   *
-   * @returns {Array} Array of navigation item objects
-   */
   function getNavItems() {
     const headerConfig = navigation?.header || {};
 
@@ -111,11 +99,6 @@ export default function Header() {
     }
   }
 
-  /**
-   * Determines which user dropdown items to show based on role.
-   *
-   * @returns {Array} Array of dropdown link objects
-   */
   function getDropdownItems() {
     const dropdownConfig = navigation?.header?.userDropdown || {};
 
@@ -139,7 +122,7 @@ export default function Header() {
   return (
     <header className="header" ref={headerRef}>
       <div className="header__container">
-        {/* Logo — config-driven: image if available, text fallback if not */}
+        {/* Logo */}
         <Link href={constants.ROUTES.HOME} className="header__logo">
           {headerLogoPath ? (
             <img
@@ -154,7 +137,7 @@ export default function Header() {
           )}
         </Link>
 
-        {/* Desktop Navigation — dynamically rendered from config */}
+        {/* Desktop Navigation */}
         <nav className="header__nav" aria-label="Main navigation">
           {navItems.map((item) => {
             if (item.featureFlag && !isEnabled(item.featureFlag)) {
@@ -181,8 +164,50 @@ export default function Header() {
           })}
         </nav>
 
-        {/* Right Side: Notifications + User Menu */}
+        {/* Right Side: Language + Notifications + User Menu */}
         <div className="header__actions">
+          {/* Language Switcher */}
+          {supportedLanguages.length > 1 && (
+            <div className="header__lang-switcher">
+              <button
+                type="button"
+                onClick={handleLangMenuToggle}
+                className="header__lang-button"
+                aria-expanded={isLangMenuOpen}
+                aria-label="Select language"
+              >
+                <span className="header__lang-flag">
+                  {supportedLanguages.find((l) => l.code === currentLanguage)?.flag || '🌐'}
+                </span>
+              </button>
+
+              {isLangMenuOpen && (
+                <div className="header__dropdown header__dropdown--lang">
+                  {supportedLanguages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => {
+                        switchLanguage(lang.code);
+                        setIsLangMenuOpen(false);
+                      }}
+                      className={`header__dropdown-link header__dropdown-link--lang ${
+                        currentLanguage === lang.code ? 'header__dropdown-link--active' : ''
+                      }`}
+                      style={{
+                        fontWeight: currentLanguage === lang.code ? 'var(--font-weight-bold)' : 'normal',
+                      }}
+                    >
+                      <span style={{ marginRight: '0.5rem' }}>{lang.flag}</span>
+                      {lang.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notification Bell */}
           {isEnabled('notificationsEnabled') && (
             <NotificationBell
               isAuthenticated={isAuthenticated}
@@ -191,6 +216,7 @@ export default function Header() {
             />
           )}
 
+          {/* User Menu */}
           {isAuthenticated && user ? (
             <div className="header__user-menu">
               <button
@@ -208,14 +234,7 @@ export default function Header() {
                   )}
                 </div>
                 <span className="header__user-name">{user.firstName}</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
@@ -223,131 +242,49 @@ export default function Header() {
               {isUserMenuOpen && (
                 <div className="header__dropdown">
                   <div className="header__dropdown-header">
-                    <p className="header__dropdown-name">
-                      {user.firstName} {user.lastName}
-                    </p>
+                    <p className="header__dropdown-name">{user.firstName} {user.lastName}</p>
                     <p className="header__dropdown-email">{user.email}</p>
                   </div>
-
                   <div className="header__dropdown-menu">
                     {dropdownItems.map((item) => {
-                      if (item.featureFlag && !isEnabled(item.featureFlag)) {
-                        return null;
-                      }
-
+                      if (item.featureFlag && !isEnabled(item.featureFlag)) return null;
                       return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className="header__dropdown-link"
-                          onClick={closeAllDropdowns}
-                          style={
-                            item.highlight
-                              ? {
-                                  color: 'var(--color-primary)',
-                                  fontWeight: 'var(--font-weight-semibold)',
-                                }
-                              : undefined
-                          }
-                        >
+                        <Link key={item.href} href={item.href} className="header__dropdown-link" onClick={closeAllDropdowns} style={item.highlight ? { color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)' } : undefined}>
                           {item.label}
                         </Link>
                       );
                     })}
-                    <Link
-                      href={constants.ROUTES.GUEST_PROFILE}
-                      className="header__dropdown-link"
-                      onClick={closeAllDropdowns}
-                    >
-                      Profile Settings
-                    </Link>
+                    <Link href={constants.ROUTES.GUEST_PROFILE} className="header__dropdown-link" onClick={closeAllDropdowns}>Profile Settings</Link>
                   </div>
-
                   <div className="header__dropdown-footer">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeAllDropdowns();
-                        handleLogout();
-                      }}
-                      className="header__dropdown-link header__dropdown-link--logout"
-                    >
-                      Logout
-                    </button>
+                    <button type="button" onClick={() => { closeAllDropdowns(); handleLogout(); }} className="header__dropdown-link header__dropdown-link--logout">Logout</button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
             <div className="header__auth-links">
-              <Link href={constants.ROUTES.LOGIN} className="header__link">
-                Login
-              </Link>
-              <Link href={constants.ROUTES.REGISTER} className="header__button">
-                Sign Up
-              </Link>
+              <Link href={constants.ROUTES.LOGIN} className="header__link">Login</Link>
+              <Link href={constants.ROUTES.REGISTER} className="header__button">Sign Up</Link>
             </div>
           )}
 
-          {/* Mobile hamburger toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              closeAllDropdowns();
-              setIsMenuOpen(!isMenuOpen);
-            }}
-            className="header__menu-toggle"
-            aria-label="Toggle menu"
-            aria-expanded={isMenuOpen}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width="24"
-              height="24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              {isMenuOpen ? (
-                <>
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </>
-              ) : (
-                <>
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </>
-              )}
+          {/* Mobile hamburger */}
+          <button type="button" onClick={() => { closeAllDropdowns(); setIsMenuOpen(!isMenuOpen); }} className="header__menu-toggle" aria-label="Toggle menu" aria-expanded={isMenuOpen}>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+              {isMenuOpen ? (<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>) : (<><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></>)}
             </svg>
           </button>
         </div>
       </div>
 
-      {/* Mobile Navigation — dynamically rendered from config */}
+      {/* Mobile Navigation */}
       {isMenuOpen && (
         <nav className="header__mobile-nav" aria-label="Mobile navigation">
           {navItems.map((item) => {
-            if (item.featureFlag && !isEnabled(item.featureFlag)) {
-              return null;
-            }
-
+            if (item.featureFlag && !isEnabled(item.featureFlag)) return null;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="header__mobile-link"
-                onClick={() => setIsMenuOpen(false)}
-                style={
-                  item.highlight
-                    ? {
-                        color: 'var(--color-primary)',
-                        fontWeight: 'var(--font-weight-semibold)',
-                      }
-                    : undefined
-                }
-              >
+              <Link key={item.href} href={item.href} className="header__mobile-link" onClick={() => setIsMenuOpen(false)} style={item.highlight ? { color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)' } : undefined}>
                 {item.label}
               </Link>
             );

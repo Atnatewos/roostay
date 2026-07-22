@@ -1,0 +1,132 @@
+{
+  "app": {
+    "name": "ROOSTAY",
+    "tagline": "ኣብ ኢትዮጵያ ፍጹም መቐመጢ ረኸቡ።",
+    "description": "ኣብ ኢትዮጵያ ንሓጺር እናነዊሕ ግዘ ኪራይ ቤታት ደንጹዩ። ኣፓርታማታት፣ ኣባይቲ፣ ቪላታትን ካልኦትን ረኸቡ።"
+  },
+  "homepage": {
+    "heroTitle": "ኣብ ኢትዮጵያ ፍጹም መቐመጢ ረኸቡ",
+    "heroSubtitle": "ካብ ሓጺር ግዘ ሽርሽር ክሳብ ነዊሕ ግዘ ኪራይ — ኣብ መላእ ኢትዮጵያ ኣፓርታማታት፣ ቪላታትን ጋሻ ኣጋይሽን ረኸቡ።",
+    "searchPlaceholder": "ብስም፣ ከተማ ድለዩ...",
+    "allCities": "ኩለን ከተማታት",
+    "searchButton": "ድለዩ",
+    "popularStays": "ተፈታዊት መቐመጢታት",
+    "viewAllListings": "ኩሉ ዝርዝራት ርኣዩ",
+    "noListings": "ክሳብ ሕጂ ዝርዝራት የለን። ንምእንጋድ ቀዳማይ ኩኑ!",
+    "createListing": "ዝርዝር ፍጠሩ",
+    "howItWorks": "ROOSTAY ከመይ ከም ዝሰርሕ",
+    "steps": [
+      { "number": 1, "title": "ድለዩ", "description": "ኣብ ከተማታት ኢትዮጵያ ዝተረጋገጹ ዝርዝራት ቃንዩ።" },
+      { "number": 2, "title": "ደንጹዩ", "description": "ዕለታትኩም ምረጹ እሞ ብኡብኡ ደንጹዩ።" },
+      { "number": 3, "title": "ተቐመጡ", "description": "ኣብ ቆይታኹም ተደሰቱ እሞ ገምጋም ግደፉ።" }
+    ]
+  },
+  "booking": {
+    "messages": {
+      "bookingCreated": "ምዝገባ ብዓወት ተፈጢሩ!",
+      "bookingAwaitingConfirmation": "ምዝገባኹም ቀሪቡ ኣሎ እሞ ማረጋገጺ ይጽበ። ክፍሊትኹም ምስ ተረጋገጸት ነፍልጥኩም።",
+      "bookingReferenceLabel": "መወከሲ ምዝገባ",
+      "paymentExpired": "መስኮት ክፍሊት ሓሊፉ። በጃኹም ነዚ ሞዳል ዕጸዉ እሞ እንደገና ፈትኑ።",
+      "completePaymentWithin": "ክፍሊትኩም ኣብዚ ግዘ ውሽጢ ወድኡ:",
+      "enterTransactionHint": "ክፍሊት ምስ ለኣኹም፣ ካብቲ ማረጋገጺ ኤስኤምኤስኩም ዝረኸብኩምዎ መወከሲ ቁጽሪ ኣእትዉ።",
+      "transactionVerified": "ቁጽሪ ግብዚ ተረጋጊጹ — ቅድሚ ሕጂ ኣይተጠቐመን።",
+      "transactionInvalid": "እዚ ቁጽሪ ግብዚ ቅድሚ ሕጂ ተጠቒሙ ኣሎ።",
+      "transactionRequired": "በጃኹም ቅኑዕ መወከሲ ቁጽሪ ግብዚ ኣእትዉ።",
+      "transactionMustVerify": "ቅድሚ ምቕራብኩም በጃኹም ቁጽሪ ግብዚኹም ኣረጋግጹ።",
+      "validationFailed": "ምርግጋጽ ቁጽሪ ግብዚ ኣይተዓወተን። በጃኹም እንደገና ፈትኑ።",
+      "bookingFailed": "ምፍጣር ምዝገባ ኣይተዓወተን። በጃኹም እንደገና ፈትኑ።",
+      "additionalNotesLabel": "ተወሳኺ መዘኻኸሪታት (ምርጫዊ)",
+      "additionalNotesPlaceholder": "ብዛዕባ ክፍሊትኩም ዝኾነ ተወሳኺ ሓበሬታ...",
+      "submitAndBook": "ኣእቱ እሞ ደንጹዩ",
+      "cancel": "ምሕረግ",
+      "viewMyBookings": "ምዝገባታተይ ርኣዩ",
+      "selectPaymentMethod": "ኣገባብ ክፍሊት ምረጹ",
+      "bankTransfer": "ምምሕላል ባንኪ",
+      "telebirr": "ተሌብር",
+      "bankTransferDetails": "ዝርዝራት ምምሕላል ባንኪ",
+      "telebirrDetails": "ዝርዝራት ክፍሊት ተሌብር",
+      "bankLabel": "ባንኪ",
+      "accountNumberLabel": "ቁጽሪ ሕሳብ",
+      "accountHolderLabel": "ዋና ሕሳብ",
+      "amountToTransfer": "ዝልወለወል መጠን",
+      "merchantLabel": "ነጋዳይ",
+      "shortcodeLabel": "ሓጸር ኮድ",
+      "amountLabel": "መጠን",
+      "copied": "ተቐዲሑ!",
+      "copy": "ቅድሕ",
+      "transactionReferenceNumber": "መወከሲ ቁጽሪ ግብዚ",
+      "telebirrTransactionId": "መለለዪ ግብዚ ተሌብር",
+      "verify": "ኣረጋግጽ",
+      "importantNotice": "መጀመርታ ክፍሊት ወድኡ፣ ድሕሪኡ ቁጽሪ ግብዚ ኣእትዉ። ምዝገባኹም ክፍሊት ምስ ተረጋገጸ እዩ ዝረጋገጽ።",
+      "transactionPlaceholderBank": "ንኣብነት፣ FT1234567890",
+      "transactionPlaceholderTelebirr": "ንኣብነት፣ TB123456789"
+    }
+  },
+  "errors": {
+    "generic": "ገለ ጸገም ኣጋጢሙ። በጃኹም እንደገና ፈትኑ።",
+    "networkError": "ጌጋ ኔትወርክ። በጃኹም መስመርኩም ኣረጋግጹ።",
+    "unauthorized": "ንምቕጻል በጃኹም ብመንነትኩም እተዉ።",
+    "forbidden": "ነዚ ተግባር ንምፍጻም ፍቓድ የብልኩምን።",
+    "notFound": "እቲ ዝተለመነ ሃብቲ ኣይተረኸበን።",
+    "validationFailed": "በጃኹም እተው ዝገበርኩምዎ ኣረጋግጹ እሞ እንደገና ፈትኑ።"
+  },
+  "auth": {
+    "loginTitle": "እንቋዕ ደሓን መጻእኩም",
+    "loginSubtitle": "ናብ ሕሳብ ROOSTAYኩም እተዉ",
+    "registerTitle": "ሕሳብ ፍጠሩ",
+    "registerSubtitle": "ኣብ ኢትዮጵያ ምዝገባ ንምጅማር ROOSTAY ተጸንበሩ",
+    "emailLabel": "ኢመይል",
+    "passwordLabel": "ፓስወርድ",
+    "firstNameLabel": "ሽም",
+    "lastNameLabel": "ሽም ኣቦ",
+    "phoneLabel": "ተሌፎን (ምርጫዊ)",
+    "phonePlaceholder": "0911223344",
+    "passwordHelperText": "እንተወሓደ 8 ፊደላት፣ 1 ዓቢ ፊደል፣ 1 ንእሽቶ ፊደል፣ 1 ቁጽሪ",
+    "signInButton": "እተዉ",
+    "createAccountButton": "ሕሳብ ፍጠሩ",
+    "noAccount": "ሕሳብ የብልኩምን?",
+    "hasAccount": "ሕሳብ ኣለኩም?",
+    "signUpLink": "ተመዝገቡ",
+    "signInLink": "እተዉ",
+    "loginFailed": "ምእታው ኣይተዓወተን",
+    "registrationFailed": "ምዝገባ ኣይተዓወተን",
+    "logoutFailed": "ምውጻእ ኣይተዓወተን"
+  },
+  "navigation": {
+    "browse": "ቃንዩ",
+    "search": "ድለዩ",
+    "becomeHost": "ኣአንጋዲ ኩኑ",
+    "dashboard": "ዳሽቦርድ",
+    "admin": "ኣስተዳዳሪ",
+    "myBookings": "ምዝገባታተይ",
+    "favorites": "ተፈተውቲ",
+    "myListings": "ዝርዝራተይ",
+    "bookings": "ምዝገባታት",
+    "profileSettings": "ምትእምማን ፕሮፋይል",
+    "logout": "ውጻእ",
+    "login": "እተዉ",
+    "signUp": "ተመዝገቡ"
+  },
+  "footer": {
+    "brandDescription": "ኣብ ኢትዮጵያ ፍጹም መቐመጢ ረኸቡ። ኣብ መላእ ሃገር ንሓጺርን ነዊሕን ግዘ ኪራይ።",
+    "copyright": "ROOSTAY። ኩሉ መሰላት ዝተሓለወ እዩ።",
+    "exploreHeading": "ዳህስሱ",
+    "hostHeading": "ኣአንጋዲ",
+    "supportHeading": "ደገፍ",
+    "browseListings": "ዝርዝራት ቃንዩ",
+    "listYourProperty": "ንብረትኩም ዘርዝሩ",
+    "hostDashboard": "ዳሽቦርድ ኣአንጋዲ",
+    "helpCenter": "ማእከል ሓገዝ",
+    "contactUs": "ርኸቡና",
+    "madeInEthiopia": "ኣብ ኢትዮጵያ ዝተሰርሐ"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "ዳሽቦርድ ኣስተዳዳሪ",
+      "subtitle": "ቅንይብ መድረኽን ምሕደራ ስርዓትን።"
+    },
+    "reports": {
+      "lastUpdated": "ናይ መወዳእታ ምሕዳስ"
+    }
+  }
+}
