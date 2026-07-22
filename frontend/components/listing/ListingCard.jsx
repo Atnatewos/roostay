@@ -7,25 +7,25 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Badge from '@/components/ui/Badge';
 import { apiClient } from '@/lib/api';
 import constants from '@/lib/constants';
 
-const PLACEHOLDER = '/assets/placeholders/placeholder-listing.svg';
+const PLACEHOLDER = '/images/placeholder-listing.svg';
 
 /**
  * Premium listing card with inline-critical sizing to guarantee consistency.
  * Card width, image aspect ratio, and spacing are enforced via inline styles
  * to override any legacy CSS conflicts across the platform.
  *
- * @param {Object}   props
- * @param {Object}   props.listing        - Listing data object
- * @param {boolean}  [props.showFavorite]  - Whether to show favorite heart
+ * @param {Object}    props
+ * @param {Object}    props.listing        - Listing data object
+ * @param {boolean}   [props.showFavorite] - Whether to show favorite heart
+ * @param {Function}  [props.onToggle]     - Optional callback when favorite state changes (listingId, isNowFavorited)
  */
-export default function ListingCard({
-  listing,
-  showFavorite = true,
-}) {
-  const [isFavorited, setIsFavorited] = useState(false);
+export default function ListingCard({ listing, showFavorite = true, onToggle }) {
+  // Default to true if the listing object explicitly says so, otherwise false
+  const [isFavorited, setIsFavorited] = useState(listing.isFavorited ?? false);
 
   // Resolve image with fallback chain
   const rawImageUrl = listing.primaryImage || listing.primary_image || listing.image_url;
@@ -54,13 +54,22 @@ export default function ListingCard({
   /**
    * Toggles favorite state for this listing.
    * Stops event propagation to prevent link navigation.
+   * Notifies parent component via onToggle callback if provided.
+   *
+   * @param {Event} e - Click event
    */
   async function handleFavoriteToggle(e) {
     e.preventDefault();
     e.stopPropagation();
+    
     try {
       await apiClient.post(`/favorites/${listing.id}`);
-      setIsFavorited((prev) => !prev);
+      const newState = !isFavorited;
+      setIsFavorited(newState);
+      
+      if (onToggle) {
+        onToggle(listing.id, newState);
+      }
     } catch (err) {
       console.error('Failed to toggle favorite:', err.message);
     }
@@ -124,6 +133,27 @@ export default function ListingCard({
             }}
           />
 
+          {/* Badges Overlay */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              display: 'flex',
+              gap: '6px',
+              zIndex: '2',
+            }}
+          >
+            <Badge variant={listingType === 'short_term' ? 'primary' : 'info'} size="sm">
+              {listingType === 'short_term' ? 'Short Stay' : 'Long Stay'}
+            </Badge>
+            {(listing.instantBook || listing.instant_book) && (
+              <Badge variant="success" size="sm">
+                Instant Book
+              </Badge>
+            )}
+          </div>
+
           {/* Favorite Heart Overlay */}
           {showFavorite && (
             <button
@@ -158,52 +188,9 @@ export default function ListingCard({
                 }}
               >
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
+                </svg>
             </button>
           )}
-
-          {/* Badges — only render if badges exist */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '12px',
-              left: '12px',
-              display: 'flex',
-              gap: '6px',
-              zIndex: '2',
-            }}
-          >
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '4px 10px',
-                fontSize: '12px',
-                fontWeight: '500',
-                borderRadius: '4px',
-                background: listingType === 'short_term' ? '#FFE4EC' : '#E6F0FE',
-                color: listingType === 'short_term' ? '#E41D56' : '#1E40AF',
-              }}
-            >
-              {listingType === 'short_term' ? 'Short Stay' : 'Long Stay'}
-            </span>
-            {(listing.instantBook || listing.instant_book) && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '4px 10px',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  borderRadius: '4px',
-                  background: '#E6F9F3',
-                  color: '#065F46',
-                }}
-              >
-                Instant Book
-              </span>
-            )}
-          </div>
         </div>
 
         {/* Content Below Image */}
@@ -263,7 +250,6 @@ export default function ListingCard({
               fontSize: '15px',
               fontWeight: '400',
               color: '#9CA3AF',
-              marginBottom: '2px',
               margin: '0 0 2px 0',
             }}
           >
@@ -276,7 +262,6 @@ export default function ListingCard({
               fontSize: '15px',
               fontWeight: '400',
               color: '#9CA3AF',
-              marginBottom: '2px',
               margin: '0 0 2px 0',
             }}
           >
@@ -289,7 +274,6 @@ export default function ListingCard({
             style={{
               fontSize: '15px',
               color: '#1A1A2E',
-              marginTop: '6px',
               margin: '6px 0 0 0',
             }}
           >

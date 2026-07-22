@@ -2,6 +2,7 @@
 // Homepage — Hero section, featured listings, and value proposition
 // All content strings are driven by content.config.json via useConfig()
 // Feature flags control visibility of sections
+// Uses premium listing grid for featured properties
 // Author: Theron
 'use client';
 
@@ -9,7 +10,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import Skeleton from '@/components/ui/Skeleton';
+import ListingCard from '@/components/listing/ListingCard';
 import useApi from '@/hooks/useApi';
 import useConfig from '@/hooks/useConfig';
 import { apiClient } from '@/lib/api';
@@ -20,6 +21,7 @@ import constants from '@/lib/constants';
  * Serves as the main landing page for ROOSTAY.
  * All text content is fetched from the centralized config system.
  * Feature flags control which sections are rendered.
+ * Featured listings use the premium card grid for a modern look.
  */
 export default function HomePage() {
   const { data: listingsData, isLoading, execute } = useApi();
@@ -111,7 +113,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Featured Listings Section */}
+        {/* Featured Listings Section — Premium Grid */}
         <section className="home-page__featured">
           <div className="container">
             <div className="home-page__section-header">
@@ -123,63 +125,40 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="listing-grid">
-              {isLoading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} type="card" />
-                ))
-              ) : featuredListings.length > 0 ? (
-                featuredListings.map((listing) => {
-                  const priceDisplay =
-                    listing.listingType === 'long_term'
-                      ? `${currencySymbol} ${listing.pricePerMonth?.toLocaleString()}/month`
-                      : `${currencySymbol} ${listing.pricePerNight?.toLocaleString()}/night`;
-
-                  return (
-                    <div key={listing.id} className="listing-card">
-                      <Link
-                        href={`${constants.ROUTES.LISTINGS}/${listing.id}`}
-                        className="listing-card__link"
-                      >
-                        <div className="listing-card__image-wrapper">
-                          <img
-                            src={
-                              listing.primaryImage ||
-                              '/images/placeholder-listing.svg'
-                            }
-                            alt={listing.title}
-                            className="listing-card__image"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="listing-card__content">
-                          <h3 className="listing-card__title">{listing.title}</h3>
-                          <p className="listing-card__location">{listing.city}</p>
-                          <div className="listing-card__footer">
-                            <span className="listing-card__price">
-                              <strong>{priceDisplay}</strong>
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
+            {/* Premium Listings Grid — responsive 4/3/2/1 columns */}
+            {isLoading ? (
+              <div className="premium-listings-grid">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="premium-skeleton">
+                    <div className="premium-skeleton__image" />
+                    <div className="premium-skeleton__content">
+                      <div className="premium-skeleton__line premium-skeleton__line--title" />
+                      <div className="premium-skeleton__line" />
+                      <div className="premium-skeleton__line premium-skeleton__line--short" />
                     </div>
-                  );
-                })
-              ) : (
-                <div className="listing-grid__empty">
-                  <p className="listing-grid__empty-text">
-                    {homepageContent.noListings ||
-                      'No listings available yet. Be the first to host!'}
-                  </p>
-                  <Link
-                    href={constants.ROUTES.HOST_LISTINGS_CREATE}
-                    className="btn btn--outline"
-                  >
-                    {homepageContent.createListing || 'Create a Listing'}
-                  </Link>
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : featuredListings.length > 0 ? (
+              <div className="premium-listings-grid">
+                {featuredListings.map((listing) => (
+                  <ListingCard key={listing.id} listing={listing} />
+                ))}
+              </div>
+            ) : (
+              <div className="premium-listings-empty">
+                <div className="premium-listings-empty__icon">🏠</div>
+                <h3 className="premium-listings-empty__title">
+                  {homepageContent.noListings || 'No listings available yet. Be the first to host!'}
+                </h3>
+                <Link
+                  href={constants.ROUTES.HOST_LISTINGS_CREATE}
+                  className="premium-btn premium-btn--primary"
+                >
+                  {homepageContent.createListing || 'Create a Listing'}
+                </Link>
+              </div>
+            )}
           </div>
         </section>
 

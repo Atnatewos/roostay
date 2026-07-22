@@ -1,0 +1,337 @@
+/* ==========================================================================
+   ROOSTAY Premium Search
+   Pill-shaped search bar with divider sections, category chips,
+   filter buttons, and search popover
+   ========================================================================== */
+
+/* ==========================================================================
+   MAIN SEARCH BAR — Pill Shape
+   ========================================================================== */
+
+.premium-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 40px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease;
+  overflow: hidden;
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.premium-search-bar:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.premium-search-bar--focused {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-color: var(--color-text);
+}
+
+/* Search Bar Sections */
+.premium-search-bar__section {
+  flex: 1;
+  position: relative;
+  padding: 0 24px;
+  cursor: pointer;
+  border-right: 1px solid var(--color-border-light);
+  transition: background-color 0.15s ease;
+}
+
+.premium-search-bar__section:last-child {
+  border-right: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  padding-right: 8px;
+  cursor: default;
+}
+
+.premium-search-bar__section:hover {
+  background-color: var(--color-bg-secondary);
+  border-radius: 40px;
+}
+
+/* Section Labels and Values */
+.premium-search-bar__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
+  padding-top: 12px;
+}
+
+.premium-search-bar__value {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-light);
+  padding-bottom: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.premium-search-bar__value--selected {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+/* Section — Where (Location) */
+.premium-search-bar__section--where {
+  flex: 1.5;
+}
+
+/* Section — Guests */
+.premium-search-bar__section--guests {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Search Button */
+.premium-search-bar__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--color-white);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.premium-search-bar__button:hover {
+  box-shadow: 0 4px 12px var(--color-primary-glow);
+  transform: scale(1.04);
+}
+
+.premium-search-bar__button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.premium-search-bar__button-text {
+  display: none;
+  font-size: 14px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* ==========================================================================
+   SEARCH BAR — Compact variant (header)
+   ========================================================================== */
+
+.premium-search-bar--compact {
+  max-width: 360px;
+  height: 48px;
+  margin: 0;
+  border-radius: 40px;
+}
+
+.premium-search-bar--compact .premium-search-bar__section {
+  padding: 0 16px;
+}
+
+.premium-search-bar--compact .premium-search-bar__label {
+  display: none;
+}
+
+.premium-search-bar--compact .premium-search-bar__value {
+  font-size: 14px;
+  padding: 0;
+  line-height: 48px;
+}
+
+.premium-search-bar--compact .premium-search-bar__button {
+  width: 32px;
+  height: 32px;
+}
+
+/* ==========================================================================
+   SEARCH BAR — Full variant (search page)
+   ========================================================================== */
+
+.premium-search-bar--full {
+  max-width: 100%;
+}
+
+.premium-search-bar--full .premium-search-bar__button {
+  width: auto;
+  height: auto;
+  padding: 12px 24px;
+  border-radius: 24px;
+  margin-right: 4px;
+}
+
+.premium-search-bar--full .premium-search-bar__button-text {
+  display: inline;
+}
+
+/* ==========================================================================
+   SEARCH POPOVER
+   ========================================================================== */
+
+.premium-search-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-bg-elevated);
+  border-radius: 32px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.14);
+  padding: 16px 32px;
+  z-index: var(--z-dropdown);
+  min-width: 300px;
+  animation: scaleIn 200ms var(--ease-out-expo);
+}
+
+.premium-search-popover__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 16px;
+}
+
+.premium-search-popover__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.premium-search-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.premium-search-popover__item:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.premium-search-popover__item-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   CATEGORY CHIPS
+   ========================================================================== */
+
+.premium-categories {
+  display: flex;
+  gap: 8px;
+  padding: 16px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.premium-categories::-webkit-scrollbar {
+  display: none;
+}
+
+.premium-category-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.premium-category-chip:hover {
+  color: var(--color-text);
+  border-bottom-color: var(--color-border);
+}
+
+.premium-category-chip--active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+  font-weight: 600;
+}
+
+.premium-category-chip__icon {
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.premium-category-chip:hover .premium-category-chip__icon,
+.premium-category-chip--active .premium-category-chip__icon {
+  opacity: 1;
+}
+
+.premium-category-chip__label {
+  font-size: 12px;
+}
+
+/* ==========================================================================
+   FILTER BUTTON
+   ========================================================================== */
+
+.premium-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.premium-filter-btn:hover {
+  border-color: var(--color-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.premium-filter-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.premium-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  flex-wrap: wrap;
+}

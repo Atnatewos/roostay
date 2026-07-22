@@ -1,22 +1,10 @@
 // frontend/components/listing/ListingGrid.jsx
-// Responsive grid layout for displaying listing cards
-// Adapts from 1 to 4 columns based on viewport width
+// Responsive grid layout for displaying premium listing cards
+// Uses explicit inline styles to guarantee grid layout
+import ListingCard from '@/components/listing/ListingCard';
+import Skeleton from '@/components/ui/Skeleton';
 
-const ListingCard = require('@components/listing/ListingCard').default;
-const Skeleton = require('@components/ui/Skeleton').default;
-
-/**
- * Responsive grid component for displaying listing cards.
- * Shows loading skeletons when data is being fetched.
- * Displays an empty state message when no listings are found.
- *
- * @param {Object} props
- * @param {Array} props.listings - Array of listing objects to display
- * @param {boolean} [props.isLoading=false] - Whether listings are being loaded
- * @param {string} [props.emptyMessage='No listings found.'] - Message when listings array is empty
- * @param {number} [props.skeletonCount=6] - Number of skeleton cards to show while loading
- */
-function ListingGrid({
+export default function ListingGrid({
   listings = [],
   isLoading = false,
   emptyMessage = 'No listings found.',
@@ -25,9 +13,20 @@ function ListingGrid({
   // Loading state
   if (isLoading) {
     return (
-      <div className="listing-grid">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '24px',
+      }}>
         {Array.from({ length: skeletonCount }).map((_, index) => (
-          <Skeleton key={index} type="card" />
+          <div key={index} className="premium-skeleton">
+            <div className="premium-skeleton__image" />
+            <div className="premium-skeleton__content">
+              <div className="premium-skeleton__line premium-skeleton__line--title" />
+              <div className="premium-skeleton__line" />
+              <div className="premium-skeleton__line premium-skeleton__line--short" />
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -36,26 +35,34 @@ function ListingGrid({
   // Empty state
   if (!listings || listings.length === 0) {
     return (
-      <div className="listing-grid__empty">
-        <div className="listing-grid__empty-icon">
-          <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
-        </div>
-        <p className="listing-grid__empty-text">{emptyMessage}</p>
+      <div className="premium-listings-empty">
+        <div className="premium-listings-empty__icon">🏠</div>
+        <h3 className="premium-listings-empty__title">No listings found</h3>
+        <p className="premium-listings-empty__text">{emptyMessage}</p>
       </div>
     );
   }
 
-  // Listings grid
+  // Listings grid - with EXPLICIT inline styles to guarantee grid layout
   return (
-    <div className="listing-grid">
+    <div 
+      className="premium-listings-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '24px',
+        width: '100%',
+      }}
+    >
       {listings.map((listing) => (
-        <ListingCard key={listing.id} listing={listing} />
+        <ListingCard
+          key={listing.id}
+          listing={listing}
+          showFavorite={true}
+          imageCount={listing.images?.length || 1}
+          activeImage={0}
+        />
       ))}
     </div>
   );
 }
-
-module.exports = ListingGrid;

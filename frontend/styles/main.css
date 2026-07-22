@@ -1,8 +1,8 @@
 /* ==========================================================================
    ROOSTAY Master Stylesheet
-   Trillion-dollar design system — centralized, animated, modern
-   Cascade order: Tokens → Reset → Design System → Components → 
-                  Animations → Layout → Admin → Pages → Responsive
+   Premium design system — modern, animated, scalable
+   Cascade order: Tokens → Reset → Design System → Components →
+                  Animations → Premium → Layout → Admin → Pages → Responsive
    ========================================================================== */
 
 /* 1. Design Tokens — CSS Custom Properties */
@@ -23,14 +23,26 @@
 /* 6. Animations — Micro-interactions, scroll reveals, effects */
 @import './animations.css';
 
-/* 7. Layout Styles — Header, Footer, Sidebar, Grids */
+/* 7. Premium Design Patterns — Typography, surfaces, components */
+@import './premium.css';
+
+/* 8. Premium Listing Cards — Card styles for property listings */
+@import './premium-listings.css';
+
+/* 9. Premium Search — Pill search bar with category chips */
+@import './premium-search.css';
+
+/* 10. Premium Listing Detail — Two-column layout, sticky booking */
+@import './premium-detail.css';
+
+/* 11. Layout Styles — Header, Footer, Sidebar, Grids */
 @import './layout.css';
 
-/* 8. Admin Styles — Admin panel specific */
+/* 12. Admin Styles — Admin panel specific */
 @import './admin.css';
 
-/* 9. Page Styles — Page-specific styles */
+/* 13. Page Styles — Page-specific styles */
 @import './pages.css';
 
-/* 10. Responsive Design — Mobile-first media queries */
+/* 14. Responsive Design — Mobile-first media queries */
 @import './responsive.css';
