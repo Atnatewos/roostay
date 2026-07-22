@@ -2,7 +2,8 @@
 // Payment-first booking modal with countdown timer starting immediately
 // Displays bank/Telebirr details FIRST, then collects transaction number
 // Validates transaction uniqueness before final booking submission
-// All user-facing strings are driven by constants.BOOKING_CONFIG.MESSAGES
+// All user-facing strings are driven by the config system via useConfig()
+// Telebirr option is gated behind the "telebirr.enabled" feature flag
 // Author: Theron
 
 'use client';
@@ -13,12 +14,8 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import CountdownTimer from '@/components/ui/CountdownTimer';
 import PriceBreakdown from '@/components/booking/PriceBreakdown';
+import useConfig from '@/hooks/useConfig';
 import { apiClient, ApiError } from '@/lib/api';
-import constants from '@/lib/constants';
-
-// Destructure booking config for cleaner access
-const { BOOKING_CONFIG } = constants;
-const { MESSAGES, BANK_TRANSFER, TELEBIRR } = BOOKING_CONFIG;
 
 /**
  * Booking Payment Modal
@@ -36,7 +33,7 @@ const { MESSAGES, BANK_TRANSFER, TELEBIRR } = BOOKING_CONFIG;
  * @param {boolean}  props.isOpen            - Whether the modal is visible
  * @param {Function} props.onClose           - Callback to close the modal
  * @param {Object}   props.listing           - Full listing data object
- * @param {Object}   props.bookingData       - Booking details { checkInDate, checkOutDate, guestCount, bookingType }
+ * @param {Object}   props.bookingData       - Booking details
  * @param {Object}   props.pricing           - Calculated pricing breakdown
  * @param {Function} props.onBookingComplete - Callback after successful booking creation
  */
@@ -48,6 +45,25 @@ export default function BookingPaymentModal({
   pricing,
   onBookingComplete,
 }) {
+  // =========================================================================
+  // CONFIG — All payment config, messages, and feature flags
+  // =========================================================================
+  const { payment, booking, pricing: pricingConfig, isEnabled } = useConfig();
+
+  // Derive messages from config, falling back to booking config if needed
+  const messages = booking?.messages || {};
+  const bankTransferConfig = payment?.bankTransfer || {};
+  const telebirrConfig = payment?.telebirr || {};
+
+  // Feature flag: is Telebirr enabled?
+  const telebirrEnabled = isEnabled('telebirr.enabled');
+
+  // Payment timeout from config
+  const paymentTimeoutMinutes =
+    payment?.paymentTimeoutMinutes ||
+    pricingConfig?.payment?.paymentTimeoutMinutes ||
+    30;
+
   // =========================================================================
   // STATE MANAGEMENT
   // =========================================================================
@@ -65,7 +81,7 @@ export default function BookingPaymentModal({
 
   /**
    * Resets all form state and starts the countdown timer when modal opens.
-   * The timer duration is driven by BOOKING_CONFIG.PAYMENT_TIMEOUT_MINUTES.
+   * The timer duration is driven by config.
    */
   useEffect(() => {
     if (isOpen) {
@@ -78,18 +94,20 @@ export default function BookingPaymentModal({
       setBookingResult(null);
       setIsSubmitting(false);
 
-      // Start the countdown timer IMMEDIATELY using config-driven timeout
-      const timeoutMinutes = BOOKING_CONFIG.PAYMENT_TIMEOUT_MINUTES;
-      const expiryTime = new Date(Date.now() + timeoutMinutes * 60 * 1000);
+      const expiryTime = new Date(
+        Date.now() + paymentTimeoutMinutes * 60 * 1000
+      );
       setPaymentExpiresAt(expiryTime);
     } else {
       setPaymentExpiresAt(null);
     }
-  }, [isOpen]);
+  }, [isOpen, paymentTimeoutMinutes]);
 
   /**
    * Handles payment method selection.
    * Resets transaction validation when switching methods.
+   *
+   * @param {string} method - The selected payment method
    */
   function handleMethodChange(method) {
     setPaymentMethod(method);
@@ -100,6 +118,8 @@ export default function BookingPaymentModal({
   /**
    * Handles transaction number input changes.
    * Clears previous validation state when the user edits the number.
+   *
+   * @param {Event} e - Input change event
    */
   function handleTransactionChange(e) {
     setTransactionNumber(e.target.value);
@@ -113,7 +133,9 @@ export default function BookingPaymentModal({
    */
   async function handleValidateTransaction() {
     if (!transactionNumber || transactionNumber.trim().length < 3) {
-      setTransactionError(MESSAGES.TRANSACTION_REQUIRED);
+      setTransactionError(
+        messages.transactionRequired || 'Please enter a valid transaction reference number.'
+      );
       setIsTransactionValid(false);
       return;
     }
@@ -132,7 +154,9 @@ export default function BookingPaymentModal({
       } else {
         setIsTransactionValid(false);
         setTransactionError(
-          response?.data?.message || MESSAGES.TRANSACTION_INVALID
+          response?.data?.message ||
+            messages.transactionInvalid ||
+            'This transaction number has already been used.'
         );
       }
     } catch (err) {
@@ -140,7 +164,9 @@ export default function BookingPaymentModal({
       if (err instanceof ApiError) {
         setTransactionError(err.message);
       } else {
-        setTransactionError(MESSAGES.VALIDATION_FAILED);
+        setTransactionError(
+          messages.validationFailed || 'Failed to validate transaction number. Please try again.'
+        );
       }
     } finally {
       setIsValidatingTransaction(false);
@@ -153,12 +179,16 @@ export default function BookingPaymentModal({
    */
   async function handleSubmitBooking() {
     if (!transactionNumber || transactionNumber.trim().length < 3) {
-      setTransactionError(MESSAGES.TRANSACTION_REQUIRED);
+      setTransactionError(
+        messages.transactionRequired || 'Please enter a valid transaction reference number.'
+      );
       return;
     }
 
     if (!isTransactionValid) {
-      setTransactionError(MESSAGES.TRANSACTION_MUST_VERIFY);
+      setTransactionError(
+        messages.transactionMustVerify || 'Please verify your transaction number before submitting.'
+      );
       return;
     }
 
@@ -187,7 +217,9 @@ export default function BookingPaymentModal({
       if (err instanceof ApiError) {
         setSubmitError(err.message);
       } else {
-        setSubmitError(MESSAGES.BOOKING_FAILED);
+        setSubmitError(
+          messages.bookingFailed || 'Failed to create booking. Please try again.'
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -196,7 +228,9 @@ export default function BookingPaymentModal({
 
   /**
    * Copies text to the clipboard with fallback for older browsers.
-   * Shows a temporary confirmation state on the copied button.
+   *
+   * @param {string} text  - Text to copy
+   * @param {string} field - Field identifier for feedback
    */
   async function copyToClipboard(text, field) {
     try {
@@ -219,13 +253,17 @@ export default function BookingPaymentModal({
 
   /**
    * Handles the countdown expiry.
-   * Shows an error message if the booking hasn't been created yet.
    */
   function handleCountdownExpire() {
     if (!bookingResult) {
-      setSubmitError(MESSAGES.PAYMENT_EXPIRED);
+      setSubmitError(
+        messages.paymentExpired || 'Payment window has expired. Please close this modal and try again.'
+      );
     }
   }
+
+  // Currency symbol from config
+  const currencySymbol = payment?.currencySymbol || 'Br';
 
   // =========================================================================
   // RENDER
@@ -234,17 +272,19 @@ export default function BookingPaymentModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={bookingResult ? MESSAGES.BOOKING_CREATED : 'Complete Your Booking'}
+      title={
+        bookingResult
+          ? messages.bookingCreated || 'Booking Created Successfully!'
+          : 'Complete Your Booking'
+      }
       size="md"
       closeOnOverlay={!isSubmitting}
     >
       {/* =====================================================================
-          SUCCESS STATE — Simplified congratulations view
-          No redundant payment instructions — just confirmation and reference
+          SUCCESS STATE
           ===================================================================== */}
       {bookingResult ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Success Icon and Message */}
           <div
             style={{
               padding: '2rem 1.25rem',
@@ -262,7 +302,7 @@ export default function BookingPaymentModal({
                 marginBottom: '0.5rem',
               }}
             >
-              {MESSAGES.BOOKING_CREATED}
+              {messages.bookingCreated || 'Booking Created Successfully!'}
             </p>
             <p
               style={{
@@ -273,11 +313,11 @@ export default function BookingPaymentModal({
                 margin: '0 auto',
               }}
             >
-              {MESSAGES.BOOKING_AWAITING_CONFIRMATION}
+              {messages.bookingAwaitingConfirmation ||
+                'Your booking has been submitted and is awaiting confirmation.'}
             </p>
           </div>
 
-          {/* Booking Reference */}
           <div
             style={{
               padding: '1rem',
@@ -295,7 +335,7 @@ export default function BookingPaymentModal({
                 letterSpacing: '0.05em',
               }}
             >
-              {MESSAGES.BOOKING_REFERENCE_LABEL}
+              {messages.bookingReferenceLabel || 'Booking Reference'}
             </p>
             <p
               style={{
@@ -309,18 +349,16 @@ export default function BookingPaymentModal({
             </p>
           </div>
 
-          {/* Close Button */}
           <Button variant="primary" fullWidth onClick={onClose}>
-            {MESSAGES.VIEW_MY_BOOKINGS}
+            {messages.viewMyBookings || 'View My Bookings'}
           </Button>
         </div>
       ) : (
         /* ===================================================================
-            FORM STATE — Countdown timer, payment details, and transaction input
-            Timer starts IMMEDIATELY when modal opens
+            FORM STATE
             =================================================================== */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Countdown Timer — STARTS IMMEDIATELY */}
+          {/* Countdown Timer */}
           {paymentExpiresAt && (
             <div>
               <p
@@ -330,7 +368,7 @@ export default function BookingPaymentModal({
                   marginBottom: '0.5rem',
                 }}
               >
-                {MESSAGES.COMPLETE_PAYMENT_WITHIN}
+                {messages.completePaymentWithin || 'Complete your payment within:'}
               </p>
               <CountdownTimer
                 expiresAt={paymentExpiresAt}
@@ -349,7 +387,7 @@ export default function BookingPaymentModal({
             />
           )}
 
-          {/* Payment Method Selection */}
+          {/* Payment Method Selection — Telebirr gated by feature flag */}
           <div>
             <p
               style={{
@@ -358,15 +396,15 @@ export default function BookingPaymentModal({
                 marginBottom: '0.75rem',
               }}
             >
-              {MESSAGES.SELECT_PAYMENT_METHOD}
+              {messages.selectPaymentMethod || 'Select Payment Method'}
             </p>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              {/* Bank Transfer Option */}
+              {/* Bank Transfer — always available */}
               <button
                 type="button"
                 onClick={() => handleMethodChange('bank_transfer')}
                 style={{
-                  flex: 1,
+                  flex: telebirrEnabled ? 1 : 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -391,47 +429,49 @@ export default function BookingPaymentModal({
                   <line x1="2" y1="10" x2="22" y2="10" />
                 </svg>
                 <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
-                  {MESSAGES.BANK_TRANSFER}
+                  {messages.bankTransfer || 'Bank Transfer'}
                 </span>
               </button>
 
-              {/* Telebirr Option */}
-              <button
-                type="button"
-                onClick={() => handleMethodChange('telebirr')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '1rem',
-                  border: '2px solid',
-                  borderColor:
-                    paymentMethod === 'telebirr'
-                      ? 'var(--color-primary)'
-                      : 'var(--color-border)',
-                  borderRadius: 'var(--radius-lg)',
-                  cursor: 'pointer',
-                  transition: 'all 150ms ease',
-                  backgroundColor:
-                    paymentMethod === 'telebirr'
-                      ? 'var(--color-primary-light)'
-                      : 'transparent',
-                }}
-              >
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-                  <line x1="1" y1="10" x2="23" y2="10" />
-                </svg>
-                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
-                  {MESSAGES.TELEBIRR}
-                </span>
-              </button>
+              {/* Telebirr — only shown when feature flag is enabled */}
+              {telebirrEnabled && (
+                <button
+                  type="button"
+                  onClick={() => handleMethodChange('telebirr')}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '1rem',
+                    border: '2px solid',
+                    borderColor:
+                      paymentMethod === 'telebirr'
+                        ? 'var(--color-primary)'
+                        : 'var(--color-border)',
+                    borderRadius: 'var(--radius-lg)',
+                    cursor: 'pointer',
+                    transition: 'all 150ms ease',
+                    backgroundColor:
+                      paymentMethod === 'telebirr'
+                        ? 'var(--color-primary-light)'
+                        : 'transparent',
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                    <line x1="1" y1="10" x2="23" y2="10" />
+                  </svg>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+                    {messages.telebirr || 'Telebirr'}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Payment Details — Config-driven bank/Telebirr info */}
+          {/* Payment Details */}
           <div
             style={{
               padding: '1rem',
@@ -443,22 +483,28 @@ export default function BookingPaymentModal({
             {paymentMethod === 'bank_transfer' ? (
               <>
                 <p style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: '0.75rem' }}>
-                  {MESSAGES.BANK_TRANSFER_DETAILS}
+                  {messages.bankTransferDetails || 'Bank Transfer Details'}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.BANK_LABEL}</span>
-                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{BANK_TRANSFER.BANK_NAME}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.bankLabel || 'Bank'}
+                    </span>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>
+                      {bankTransferConfig.bankName || 'N/A'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.ACCOUNT_NUMBER_LABEL}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.accountNumberLabel || 'Account Number'}
+                    </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontWeight: 'var(--font-weight-medium)', fontFamily: 'var(--font-family-mono)' }}>
-                        {BANK_TRANSFER.ACCOUNT_NUMBER}
+                        {bankTransferConfig.accountNumber || 'N/A'}
                       </span>
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(BANK_TRANSFER.ACCOUNT_NUMBER, 'account')}
+                        onClick={() => copyToClipboard(bankTransferConfig.accountNumber, 'account')}
                         style={{
                           padding: '2px 6px',
                           fontSize: 'var(--font-size-xs)',
@@ -469,13 +515,17 @@ export default function BookingPaymentModal({
                           fontWeight: 'var(--font-weight-medium)',
                         }}
                       >
-                        {copiedField === 'account' ? MESSAGES.COPIED : MESSAGES.COPY}
+                        {copiedField === 'account' ? (messages.copied || 'Copied!') : (messages.copy || 'Copy')}
                       </button>
                     </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.ACCOUNT_HOLDER_LABEL}</span>
-                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{BANK_TRANSFER.ACCOUNT_HOLDER}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.accountHolderLabel || 'Account Holder'}
+                    </span>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>
+                      {bankTransferConfig.accountHolder || 'N/A'}
+                    </span>
                   </div>
                   <div
                     style={{
@@ -486,9 +536,17 @@ export default function BookingPaymentModal({
                       borderTop: '1px solid var(--color-border-light)',
                     }}
                   >
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.AMOUNT_TO_TRANSFER}</span>
-                    <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-lg)', color: 'var(--color-primary)' }}>
-                      {constants.CURRENCY_SYMBOL} {Number(pricing?.totalAmount || 0).toLocaleString()}
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.amountToTransfer || 'Amount to Transfer'}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 'var(--font-weight-bold)',
+                        fontSize: 'var(--font-size-lg)',
+                        color: 'var(--color-primary)',
+                      }}
+                    >
+                      {currencySymbol} {Number(pricing?.totalAmount || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -496,22 +554,28 @@ export default function BookingPaymentModal({
             ) : (
               <>
                 <p style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: '0.75rem' }}>
-                  {MESSAGES.TELEBIRR_DETAILS}
+                  {messages.telebirrDetails || 'Telebirr Payment Details'}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.MERCHANT_LABEL}</span>
-                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{TELEBIRR.MERCHANT_NAME}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.merchantLabel || 'Merchant'}
+                    </span>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)' }}>
+                      {telebirrConfig.merchantName || 'N/A'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.SHORTCODE_LABEL}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.shortcodeLabel || 'Shortcode'}
+                    </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontWeight: 'var(--font-weight-medium)', fontFamily: 'var(--font-family-mono)' }}>
-                        {TELEBIRR.SHORTCODE}
+                        {telebirrConfig.shortcode || 'N/A'}
                       </span>
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(TELEBIRR.SHORTCODE, 'shortcode')}
+                        onClick={() => copyToClipboard(telebirrConfig.shortcode, 'shortcode')}
                         style={{
                           padding: '2px 6px',
                           fontSize: 'var(--font-size-xs)',
@@ -522,7 +586,7 @@ export default function BookingPaymentModal({
                           fontWeight: 'var(--font-weight-medium)',
                         }}
                       >
-                        {copiedField === 'shortcode' ? MESSAGES.COPIED : MESSAGES.COPY}
+                        {copiedField === 'shortcode' ? (messages.copied || 'Copied!') : (messages.copy || 'Copy')}
                       </button>
                     </div>
                   </div>
@@ -535,9 +599,17 @@ export default function BookingPaymentModal({
                       borderTop: '1px solid var(--color-border-light)',
                     }}
                   >
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{MESSAGES.AMOUNT_LABEL}</span>
-                    <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-lg)', color: 'var(--color-primary)' }}>
-                      {constants.CURRENCY_SYMBOL} {Number(pricing?.totalAmount || 0).toLocaleString()}
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      {messages.amountLabel || 'Amount'}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 'var(--font-weight-bold)',
+                        fontSize: 'var(--font-size-lg)',
+                        color: 'var(--color-primary)',
+                      }}
+                    >
+                      {currencySymbol} {Number(pricing?.totalAmount || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -549,11 +621,11 @@ export default function BookingPaymentModal({
           <div>
             <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: '0.5rem' }}>
               {paymentMethod === 'bank_transfer'
-                ? MESSAGES.TRANSACTION_REFERENCE_NUMBER
-                : MESSAGES.TELEBIRR_TRANSACTION_ID}
+                ? messages.transactionReferenceNumber || 'Transaction Reference Number'
+                : messages.telebirrTransactionId || 'Telebirr Transaction ID'}
             </p>
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-light)', marginBottom: '0.75rem' }}>
-              {MESSAGES.ENTER_TRANSACTION_HINT}
+              {messages.enterTransactionHint || 'After sending payment, enter the reference number from your confirmation SMS.'}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <div style={{ flex: 1 }}>
@@ -563,8 +635,8 @@ export default function BookingPaymentModal({
                   onChange={handleTransactionChange}
                   placeholder={
                     paymentMethod === 'bank_transfer'
-                      ? MESSAGES.TRANSACTION_PLACEHOLDER_BANK
-                      : MESSAGES.TRANSACTION_PLACEHOLDER_TELEBIRR
+                      ? messages.transactionPlaceholderBank || 'e.g., FT1234567890'
+                      : messages.transactionPlaceholderTelebirr || 'e.g., TB123456789'
                   }
                   error={transactionError}
                   disabled={isSubmitting}
@@ -575,13 +647,16 @@ export default function BookingPaymentModal({
                 size="md"
                 onClick={handleValidateTransaction}
                 isLoading={isValidatingTransaction}
-                disabled={!transactionNumber || transactionNumber.trim().length < 3 || isSubmitting}
+                disabled={
+                  !transactionNumber ||
+                  transactionNumber.trim().length < 3 ||
+                  isSubmitting
+                }
               >
-                {MESSAGES.VERIFY}
+                {messages.verify || 'Verify'}
               </Button>
             </div>
 
-            {/* Transaction Validation Feedback */}
             {isTransactionValid && (
               <p
                 style={{
@@ -593,7 +668,7 @@ export default function BookingPaymentModal({
                   gap: '0.25rem',
                 }}
               >
-                ✓ {MESSAGES.TRANSACTION_VERIFIED}
+                ✓ {messages.transactionVerified || 'Transaction number verified — not previously used.'}
               </p>
             )}
           </div>
@@ -603,10 +678,10 @@ export default function BookingPaymentModal({
             <Input
               id="proofNotes"
               type="textarea"
-              label={MESSAGES.ADDITIONAL_NOTES_LABEL}
+              label={messages.additionalNotesLabel || 'Additional Notes (optional)'}
               value={proofNotes}
               onChange={(e) => setProofNotes(e.target.value)}
-              placeholder={MESSAGES.ADDITIONAL_NOTES_PLACEHOLDER}
+              placeholder={messages.additionalNotesPlaceholder || 'Any additional information about your payment...'}
               disabled={isSubmitting}
             />
           </div>
@@ -643,7 +718,10 @@ export default function BookingPaymentModal({
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-            <span>{MESSAGES.IMPORTANT_NOTICE}</span>
+            <span>
+              {messages.importantNotice ||
+                'Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.'}
+            </span>
           </div>
 
           {/* Action Buttons */}
@@ -654,7 +732,7 @@ export default function BookingPaymentModal({
               disabled={isSubmitting}
               style={{ flex: 1 }}
             >
-              {MESSAGES.CANCEL}
+              {messages.cancel || 'Cancel'}
             </Button>
             <Button
               variant="primary"
@@ -664,7 +742,7 @@ export default function BookingPaymentModal({
               disabled={!isTransactionValid || isSubmitting}
               style={{ flex: 2 }}
             >
-              {MESSAGES.SUBMIT_AND_BOOK}
+              {messages.submitAndBook || 'Submit & Book'}
             </Button>
           </div>
         </div>

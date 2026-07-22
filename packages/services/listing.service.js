@@ -2,6 +2,7 @@
 // Listing service - handles property listing CRUD and search
 // Supports short-term, long-term, and dual listing types
 // All queries use parameterized statements for security
+// Feature flags control listing approval workflow via config
 
 const { query, queryOne } = require('../database');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/errors');
@@ -17,6 +18,7 @@ try {
       maxImagesPerListing: 15,
       paginationDefaultLimit: 12,
       paginationMaxLimit: 50,
+      listingApprovalRequired: false,
     },
   };
 }
@@ -25,13 +27,14 @@ const listingService = {
   /**
    * Creates a new property listing.
    * Validates listing type and sets pricing fields accordingly.
+   * Uses the listingApprovalRequired feature flag to determine initial approval state.
    *
-   * @param {string} hostId - The host user ID
+   * @param {string} hostId      - The host user ID
    * @param {Object} listingData - Listing details
    * @returns {Promise<Object>} Created listing
    */
   async createListing(hostId, listingData) {
-    // Check host listing limit
+    // Check host listing limit from config
     const hostListingCount = await queryOne(
       'SELECT COUNT(*) as count FROM listings WHERE host_id = $1',
       [hostId]
@@ -45,16 +48,35 @@ const listingService = {
     }
 
     const {
-      title, description, listingType, propertyType,
-      bedrooms, bathrooms, maxGuests, bedsCount,
-      pricePerNight, pricePerMonth,
-      cleaningFee, securityDeposit,
-      weeklyDiscountPercent, monthlyDiscountPercent,
-      streetAddress, city, region, subcity, wereda,
-      latitude, longitude, nearbyLandmarks,
-      instantBook, minNights, maxNights,
-      checkInTime, checkOutTime,
-      houseRules, cancellationPolicy,
+      title,
+      description,
+      listingType,
+      propertyType,
+      bedrooms,
+      bathrooms,
+      maxGuests,
+      bedsCount,
+      pricePerNight,
+      pricePerMonth,
+      cleaningFee,
+      securityDeposit,
+      weeklyDiscountPercent,
+      monthlyDiscountPercent,
+      streetAddress,
+      city,
+      region,
+      subcity,
+      wereda,
+      latitude,
+      longitude,
+      nearbyLandmarks,
+      instantBook,
+      minNights,
+      maxNights,
+      checkInTime,
+      checkOutTime,
+      houseRules,
+      cancellationPolicy,
       amenities,
     } = listingData;
 
@@ -66,6 +88,11 @@ const listingService = {
     if ((listingType === 'long_term' || listingType === 'both') && !pricePerMonth) {
       throw new ValidationError('Price per month is required for long-term listings.');
     }
+
+    // Determine approval state based on feature flag
+    const approvalRequired = config.features.listingApprovalRequired !== false;
+    const isApproved = approvalRequired ? false : true;
+    const approvalStatus = approvalRequired ? 'pending' : 'approved';
 
     const listing = await queryOne(
       `INSERT INTO listings (
@@ -124,16 +151,19 @@ const listingService = {
         checkOutTime || '11:00',
         houseRules || null,
         cancellationPolicy || 'flexible',
-        config.features.listingApprovalRequired ? false : true,
-        config.features.listingApprovalRequired ? 'pending' : 'approved',
+        isApproved,
+        approvalStatus,
       ]
     );
 
     // Insert amenities if provided
     if (amenities && Array.isArray(amenities) && amenities.length > 0) {
-      const amenityValues = amenities.map((a, index) =>
-        `($1, $${index * 3 + 2}, $${index * 3 + 3}, $${index * 3 + 4})`
-      ).join(', ');
+      const amenityValues = amenities
+        .map(
+          (a, index) =>
+            `($1, $${index * 3 + 2}, $${index * 3 + 3}, $${index * 3 + 4})`
+        )
+        .join(', ');
 
       const amenityParams = [listing.id];
       amenities.forEach((a) => {
@@ -152,6 +182,7 @@ const listingService = {
       hostId,
       listingType,
       city,
+      approvalStatus,
     });
 
     return listing;
@@ -346,7 +377,13 @@ const listingService = {
     }
 
     // Validate sort field to prevent SQL injection
-    const allowedSortFields = ['created_at', 'price_per_night', 'price_per_month', 'view_count', 'bedrooms'];
+    const allowedSortFields = [
+      'created_at',
+      'price_per_night',
+      'price_per_month',
+      'view_count',
+      'bedrooms',
+    ];
     const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
     const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
@@ -428,15 +465,12 @@ const listingService = {
    * Updates a listing. Only the owner can update.
    *
    * @param {string} listingId - The listing ID
-   * @param {string} hostId - The host user ID
-   * @param {Object} updates - Fields to update
+   * @param {string} hostId    - The host user ID
+   * @param {Object} updates   - Fields to update
    * @returns {Promise<Object>} Updated listing
    */
   async updateListing(listingId, hostId, updates) {
-    const listing = await queryOne(
-      'SELECT * FROM listings WHERE id = $1',
-      [listingId]
-    );
+    const listing = await queryOne('SELECT * FROM listings WHERE id = $1', [listingId]);
 
     if (!listing) {
       throw new NotFoundError('Listing not found.');
@@ -513,14 +547,11 @@ const listingService = {
    * Deletes a listing. Only the owner or admin can delete.
    *
    * @param {string} listingId - The listing ID
-   * @param {string} userId - The requesting user ID
-   * @param {string} userRole - The requesting user role
+   * @param {string} userId    - The requesting user ID
+   * @param {string} userRole  - The requesting user role
    */
   async deleteListing(listingId, userId, userRole) {
-    const listing = await queryOne(
-      'SELECT host_id FROM listings WHERE id = $1',
-      [listingId]
-    );
+    const listing = await queryOne('SELECT host_id FROM listings WHERE id = $1', [listingId]);
 
     if (!listing) {
       throw new NotFoundError('Listing not found.');
@@ -538,7 +569,7 @@ const listingService = {
   /**
    * Gets all listings for a specific host.
    *
-   * @param {string} hostId - The host user ID
+   * @param {string} hostId  - The host user ID
    * @param {Object} options - Pagination options
    * @returns {Promise<Object>} Paginated host listings
    */

@@ -1,39 +1,74 @@
-import Link from 'next/link';
-import constants from '@/lib/constants';
+// frontend/components/layout/Footer.jsx
+// Site-wide footer with config-driven navigation columns
+// All links and text come from content.config.json and navigation.config.json
+// Zero hardcoded values — fully configurable per environment
+// Author: Theron
+'use client';
 
+import Link from 'next/link';
+import useConfig from '@/hooks/useConfig';
+
+/**
+ * Footer Component
+ * Renders the site footer with dynamic navigation columns.
+ * All content strings are fetched from the centralized config system.
+ * Navigation structure is driven by navigation.config.json.
+ */
 export default function Footer() {
+  const { navigation, content, app } = useConfig();
   const year = new Date().getFullYear();
+
+  // Load footer columns from navigation config
+  const footerColumns = navigation?.footer?.columns || [];
+
+  // Load footer content strings from content config
+  const footerContent = content?.footer || {};
+
   return (
     <footer className="footer">
       <div className="container footer__container">
+        {/* Brand Column */}
         <div className="footer__column footer__column--brand">
-          <Link href="/" className="footer__logo"><span className="footer__logo-text">ROOSTAY</span></Link>
-          <p className="footer__description">Find your perfect stay in Ethiopia. Short-term getaways and long-term rentals across the country.</p>
-          <p className="footer__copyright">&copy; {year} ROOSTAY. All rights reserved.</p>
+          <Link href="/" className="footer__logo">
+            <span className="footer__logo-text">
+              {app?.name || 'ROOSTAY'}
+            </span>
+          </Link>
+          <p className="footer__description">
+            {footerContent.brandDescription || 'Find your perfect stay in Ethiopia.'}
+          </p>
+          <p className="footer__copyright">
+            &copy; {year} {footerContent.copyright || 'ROOSTAY. All rights reserved.'}
+          </p>
         </div>
-        <div className="footer__column">
-          <h3 className="footer__heading">Explore</h3>
-          <ul className="footer__links">
-            <li><Link href="/listings" className="footer__link">Browse Listings</Link></li>
-            <li><Link href="/search" className="footer__link">Search</Link></li>
-          </ul>
-        </div>
-        <div className="footer__column">
-          <h3 className="footer__heading">Host</h3>
-          <ul className="footer__links">
-            <li><Link href="/host/listings/create" className="footer__link">List Your Property</Link></li>
-            <li><Link href="/host/dashboard" className="footer__link">Host Dashboard</Link></li>
-          </ul>
-        </div>
-        <div className="footer__column">
-          <h3 className="footer__heading">Support</h3>
-          <ul className="footer__links">
-            <li><Link href="/help" className="footer__link">Help Center</Link></li>
-            <li><Link href="/contact" className="footer__link">Contact Us</Link></li>
-          </ul>
+
+        {/* Dynamic Navigation Columns — driven by config */}
+        {footerColumns.map((column, index) => (
+          <div key={index} className="footer__column">
+            <h3 className="footer__heading">
+              {column.heading || ''}
+            </h3>
+            <ul className="footer__links">
+              {column.links.map((link, linkIndex) => (
+                <li key={linkIndex}>
+                  <Link href={link.href} className="footer__link">
+                    {link.label || link.key}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="footer__bottom">
+        <div className="container">
+          <p className="footer__bottom-text">
+            {footerContent.madeInEthiopia || 'Powered By SoDar!'}
+          </p>
         </div>
       </div>
-      <div className="footer__bottom"><div className="container"><p className="footer__bottom-text">Made for Ethiopia</p></div></div>
     </footer>
   );
 }

@@ -2,7 +2,7 @@
 // Booking sidebar card for listing detail pages
 // Integrates the payment-first flow — opens BookingPaymentModal on "Book Now"
 // Combines date picker, guest selector, price breakdown, and payment modal
-// Fetches blocked dates from API and shows unavailable date messaging
+// Pricing calculations use centralized config via useConfig() — zero hardcoded values
 // Prevents hosts from booking their own listings
 // Author: Theron
 'use client';
@@ -16,16 +16,18 @@ import PriceBreakdown from '@/components/booking/PriceBreakdown';
 import BookingPaymentModal from '@/components/booking/BookingPaymentModal';
 import Button from '@/components/ui/Button';
 import useAuth from '@/hooks/useAuth';
+import useConfig from '@/hooks/useConfig';
 import { apiClient } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
  * Booking Card Component
  * Provides the complete booking flow on listing detail pages.
- * 
+ * All pricing rules come from pricing.config.json via useConfig().
+ *
  * @param {Object}        props
- * @param {Object}        props.listing          - Full listing data object
- * @param {Array<string>} [props.blockedDates]   - Array of unavailable dates (YYYY-MM-DD)
+ * @param {Object}        props.listing            - Full listing data object
+ * @param {Array<string>} [props.blockedDates]     - Array of unavailable dates
  * @param {Function}      [props.onBookingComplete] - Callback after successful booking
  */
 export default function BookingCard({
@@ -33,16 +35,31 @@ export default function BookingCard({
   blockedDates = [],
   onBookingComplete,
 }) {
-  // Guard clause - prevent crash when listing is not yet loaded
+  // Guard clause — prevent crash when listing is not yet loaded
   if (!listing) {
     return null;
   }
 
   const router = useRouter();
-  
-  // Get authentication state ONCE
+
+  // =========================================================================
+  // CONFIG — Pricing rules, feature flags, currency
+  // =========================================================================
+  const { pricing: pricingConfig, payment, isEnabled } = useConfig();
+
+  // Service fee configuration from pricing config
+  const serviceFeePercent = pricingConfig?.serviceFee?.percent || 5;
+  const serviceFeeMin = pricingConfig?.serviceFee?.minAmount || 100;
+  const serviceFeeMax = pricingConfig?.serviceFee?.maxAmount || 5000;
+
+  // Currency symbol from payment config
+  const currencySymbol = payment?.currencySymbol || constants.CURRENCY_SYMBOL;
+
+  // =========================================================================
+  // AUTHENTICATION
+  // =========================================================================
   const { isAuthenticated, user } = useAuth();
-  
+
   // Check if the current user is the host of this listing
   const isOwnListing = user && listing.hostId === user.id;
 
@@ -72,9 +89,10 @@ export default function BookingCard({
   const [selectedDatesBlocked, setSelectedDatesBlocked] = useState(false);
   const [nextAvailableDate, setNextAvailableDate] = useState(null);
 
-  const pricePerUnit = listing.listingType === 'long_term'
-    ? listing.pricePerMonth
-    : listing.pricePerNight;
+  const pricePerUnit =
+    listing.listingType === 'long_term'
+      ? listing.pricePerMonth
+      : listing.pricePerNight;
 
   // =========================================================================
   // FETCH BLOCKED DATES ON MOUNT
@@ -84,12 +102,14 @@ export default function BookingCard({
 
     async function fetchBlockedDates() {
       try {
-        const response = await apiClient.get(`/listings/${listing.id}/blocked-dates`);
+        const response = await apiClient.get(
+          `/listings/${listing.id}/blocked-dates`
+        );
         if (response?.data?.blockedRanges) {
           setBlockedRanges(response.data.blockedRanges);
         }
       } catch (err) {
-        console.error('Failed to fetch blocked dates for conflict check:', err.message);
+        console.error('Failed to fetch blocked dates:', err.message);
       }
     }
 
@@ -129,6 +149,11 @@ export default function BookingCard({
     setNextAvailableDate(nextAvailable);
   }, [checkIn, checkOut, blockedRanges]);
 
+  /**
+   * Handles date selection from the DatePicker.
+   *
+   * @param {Object} dates - { checkIn, checkOut }
+   */
   function handleDateChange({ checkIn: newCheckIn, checkOut: newCheckOut }) {
     setCheckIn(newCheckIn);
     setCheckOut(newCheckOut);
@@ -138,11 +163,21 @@ export default function BookingCard({
     }
   }
 
+  /**
+   * Handles guest count changes from GuestSelector.
+   *
+   * @param {Object} guestData - Guest count data
+   */
   function handleGuestChange(guestData) {
     setGuests(guestData);
     setError(null);
   }
 
+  /**
+   * Auto-selects the next available date when the user clicks "Select This Date".
+   *
+   * @param {Date} date - The next available date
+   */
   function handleSelectNextAvailable(date) {
     const checkInStr = date.toISOString().split('T')[0];
     const checkOutDate = new Date(date);
@@ -155,6 +190,10 @@ export default function BookingCard({
     setError(null);
   }
 
+  /**
+   * Calculates the pricing estimate for the selected dates.
+   * Uses config-driven service fee rules — zero hardcoded values.
+   */
   const calculateEstimate = useCallback(() => {
     if (!checkIn || !checkOut || !pricePerUnit) return null;
 
@@ -175,10 +214,7 @@ export default function BookingCard({
     const cleaningFee = parseFloat(listing.cleaningFee) || 0;
     const securityDeposit = parseFloat(listing.securityDeposit) || 0;
 
-    const serviceFeePercent = 5;
-    const serviceFeeMin = 100;
-    const serviceFeeMax = 5000;
-
+    // Service fee from config — no hardcoded values
     let serviceFee = Math.round(baseAmount * (serviceFeePercent / 100));
     serviceFee = Math.max(serviceFee, serviceFeeMin);
     serviceFee = Math.min(serviceFee, serviceFeeMax);
@@ -195,12 +231,15 @@ export default function BookingCard({
       nights,
       months,
     };
-  }, [checkIn, checkOut, pricePerUnit, listing]);
+  }, [checkIn, checkOut, pricePerUnit, listing, serviceFeePercent, serviceFeeMin, serviceFeeMax]);
 
+  /**
+   * Handles the "Book Now" button click.
+   * Validates inputs and opens the payment modal.
+   */
   function handleBookNowClick() {
     setError(null);
 
-    // Prevent hosts from booking their own listings
     if (isOwnListing) {
       setError('You cannot book your own listing.');
       return;
@@ -224,12 +263,20 @@ export default function BookingCard({
     setShowPaymentModal(true);
   }
 
+  /**
+   * Callback after successful booking.
+   *
+   * @param {Object} bookingData - The created booking data
+   */
   function handleBookingComplete(bookingData) {
     if (onBookingComplete) {
       onBookingComplete(bookingData);
     }
   }
 
+  /**
+   * Closes the payment modal.
+   */
   function handleClosePaymentModal() {
     setShowPaymentModal(false);
     setError(null);
@@ -237,9 +284,10 @@ export default function BookingCard({
 
   const estimate = calculateEstimate();
 
-  const dateDisplay = checkIn && checkOut
-    ? `${new Date(checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-    : 'Select check-in and check-out dates';
+  const dateDisplay =
+    checkIn && checkOut
+      ? `${new Date(checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : 'Select check-in and check-out dates';
 
   const nextAvailableDisplay = nextAvailableDate
     ? nextAvailableDate.toLocaleDateString('en-US', {
@@ -252,9 +300,12 @@ export default function BookingCard({
   return (
     <>
       <div className="booking-card">
+        {/* Price Header */}
         <div className="booking-card__header">
           <span className="booking-card__price">
-            <strong>{constants.CURRENCY_SYMBOL} {pricePerUnit?.toLocaleString()}</strong>
+            <strong>
+              {currencySymbol} {pricePerUnit?.toLocaleString()}
+            </strong>
             <span className="booking-card__price-unit">
               /{listing.listingType === 'long_term' ? 'month' : 'night'}
             </span>
@@ -275,6 +326,7 @@ export default function BookingCard({
           )}
         </div>
 
+        {/* Blocked Dates Warning */}
         {selectedDatesBlocked && checkIn && checkOut && (
           <div className="booking-card__section" style={{ borderBottom: 'none', paddingBottom: 0 }}>
             <div
@@ -286,45 +338,17 @@ export default function BookingCard({
                 marginBottom: '1rem',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.75rem',
-                  marginBottom: '0.75rem',
-                }}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
-                  fill="none"
-                  stroke="var(--color-warning)"
-                  strokeWidth="2"
-                  style={{ flexShrink: 0, marginTop: '2px' }}
-                >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--color-warning)" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <div>
-                  <p
-                    style={{
-                      fontWeight: 'var(--font-weight-semibold)',
-                      fontSize: 'var(--font-size-sm)',
-                      color: '#92400E',
-                      marginBottom: '0.25rem',
-                    }}
-                  >
+                  <p style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', color: '#92400E', marginBottom: '0.25rem' }}>
                     These dates are not available
                   </p>
-                  <p
-                    style={{
-                      fontSize: 'var(--font-size-xs)',
-                      color: '#92400E',
-                      lineHeight: '1.5',
-                    }}
-                  >
+                  <p style={{ fontSize: 'var(--font-size-xs)', color: '#92400E', lineHeight: '1.5' }}>
                     This property is booked for some or all of the dates you selected.
                     Please choose different dates or explore similar properties.
                   </p>
@@ -332,82 +356,26 @@ export default function BookingCard({
               </div>
 
               {nextAvailableDisplay && (
-                <div
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: 'var(--color-white)',
-                    borderRadius: 'var(--radius-md)',
-                    marginBottom: '0.75rem',
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 'var(--font-size-xs)',
-                      color: 'var(--color-text-secondary)',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
+                <div style={{ padding: '0.75rem', backgroundColor: 'var(--color-white)', borderRadius: 'var(--radius-md)', marginBottom: '0.75rem' }}>
+                  <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>
                     Next available date:
                   </p>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 'var(--font-weight-semibold)',
-                        fontSize: 'var(--font-size-sm)',
-                        color: 'var(--color-success)',
-                      }}
-                    >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)', color: 'var(--color-success)' }}>
                       {nextAvailableDisplay}
                     </span>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleSelectNextAvailable(nextAvailableDate)}
-                    >
+                    <Button variant="primary" size="sm" onClick={() => handleSelectNextAvailable(nextAvailableDate)}>
                       Select This Date
                     </Button>
                   </div>
                 </div>
               )}
 
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowDatePicker(true)}
-                  style={{
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-primary)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                  }}
-                >
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setShowDatePicker(true)} style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
                   Choose different dates
                 </button>
-                <Link
-                  href={`/listings/${listing.id}/similar`}
-                  style={{
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-primary)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    textDecoration: 'underline',
-                  }}
-                >
+                <Link href={`/listings/${listing.id}/similar`} style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)', textDecoration: 'underline' }}>
                   View similar properties
                 </Link>
               </div>
@@ -415,14 +383,9 @@ export default function BookingCard({
           </div>
         )}
 
+        {/* Date Selection */}
         <div className="booking-card__section">
-          <button
-            className="booking-card__date-trigger"
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            type="button"
-            aria-expanded={showDatePicker}
-            aria-label="Select check-in and check-out dates"
-          >
+          <button className="booking-card__date-trigger" onClick={() => setShowDatePicker(!showDatePicker)} type="button" aria-expanded={showDatePicker} aria-label="Select check-in and check-out dates">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
@@ -442,22 +405,18 @@ export default function BookingCard({
                 listingId={listing.id}
                 minNights={listing.minNights}
                 maxNights={listing.maxNights}
-                bookingType={
-                  listing.listingType === 'both' ? 'short_term' : listing.listingType
-                }
+                bookingType={listing.listingType === 'both' ? 'short_term' : listing.listingType}
               />
             </div>
           )}
         </div>
 
+        {/* Guest Selection */}
         <div className="booking-card__section">
-          <GuestSelector
-            maxGuests={listing.maxGuests}
-            onChange={handleGuestChange}
-            initialValues={guests}
-          />
+          <GuestSelector maxGuests={listing.maxGuests} onChange={handleGuestChange} initialValues={guests} />
         </div>
 
+        {/* Price Breakdown — only shown when dates are selected and not blocked */}
         {estimate && !selectedDatesBlocked && (
           <div className="booking-card__section">
             <PriceBreakdown
@@ -465,14 +424,13 @@ export default function BookingCard({
               nights={estimate.nights}
               months={estimate.months}
               pricePerUnit={pricePerUnit}
-              bookingType={
-                listing.listingType === 'both' ? 'short_term' : listing.listingType
-              }
+              bookingType={listing.listingType === 'both' ? 'short_term' : listing.listingType}
               compact
             />
           </div>
         )}
 
+        {/* Action Buttons */}
         <div className="booking-card__actions">
           {error && (
             <div className="booking-card__error">
@@ -505,6 +463,7 @@ export default function BookingCard({
         </div>
       </div>
 
+      {/* Payment Modal */}
       <BookingPaymentModal
         isOpen={showPaymentModal}
         onClose={handleClosePaymentModal}
@@ -513,8 +472,7 @@ export default function BookingCard({
           checkInDate: checkIn,
           checkOutDate: checkOut,
           guestCount: guests.total,
-          bookingType:
-            listing.listingType === 'both' ? 'short_term' : listing.listingType,
+          bookingType: listing.listingType === 'both' ? 'short_term' : listing.listingType,
         }}
         pricing={estimate}
         onBookingComplete={handleBookingComplete}

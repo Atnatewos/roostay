@@ -2,64 +2,64 @@
   "development": {
     "header": {
       "public": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null }
       ],
       "guest": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
-        { "key": "dashboard", "href": "/guest/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null },
+        { "key": "becomeHost", "label": "Become a Host", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+        { "key": "dashboard", "label": "Dashboard", "href": "/guest/dashboard", "featureFlag": null }
       ],
       "host": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "dashboard", "href": "/host/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null },
+        { "key": "dashboard", "label": "Dashboard", "href": "/host/dashboard", "featureFlag": null }
       ],
       "admin": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "admin", "href": "/admin/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null },
+        { "key": "admin", "label": "Admin", "href": "/admin/dashboard", "featureFlag": null }
       ],
       "userDropdown": {
         "guest": [
-          { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
-          { "key": "myBookings", "href": "/guest/bookings", "featureFlag": null },
-          { "key": "favorites", "href": "/guest/favorites", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "becomeHost", "label": "Become a Host", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+          { "key": "myBookings", "label": "My Bookings", "href": "/guest/bookings", "featureFlag": null },
+          { "key": "favorites", "label": "Favorites", "href": "/guest/favorites", "featureFlag": null },
+          { "key": "profileSettings", "label": "Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ],
         "host": [
-          { "key": "myListings", "href": "/host/my-listings", "featureFlag": null },
-          { "key": "bookings", "href": "/host/bookings", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "myListings", "label": "My Listings", "href": "/host/my-listings", "featureFlag": null },
+          { "key": "bookings", "label": "Bookings", "href": "/host/bookings", "featureFlag": null },
+          { "key": "profileSettings", "label": "Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ],
         "admin": [
-          { "key": "admin", "href": "/admin/dashboard", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "admin", "label": "Admin Dashboard", "href": "/admin/dashboard", "featureFlag": null },
+          { "key": "profileSettings", "label": "Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ]
       }
     },
     "footer": {
       "columns": [
         {
-          "heading": "footer.exploreHeading",
+          "heading": "Explore",
           "links": [
-            { "key": "browseListings", "href": "/listings" },
-            { "key": "search", "href": "/search" }
+            { "key": "browseListings", "label": "Browse Listings", "href": "/listings" },
+            { "key": "search", "label": "Search", "href": "/search" }
           ]
         },
         {
-          "heading": "footer.hostHeading",
+          "heading": "Host",
           "links": [
-            { "key": "listYourProperty", "href": "/host/listings/create" },
-            { "key": "hostDashboard", "href": "/host/dashboard" }
+            { "key": "listYourProperty", "label": "List Your Property", "href": "/host/listings/create" },
+            { "key": "hostDashboard", "label": "Host Dashboard", "href": "/host/dashboard" }
           ]
         },
         {
-          "heading": "footer.supportHeading",
+          "heading": "Support",
           "links": [
-            { "key": "helpCenter", "href": "/help" },
-            { "key": "contactUs", "href": "/contact" }
+            { "key": "helpCenter", "label": "Help Center", "href": "/help" },
+            { "key": "contactUs", "label": "Contact Us", "href": "/contact" }
           ]
         }
       ]
@@ -68,64 +68,64 @@
   "production": {
     "header": {
       "public": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null }
       ],
       "guest": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
-        { "key": "dashboard", "href": "/guest/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null },
+        { "key": "becomeHost", "label": "Become a Host", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+        { "key": "dashboard", "label": "Dashboard", "href": "/guest/dashboard", "featureFlag": null }
       ],
       "host": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "dashboard", "href": "/host/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null },
+        { "key": "dashboard", "label": "Dashboard", "href": "/host/dashboard", "featureFlag": null }
       ],
       "admin": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "admin", "href": "/admin/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "Search", "href": "/search", "featureFlag": null },
+        { "key": "admin", "label": "Admin", "href": "/admin/dashboard", "featureFlag": null }
       ],
       "userDropdown": {
         "guest": [
-          { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
-          { "key": "myBookings", "href": "/guest/bookings", "featureFlag": null },
-          { "key": "favorites", "href": "/guest/favorites", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "becomeHost", "label": "Become a Host", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+          { "key": "myBookings", "label": "My Bookings", "href": "/guest/bookings", "featureFlag": null },
+          { "key": "favorites", "label": "Favorites", "href": "/guest/favorites", "featureFlag": null },
+          { "key": "profileSettings", "label": "Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ],
         "host": [
-          { "key": "myListings", "href": "/host/my-listings", "featureFlag": null },
-          { "key": "bookings", "href": "/host/bookings", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "myListings", "label": "My Listings", "href": "/host/my-listings", "featureFlag": null },
+          { "key": "bookings", "label": "Bookings", "href": "/host/bookings", "featureFlag": null },
+          { "key": "profileSettings", "label": "Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ],
         "admin": [
-          { "key": "admin", "href": "/admin/dashboard", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "admin", "label": "Admin Dashboard", "href": "/admin/dashboard", "featureFlag": null },
+          { "key": "profileSettings", "label": "Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ]
       }
     },
     "footer": {
       "columns": [
         {
-          "heading": "footer.exploreHeading",
+          "heading": "Explore",
           "links": [
-            { "key": "browseListings", "href": "/listings" },
-            { "key": "search", "href": "/search" }
+            { "key": "browseListings", "label": "Browse Listings", "href": "/listings" },
+            { "key": "search", "label": "Search", "href": "/search" }
           ]
         },
         {
-          "heading": "footer.hostHeading",
+          "heading": "Host",
           "links": [
-            { "key": "listYourProperty", "href": "/host/listings/create" },
-            { "key": "hostDashboard", "href": "/host/dashboard" }
+            { "key": "listYourProperty", "label": "List Your Property", "href": "/host/listings/create" },
+            { "key": "hostDashboard", "label": "Host Dashboard", "href": "/host/dashboard" }
           ]
         },
         {
-          "heading": "footer.supportHeading",
+          "heading": "Support",
           "links": [
-            { "key": "helpCenter", "href": "/help" },
-            { "key": "contactUs", "href": "/contact" }
+            { "key": "helpCenter", "label": "Help Center", "href": "/help" },
+            { "key": "contactUs", "label": "Contact Us", "href": "/contact" }
           ]
         }
       ]
@@ -134,64 +134,64 @@
   "test": {
     "header": {
       "public": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null }
+        { "key": "browse", "label": "[TEST] Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "[TEST] Search", "href": "/search", "featureFlag": null }
       ],
       "guest": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
-        { "key": "dashboard", "href": "/guest/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "[TEST] Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "[TEST] Search", "href": "/search", "featureFlag": null },
+        { "key": "becomeHost", "label": "[TEST] Become a Host", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+        { "key": "dashboard", "label": "[TEST] Dashboard", "href": "/guest/dashboard", "featureFlag": null }
       ],
       "host": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "dashboard", "href": "/host/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "[TEST] Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "[TEST] Search", "href": "/search", "featureFlag": null },
+        { "key": "dashboard", "label": "[TEST] Dashboard", "href": "/host/dashboard", "featureFlag": null }
       ],
       "admin": [
-        { "key": "browse", "href": "/listings", "featureFlag": null },
-        { "key": "search", "href": "/search", "featureFlag": null },
-        { "key": "admin", "href": "/admin/dashboard", "featureFlag": null }
+        { "key": "browse", "label": "[TEST] Browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "label": "[TEST] Search", "href": "/search", "featureFlag": null },
+        { "key": "admin", "label": "[TEST] Admin", "href": "/admin/dashboard", "featureFlag": null }
       ],
       "userDropdown": {
         "guest": [
-          { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
-          { "key": "myBookings", "href": "/guest/bookings", "featureFlag": null },
-          { "key": "favorites", "href": "/guest/favorites", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "becomeHost", "label": "[TEST] Become a Host", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+          { "key": "myBookings", "label": "[TEST] My Bookings", "href": "/guest/bookings", "featureFlag": null },
+          { "key": "favorites", "label": "[TEST] Favorites", "href": "/guest/favorites", "featureFlag": null },
+          { "key": "profileSettings", "label": "[TEST] Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ],
         "host": [
-          { "key": "myListings", "href": "/host/my-listings", "featureFlag": null },
-          { "key": "bookings", "href": "/host/bookings", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "myListings", "label": "[TEST] My Listings", "href": "/host/my-listings", "featureFlag": null },
+          { "key": "bookings", "label": "[TEST] Bookings", "href": "/host/bookings", "featureFlag": null },
+          { "key": "profileSettings", "label": "[TEST] Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ],
         "admin": [
-          { "key": "admin", "href": "/admin/dashboard", "featureFlag": null },
-          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+          { "key": "admin", "label": "[TEST] Admin Dashboard", "href": "/admin/dashboard", "featureFlag": null },
+          { "key": "profileSettings", "label": "[TEST] Profile Settings", "href": "/guest/profile", "featureFlag": null }
         ]
       }
     },
     "footer": {
       "columns": [
         {
-          "heading": "footer.exploreHeading",
+          "heading": "[TEST] Explore",
           "links": [
-            { "key": "browseListings", "href": "/listings" },
-            { "key": "search", "href": "/search" }
+            { "key": "browseListings", "label": "[TEST] Browse Listings", "href": "/listings" },
+            { "key": "search", "label": "[TEST] Search", "href": "/search" }
           ]
         },
         {
-          "heading": "footer.hostHeading",
+          "heading": "[TEST] Host",
           "links": [
-            { "key": "listYourProperty", "href": "/host/listings/create" },
-            { "key": "hostDashboard", "href": "/host/dashboard" }
+            { "key": "listYourProperty", "label": "[TEST] List Your Property", "href": "/host/listings/create" },
+            { "key": "hostDashboard", "label": "[TEST] Host Dashboard", "href": "/host/dashboard" }
           ]
         },
         {
-          "heading": "footer.supportHeading",
+          "heading": "[TEST] Support",
           "links": [
-            { "key": "helpCenter", "href": "/help" },
-            { "key": "contactUs", "href": "/contact" }
+            { "key": "helpCenter", "label": "[TEST] Help Center", "href": "/help" },
+            { "key": "contactUs", "label": "[TEST] Contact Us", "href": "/contact" }
           ]
         }
       ]
