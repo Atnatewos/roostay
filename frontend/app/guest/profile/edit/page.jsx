@@ -2,6 +2,7 @@
 // Edit Profile Page — form to update user profile information
 // Allows editing first name, last name, phone number, and profile image
 // Validates input before submission and shows success/error feedback
+// Fetches existing data via the API — no localStorage dependency
 // Author: Theron
 
 'use client';
@@ -15,7 +16,7 @@ import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
-import { apiClient, ApiError, getStoredUser } from '@/lib/api';
+import { apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
@@ -43,24 +44,15 @@ export default function EditProfilePage() {
   const [fieldErrors, setFieldErrors] = useState({});
 
   /**
-   * Fetches existing profile data to pre-fill the form.
+   * Fetches existing profile data from the API to pre-fill the form.
+   * Uses /auth/me endpoint — the single source of truth for user data.
    * Runs once on component mount.
    */
   useEffect(() => {
     async function loadProfile() {
       try {
-        const storedUser = getStoredUser();
-        if (storedUser) {
-          setForm({
-            firstName: storedUser.firstName || '',
-            lastName: storedUser.lastName || '',
-            phoneNumber: storedUser.phoneNumber || '',
-            profileImageUrl: storedUser.profileImageUrl || '',
-          });
-        }
-
-        // Fetch fresh data from API
         const response = await apiClient.get('/auth/me');
+
         if (response?.data?.user) {
           const user = response.data.user;
           setForm({
@@ -71,7 +63,7 @@ export default function EditProfilePage() {
           });
         }
       } catch (err) {
-        if (err.status === 401) {
+        if (err instanceof ApiError && err.status === 401) {
           router.push(constants.ROUTES.LOGIN);
         } else {
           setError('Failed to load profile data.');
@@ -86,6 +78,7 @@ export default function EditProfilePage() {
 
   /**
    * Updates a single form field value.
+   * Clears field-level errors when the user starts typing.
    *
    * @param {Event} e - Input change event
    */
