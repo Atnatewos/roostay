@@ -1,6 +1,9 @@
 // packages/api/routes/admin.routes.js
-// Administration routes - handles platform moderation, user management, and financial oversight
+// Administration routes - handles platform moderation, user management,
+// financial oversight, audit log viewing, and data exports
 // Strictly restricted to the 'admin' role
+// Author: Theron
+
 const express = require('express');
 const router = express.Router();
 
@@ -111,6 +114,33 @@ router.patch(
     body: withdrawalValidator.processWithdrawal,
   }),
   withdrawalController.processWithdrawal
+);
+
+// ============================================================================
+// ADMIN AUDIT LOG
+// ============================================================================
+router.get(
+  '/admin/audit-logs',
+  authenticate,
+  authorize('admin'),
+  adminController.getAuditLogs
+);
+
+// ============================================================================
+// ADMIN DATA EXPORTS
+// ============================================================================
+router.get(
+  '/admin/export/users',
+  authenticate,
+  authorize('admin'),
+  adminController.exportUsers
+);
+
+router.get(
+  '/admin/export/payments',
+  authenticate,
+  authorize('admin'),
+  adminController.exportPayments
 );
 
 module.exports = router;

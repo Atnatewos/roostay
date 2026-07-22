@@ -1,20 +1,27 @@
 // packages/services/admin.service.js
 // Admin service - dashboard statistics, user management, listing moderation
+// Includes audit logging for all admin actions and audit log retrieval
 // All operations require admin role authorization
+// Author: Theron
 
 const { query, queryOne } = require('../database');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const logger = require('../utils/logger');
+const events = require('../utils/events');
 
 const adminService = {
   /**
    * Gets dashboard statistics for the admin panel.
    * Includes user counts, listing counts, booking stats, and revenue.
+   * Supports optional dateRange parameter for time-filtered data.
    *
+   * @param {string} [dateRange] - Number of days to filter data (e.g., '30')
    * @returns {Promise<Object>} Dashboard statistics
    */
-  async getDashboardStats() {
+  async getDashboardStats(dateRange) {
     const stats = {};
+    const days = parseInt(dateRange, 10) || null;
+    const dateFilter = days ? `AND created_at > NOW() - INTERVAL '${days} days'` : '';
 
     // User statistics
     const userStats = await queryOne(
@@ -37,7 +44,7 @@ const adminService = {
     );
     stats.listings = listingStats;
 
-    // Booking statistics
+    // Booking statistics with optional date filter
     const bookingStats = await queryOne(
       `SELECT COUNT(*) as total_bookings,
               COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -45,16 +52,16 @@ const adminService = {
               COUNT(*) FILTER (WHERE status = 'completed') as completed,
               COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
               COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as bookings_30d
-       FROM bookings`
+       FROM bookings${days ? ` WHERE created_at > NOW() - INTERVAL '${days} days'` : ''}`
     );
     stats.bookings = bookingStats;
 
-    // Revenue statistics
+    // Revenue statistics with optional date filter
     const revenueStats = await queryOne(
       `SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
               COALESCE(SUM(service_fee), 0) as total_service_fees,
               COALESCE(SUM(total_amount) FILTER (WHERE created_at > NOW() - INTERVAL '30 days'), 0) as revenue_30d
-       FROM bookings WHERE status IN ('confirmed', 'completed')`
+       FROM bookings WHERE status IN ('confirmed', 'completed')${days ? ` AND created_at > NOW() - INTERVAL '${days} days'` : ''}`
     );
     stats.revenue = revenueStats;
 
@@ -101,11 +108,12 @@ const adminService = {
 
   /**
    * Approves or rejects a pending listing.
+   * Logs the action to the audit trail for accountability.
    *
    * @param {string} listingId - The listing ID
-   * @param {string} adminId - The admin user ID
-   * @param {string} action - 'approve' or 'reject'
-   * @param {string} [notes] - Review notes
+   * @param {string} adminId   - The admin user ID
+   * @param {string} action    - 'approve' or 'reject'
+   * @param {string} [notes]   - Review notes
    * @returns {Promise<Object>} Updated listing
    */
   async moderateListing(listingId, adminId, action, notes) {
@@ -134,6 +142,22 @@ const adminService = {
       [newStatus, action === 'approve', adminId, notes || null, listingId]
     );
 
+    // Insert audit log entry for this moderation action
+    await query(
+      `INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, old_values, new_values)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        adminId,
+        `listing_${newStatus}`,
+        'listing',
+        listingId,
+        JSON.stringify({ approval_status: listing.approval_status, is_approved: listing.is_approved }),
+        JSON.stringify({ approval_status: newStatus, is_approved: action === 'approve', review_notes: notes || null }),
+      ]
+    );
+
+    events.listingCreated(updated, listing.host_id);
+
     logger.info(`Listing ${newStatus}`, {
       listingId,
       adminId,
@@ -145,15 +169,16 @@ const adminService = {
 
   /**
    * Toggles user active status (activate/deactivate).
+   * Logs the action to the audit trail for accountability.
    *
-   * @param {string} userId - The target user ID
-   * @param {string} adminId - The admin performing the action
+   * @param {string}  userId   - The target user ID
+   * @param {string}  adminId  - The admin performing the action
    * @param {boolean} isActive - New active status
    * @returns {Promise<Object>} Updated user
    */
   async toggleUserStatus(userId, adminId, isActive) {
     const user = await queryOne(
-      'SELECT id, is_active FROM users WHERE id = $1',
+      'SELECT id, email, is_active FROM users WHERE id = $1',
       [userId]
     );
 
@@ -164,6 +189,20 @@ const adminService = {
     const updated = await queryOne(
       'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, email, is_active',
       [isActive, userId]
+    );
+
+    // Insert audit log entry for this user status change
+    await query(
+      `INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, old_values, new_values)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        adminId,
+        isActive ? 'user_activated' : 'user_deactivated',
+        'user',
+        userId,
+        JSON.stringify({ is_active: user.is_active }),
+        JSON.stringify({ is_active: isActive }),
+      ]
     );
 
     logger.info(`User ${isActive ? 'activated' : 'deactivated'}`, {
@@ -208,6 +247,149 @@ const adminService = {
         totalPages: Math.ceil(parseInt(countResult.total, 10) / limit),
       },
     };
+  },
+
+  /**
+   * Retrieves paginated audit logs for the admin audit trail viewer.
+   * Shows all admin actions with old and new values for accountability.
+   *
+   * @param {Object} options - Pagination and filter options
+   * @param {number} [options.page=1]   - Page number
+   * @param {number} [options.limit=20] - Items per page
+   * @param {string} [options.action]   - Filter by action type
+   * @param {string} [options.entityType] - Filter by entity type (user, listing, booking, payment)
+   * @returns {Promise<Object>} Paginated audit log entries
+   */
+  async getAuditLogs(options = {}) {
+    const { page = 1, limit = 20, action, entityType } = options;
+    const offset = (page - 1) * limit;
+
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+
+    if (action) {
+      whereClause += ` AND al.action = $${paramIndex}`;
+      params.push(action);
+      paramIndex++;
+    }
+
+    if (entityType) {
+      whereClause += ` AND al.entity_type = $${paramIndex}`;
+      params.push(entityType);
+      paramIndex++;
+    }
+
+    const countResult = await queryOne(
+      `SELECT COUNT(*) as total FROM audit_logs al WHERE 1=1${whereClause}`,
+      params
+    );
+
+    params.push(limit);
+    params.push(offset);
+
+    const logs = await query(
+      `SELECT al.*, u.first_name as admin_first_name, u.last_name as admin_last_name, u.email as admin_email
+       FROM audit_logs al
+       JOIN users u ON al.admin_id = u.id
+       WHERE 1=1${whereClause}
+       ORDER BY al.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      params
+    );
+
+    return {
+      logs: logs.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems: parseInt(countResult.total, 10),
+        totalPages: Math.ceil(parseInt(countResult.total, 10) / limit),
+      },
+    };
+  },
+
+  /**
+   * Exports users data as a CSV-formatted array.
+   * Used by the admin panel for data export functionality.
+   *
+   * @param {Object} options - Filter options (search, role)
+   * @returns {Promise<Array>} Array of user objects ready for CSV conversion
+   */
+  async exportUsers(options = {}) {
+    const { search, role } = options;
+
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+
+    if (search) {
+      whereClause += ` AND (u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    if (role) {
+      whereClause += ` AND u.role = $${paramIndex}`;
+      params.push(role);
+      paramIndex++;
+    }
+
+    const result = await query(
+      `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.role,
+              u.is_active, u.is_verified, u.created_at
+       FROM users u
+       WHERE 1=1${whereClause}
+       ORDER BY u.created_at DESC
+       LIMIT 1000`,
+      params
+    );
+
+    return result.rows;
+  },
+
+  /**
+   * Exports payments data as a CSV-formatted array.
+   * Used by the admin panel for data export functionality.
+   *
+   * @param {Object} options - Filter options (status, search)
+   * @returns {Promise<Array>} Array of payment objects ready for CSV conversion
+   */
+  async exportPayments(options = {}) {
+    const { status, search } = options;
+
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+
+    if (status) {
+      whereClause += ` AND p.status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
+    }
+
+    if (search) {
+      whereClause += ` AND (u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR p.transaction_reference ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const result = await query(
+      `SELECT p.id, p.amount, p.currency, p.payment_method, p.status,
+              p.transaction_reference, p.created_at,
+              u.first_name, u.last_name, u.email,
+              l.title as listing_title
+       FROM payments p
+       JOIN users u ON p.user_id = u.id
+       LEFT JOIN bookings b ON p.booking_id = b.id
+       LEFT JOIN listings l ON b.listing_id = l.id
+       WHERE 1=1${whereClause}
+       ORDER BY p.created_at DESC
+       LIMIT 1000`,
+      params
+    );
+
+    return result.rows;
   },
 };
 

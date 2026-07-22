@@ -1,7 +1,8 @@
 // frontend/app/admin/users/page.jsx
 // Admin Users Page — manage all platform users with search, filter, and actions
 // Lists users with role badges, verification status, active/inactive toggle,
-// checkbox selection for bulk actions, and click-to-view user detail modal
+// checkbox selection for bulk actions, click-to-view user detail modal,
+// and CSV export button for data portability
 // Supports search, role filtering, bulk activate/deactivate, and pagination
 // Inherits admin layout from app/admin/layout.jsx — no Header/Footer needed
 // All labels are config-driven via useConfig()
@@ -27,7 +28,7 @@ import constants from '@/lib/constants';
  * Admin Users Management Page
  * Provides a searchable, filterable table of all platform users.
  * Admins can view user details in a modal, toggle account active status,
- * select users for bulk actions, and filter by role.
+ * select users for bulk actions, filter by role, and export data as CSV.
  */
 export default function AdminUsersPage() {
   const { content } = useConfig();
@@ -48,6 +49,9 @@ export default function AdminUsersPage() {
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
 
   // User detail modal state
   const [detailModal, setDetailModal] = useState({ isOpen: false, user: null, userBookings: [], isLoadingBookings: false });
@@ -77,7 +81,6 @@ export default function AdminUsersPage() {
         setPagination(response.pagination);
       }
 
-      // Clear selections when data changes
       setSelectedIds([]);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -91,27 +94,15 @@ export default function AdminUsersPage() {
     }
   }, [search, roleFilter, usersContent.loadError]);
 
-  // Fetch users on mount and when filters change
   useEffect(() => {
     fetchUsers(1, search, roleFilter);
   }, [search, roleFilter, fetchUsers]);
 
-  /**
-   * Handles search form submission.
-   *
-   * @param {Event} e - Form submit event
-   */
   function handleSearchSubmit(e) {
     e.preventDefault();
     fetchUsers(1, search, roleFilter);
   }
 
-  /**
-   * Toggles a user's active status.
-   *
-   * @param {string}  userId        - User ID to toggle
-   * @param {boolean} currentStatus - Current active status
-   */
   async function handleToggleStatus(userId, currentStatus) {
     setTogglingId(userId);
 
@@ -132,16 +123,10 @@ export default function AdminUsersPage() {
     }
   }
 
-  /**
-   * Opens the user detail modal and fetches their booking history.
-   *
-   * @param {Object} user - The user object to display
-   */
   async function openUserDetail(user) {
     setDetailModal({ isOpen: true, user, userBookings: [], isLoadingBookings: true });
 
     try {
-      // Fetch bookings for this user based on their role
       const endpoint = user.role === 'host' ? '/bookings/host' : '/bookings/guest';
       const response = await apiClient.get(`${endpoint}?limit=5&userId=${user.id}`);
 
@@ -160,18 +145,10 @@ export default function AdminUsersPage() {
     }
   }
 
-  /**
-   * Closes the user detail modal.
-   */
   function closeUserDetail() {
     setDetailModal({ isOpen: false, user: null, userBookings: [], isLoadingBookings: false });
   }
 
-  /**
-   * Toggles selection of a single user for bulk actions.
-   *
-   * @param {string} userId - User ID to toggle
-   */
   function toggleSelection(userId) {
     setSelectedIds((prev) =>
       prev.includes(userId)
@@ -180,9 +157,6 @@ export default function AdminUsersPage() {
     );
   }
 
-  /**
-   * Toggles selection of all users on the current page.
-   */
   function toggleSelectAll() {
     if (selectedIds.length === users.length) {
       setSelectedIds([]);
@@ -191,23 +165,15 @@ export default function AdminUsersPage() {
     }
   }
 
-  /**
-   * Applies a bulk action to all selected users.
-   *
-   * @param {string} action - 'activate' or 'deactivate'
-   */
   async function handleBulkAction(action) {
     if (selectedIds.length === 0) return;
 
     setIsBulkProcessing(true);
 
     const isActive = action === 'activate';
-    let successCount = 0;
-
     for (const userId of selectedIds) {
       try {
         await apiClient.patch(`/admin/users/${userId}/toggle-status`, { isActive });
-        successCount++;
       } catch (err) {
         console.error(`Failed to ${action} user ${userId}:`, err.message);
       }
@@ -215,44 +181,72 @@ export default function AdminUsersPage() {
 
     setIsBulkProcessing(false);
     setSelectedIds([]);
-
-    // Refresh the list to show updated statuses
     fetchUsers(pagination.page, search, roleFilter);
   }
 
   /**
-   * Handles page changes from the Pagination component.
-   *
-   * @param {number} page - New page number
+   * Exports the current user list as a CSV file download.
+   * Uses the admin export API endpoint with current filters.
    */
+  async function handleExportCSV() {
+    setIsExporting(true);
+
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (roleFilter) params.set('role', roleFilter);
+
+      const response = await fetch(`/api/admin/export/users?${params.toString()}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      // Create a blob from the CSV response and trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `roostay-users-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export users:', err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   function handlePageChange(page) {
     fetchUsers(page, search, roleFilter);
   }
 
-  /**
-   * Returns a human-readable role label.
-   *
-   * @param {string} role - User role
-   * @returns {string} Role label
-   */
   function getRoleLabel(role) {
     const map = { admin: 'Admin', host: 'Host', guest: 'Guest' };
     return map[role] || role;
   }
 
-  // Determine if all users on the current page are selected
   const allSelected = users.length > 0 && selectedIds.length === users.length;
 
   return (
     <div className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
-      {/* Page Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: '0.25rem' }}>
-          {usersContent.title || 'Users'}
-        </h1>
-        <p style={{ color: 'var(--color-text-secondary)' }}>
-          {pagination.totalItems} {pagination.totalItems === 1 ? (usersContent.userSingular || 'user') : (usersContent.userPlural || 'users')}
-        </p>
+      {/* Page Header with Export Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+        <div>
+          <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: '0.25rem' }}>
+            {usersContent.title || 'Users'}
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)' }}>
+            {pagination.totalItems} {pagination.totalItems === 1 ? (usersContent.userSingular || 'user') : (usersContent.userPlural || 'users')}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} isLoading={isExporting}>
+          {usersContent.exportCSV || 'Export CSV'}
+        </Button>
       </div>
 
       {/* Search and Filter Bar */}
@@ -283,7 +277,7 @@ export default function AdminUsersPage() {
         </form>
       </Card>
 
-      {/* Bulk Actions Bar — visible when users are selected */}
+      {/* Bulk Actions Bar */}
       {selectedIds.length > 0 && (
         <Card padding="md" style={{ marginBottom: '1rem', backgroundColor: 'var(--color-primary-light)', border: '1px solid var(--color-primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -315,9 +309,7 @@ export default function AdminUsersPage() {
       {/* Users Table */}
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} type="rect" height="60px" />
-          ))}
+          {[1, 2, 3, 4, 5].map((i) => (<Skeleton key={i} type="rect" height="60px" />))}
         </div>
       ) : users.length === 0 ? (
         <Card padding="lg">
@@ -328,7 +320,6 @@ export default function AdminUsersPage() {
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-            {/* Table Header */}
             <div
               style={{
                 display: 'grid',
@@ -344,13 +335,7 @@ export default function AdminUsersPage() {
               }}
             >
               <span>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleSelectAll}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
-                  aria-label="Select all users"
-                />
+                <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-primary)' }} aria-label="Select all users" />
               </span>
               <span>{usersContent.colUser || 'User'}</span>
               <span>{usersContent.colEmail || 'Email'}</span>
@@ -361,42 +346,12 @@ export default function AdminUsersPage() {
 
             {users.map((user) => (
               <Card key={user.id} padding="md" hoverable>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '40px 2fr 1.5fr 1fr 1fr 1fr',
-                    gap: '1rem',
-                    alignItems: 'center',
-                  }}
-                >
-                  {/* Checkbox */}
+                <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'center' }}>
                   <span>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(user.id)}
-                      onChange={() => toggleSelection(user.id)}
-                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
-                      aria-label={`Select ${user.firstName || user.first_name} ${user.lastName || user.last_name}`}
-                    />
+                    <input type="checkbox" checked={selectedIds.includes(user.id)} onChange={() => toggleSelection(user.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-primary)' }} />
                   </span>
-
-                  {/* User Name and Join Date — clickable for detail modal */}
                   <div>
-                    <button
-                      onClick={() => openUserDetail(user)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        padding: 0,
-                        color: 'inherit',
-                        textDecoration: 'underline',
-                        textUnderlineOffset: '3px',
-                        textDecorationColor: 'var(--color-primary)',
-                      }}
-                      aria-label={`View details for ${user.firstName || user.first_name}`}
-                    >
+                    <button onClick={() => openUserDetail(user)} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'var(--color-primary)' }}>
                       <p style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-sm)' }}>
                         {user.firstName || user.first_name} {user.lastName || user.last_name}
                       </p>
@@ -405,37 +360,14 @@ export default function AdminUsersPage() {
                       {usersContent.joined || 'Joined'} {formatDate(user.createdAt || user.created_at)}
                     </p>
                   </div>
-
-                  {/* Email */}
-                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.email || 'N/A'}
-                  </p>
-
-                  {/* Role Badge */}
-                  <Badge variant={getRoleBadgeVariant(user.role)} size="sm">
-                    {getRoleLabel(user.role)}
-                  </Badge>
-
-                  {/* Active Status */}
+                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email || 'N/A'}</p>
+                  <Badge variant={getRoleBadgeVariant(user.role)} size="sm">{getRoleLabel(user.role)}</Badge>
                   <Badge variant={user.isActive || user.is_active ? 'success' : 'default'} size="sm">
                     {user.isActive || user.is_active ? (usersContent.active || 'Active') : (usersContent.inactive || 'Inactive')}
                   </Badge>
-
-                  {/* Actions */}
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openUserDetail(user)}
-                    >
-                      {usersContent.viewDetails || 'Details'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleStatus(user.id, user.isActive || user.is_active)}
-                      isLoading={togglingId === user.id}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => openUserDetail(user)}>{usersContent.viewDetails || 'Details'}</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleToggleStatus(user.id, user.isActive || user.is_active)} isLoading={togglingId === user.id}>
                       {user.isActive || user.is_active ? (usersContent.deactivate || 'Deactivate') : (usersContent.activate || 'Activate')}
                     </Button>
                   </div>
@@ -444,14 +376,8 @@ export default function AdminUsersPage() {
             ))}
           </div>
 
-          {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              onPageChange={handlePageChange}
-              showInfo
-            />
+            <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={handlePageChange} showInfo />
           )}
         </>
       )}
@@ -464,20 +390,14 @@ export default function AdminUsersPage() {
         size="md"
         footer={
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <Button variant="outline" size="sm" onClick={closeUserDetail}>
-              {usersContent.close || 'Close'}
-            </Button>
+            <Button variant="outline" size="sm" onClick={closeUserDetail}>{usersContent.close || 'Close'}</Button>
             {detailModal.user && (
               <Button
                 variant={detailModal.user.isActive || detailModal.user.is_active ? 'danger' : 'primary'}
                 size="sm"
-                onClick={() => {
-                  handleToggleStatus(detailModal.user.id, detailModal.user.isActive || detailModal.user.is_active);
-                }}
+                onClick={() => handleToggleStatus(detailModal.user.id, detailModal.user.isActive || detailModal.user.is_active)}
               >
-                {detailModal.user.isActive || detailModal.user.is_active
-                  ? (usersContent.deactivate || 'Deactivate')
-                  : (usersContent.activate || 'Activate')}
+                {detailModal.user.isActive || detailModal.user.is_active ? (usersContent.deactivate || 'Deactivate') : (usersContent.activate || 'Activate')}
               </Button>
             )}
           </div>
@@ -485,36 +405,17 @@ export default function AdminUsersPage() {
       >
         {detailModal.user && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* User Profile Summary */}
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--color-primary-light)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 'var(--font-size-xl)',
-                  fontWeight: 'var(--font-weight-bold)',
-                  color: 'var(--color-primary)',
-                  flexShrink: 0,
-                }}
-              >
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)', flexShrink: 0 }}>
                 {(detailModal.user.firstName || detailModal.user.first_name)?.charAt(0) || 'U'}
               </div>
               <div>
                 <p style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-lg)' }}>
                   {detailModal.user.firstName || detailModal.user.first_name} {detailModal.user.lastName || detailModal.user.last_name}
                 </p>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  {detailModal.user.email}
-                </p>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{detailModal.user.email}</p>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <Badge variant={getRoleBadgeVariant(detailModal.user.role)} size="sm">
-                    {getRoleLabel(detailModal.user.role)}
-                  </Badge>
+                  <Badge variant={getRoleBadgeVariant(detailModal.user.role)} size="sm">{getRoleLabel(detailModal.user.role)}</Badge>
                   <Badge variant={detailModal.user.isActive || detailModal.user.is_active ? 'success' : 'default'} size="sm">
                     {detailModal.user.isActive || detailModal.user.is_active ? (usersContent.active || 'Active') : (usersContent.inactive || 'Inactive')}
                   </Badge>
@@ -522,52 +423,29 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
-            {/* Booking History */}
             <div>
               <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: '0.75rem' }}>
                 {usersContent.recentBookings || 'Recent Bookings'}
               </h3>
-
               {detailModal.isLoadingBookings ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} type="rect" height="40px" />
-                  ))}
+                  {[1, 2, 3].map((i) => (<Skeleton key={i} type="rect" height="40px" />))}
                 </div>
               ) : detailModal.userBookings.length === 0 ? (
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-light)' }}>
-                  {usersContent.noBookings || 'No bookings found for this user.'}
-                </p>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-light)' }}>{usersContent.noBookings || 'No bookings found for this user.'}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {detailModal.userBookings.map((booking) => (
-                    <div
-                      key={booking.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '0.75rem',
-                        backgroundColor: 'var(--color-bg-secondary)',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: 'var(--font-size-sm)',
-                      }}
-                    >
+                    <div key={booking.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)' }}>
                       <div>
-                        <p style={{ fontWeight: 'var(--font-weight-medium)' }}>
-                          {booking.listing_title || 'Property'}
-                        </p>
-                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-light)' }}>
-                          {formatDate(booking.check_in_date)} — {formatDate(booking.check_out_date)}
-                        </p>
+                        <p style={{ fontWeight: 'var(--font-weight-medium)' }}>{booking.listing_title || 'Property'}</p>
+                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-light)' }}>{formatDate(booking.check_in_date)} — {formatDate(booking.check_out_date)}</p>
                       </div>
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                         <Badge variant={booking.status === 'confirmed' ? 'success' : booking.status === 'pending' ? 'warning' : 'default'} size="sm">
                           {booking.status?.charAt(0).toUpperCase() + booking.status?.slice(1)}
                         </Badge>
-                        <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
-                          {constants.CURRENCY_SYMBOL} {Number(booking.total_amount || 0).toLocaleString()}
-                        </span>
+                        <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{constants.CURRENCY_SYMBOL} {Number(booking.total_amount || 0).toLocaleString()}</span>
                       </div>
                     </div>
                   ))}
