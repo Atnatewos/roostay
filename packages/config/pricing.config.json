@@ -1,0 +1,77 @@
+{
+  "development": {
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "serviceFee": {
+      "percent": 5,
+      "minAmount": 100,
+      "maxAmount": 5000
+    },
+    "discounts": {
+      "weekly": {
+        "enabled": true,
+        "minNights": 7,
+        "defaultPercent": 5
+      },
+      "monthly": {
+        "enabled": true,
+        "minNights": 28,
+        "defaultPercent": 15
+      }
+    },
+    "seasonal": {
+      "enabled": false,
+      "rules": []
+    }
+  },
+  "production": {
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "serviceFee": {
+      "percent": 5,
+      "minAmount": 100,
+      "maxAmount": 5000
+    },
+    "discounts": {
+      "weekly": {
+        "enabled": true,
+        "minNights": 7,
+        "defaultPercent": 5
+      },
+      "monthly": {
+        "enabled": true,
+        "minNights": 28,
+        "defaultPercent": 15
+      }
+    },
+    "seasonal": {
+      "enabled": false,
+      "rules": []
+    }
+  },
+  "test": {
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "serviceFee": {
+      "percent": 5,
+      "minAmount": 100,
+      "maxAmount": 5000
+    },
+    "discounts": {
+      "weekly": {
+        "enabled": true,
+        "minNights": 7,
+        "defaultPercent": 5
+      },
+      "monthly": {
+        "enabled": true,
+        "minNights": 28,
+        "defaultPercent": 15
+      }
+    },
+    "seasonal": {
+      "enabled": false,
+      "rules": []
+    }
+  }
+}

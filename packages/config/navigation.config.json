@@ -1,0 +1,200 @@
+{
+  "development": {
+    "header": {
+      "public": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null }
+      ],
+      "guest": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+        { "key": "dashboard", "href": "/guest/dashboard", "featureFlag": null }
+      ],
+      "host": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "dashboard", "href": "/host/dashboard", "featureFlag": null }
+      ],
+      "admin": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "admin", "href": "/admin/dashboard", "featureFlag": null }
+      ],
+      "userDropdown": {
+        "guest": [
+          { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+          { "key": "myBookings", "href": "/guest/bookings", "featureFlag": null },
+          { "key": "favorites", "href": "/guest/favorites", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ],
+        "host": [
+          { "key": "myListings", "href": "/host/my-listings", "featureFlag": null },
+          { "key": "bookings", "href": "/host/bookings", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ],
+        "admin": [
+          { "key": "admin", "href": "/admin/dashboard", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ]
+      }
+    },
+    "footer": {
+      "columns": [
+        {
+          "heading": "footer.exploreHeading",
+          "links": [
+            { "key": "browseListings", "href": "/listings" },
+            { "key": "search", "href": "/search" }
+          ]
+        },
+        {
+          "heading": "footer.hostHeading",
+          "links": [
+            { "key": "listYourProperty", "href": "/host/listings/create" },
+            { "key": "hostDashboard", "href": "/host/dashboard" }
+          ]
+        },
+        {
+          "heading": "footer.supportHeading",
+          "links": [
+            { "key": "helpCenter", "href": "/help" },
+            { "key": "contactUs", "href": "/contact" }
+          ]
+        }
+      ]
+    }
+  },
+  "production": {
+    "header": {
+      "public": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null }
+      ],
+      "guest": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+        { "key": "dashboard", "href": "/guest/dashboard", "featureFlag": null }
+      ],
+      "host": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "dashboard", "href": "/host/dashboard", "featureFlag": null }
+      ],
+      "admin": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "admin", "href": "/admin/dashboard", "featureFlag": null }
+      ],
+      "userDropdown": {
+        "guest": [
+          { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+          { "key": "myBookings", "href": "/guest/bookings", "featureFlag": null },
+          { "key": "favorites", "href": "/guest/favorites", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ],
+        "host": [
+          { "key": "myListings", "href": "/host/my-listings", "featureFlag": null },
+          { "key": "bookings", "href": "/host/bookings", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ],
+        "admin": [
+          { "key": "admin", "href": "/admin/dashboard", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ]
+      }
+    },
+    "footer": {
+      "columns": [
+        {
+          "heading": "footer.exploreHeading",
+          "links": [
+            { "key": "browseListings", "href": "/listings" },
+            { "key": "search", "href": "/search" }
+          ]
+        },
+        {
+          "heading": "footer.hostHeading",
+          "links": [
+            { "key": "listYourProperty", "href": "/host/listings/create" },
+            { "key": "hostDashboard", "href": "/host/dashboard" }
+          ]
+        },
+        {
+          "heading": "footer.supportHeading",
+          "links": [
+            { "key": "helpCenter", "href": "/help" },
+            { "key": "contactUs", "href": "/contact" }
+          ]
+        }
+      ]
+    }
+  },
+  "test": {
+    "header": {
+      "public": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null }
+      ],
+      "guest": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+        { "key": "dashboard", "href": "/guest/dashboard", "featureFlag": null }
+      ],
+      "host": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "dashboard", "href": "/host/dashboard", "featureFlag": null }
+      ],
+      "admin": [
+        { "key": "browse", "href": "/listings", "featureFlag": null },
+        { "key": "search", "href": "/search", "featureFlag": null },
+        { "key": "admin", "href": "/admin/dashboard", "featureFlag": null }
+      ],
+      "userDropdown": {
+        "guest": [
+          { "key": "becomeHost", "href": "/guest/profile", "featureFlag": "hostApplications", "highlight": true },
+          { "key": "myBookings", "href": "/guest/bookings", "featureFlag": null },
+          { "key": "favorites", "href": "/guest/favorites", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ],
+        "host": [
+          { "key": "myListings", "href": "/host/my-listings", "featureFlag": null },
+          { "key": "bookings", "href": "/host/bookings", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ],
+        "admin": [
+          { "key": "admin", "href": "/admin/dashboard", "featureFlag": null },
+          { "key": "profileSettings", "href": "/guest/profile", "featureFlag": null }
+        ]
+      }
+    },
+    "footer": {
+      "columns": [
+        {
+          "heading": "footer.exploreHeading",
+          "links": [
+            { "key": "browseListings", "href": "/listings" },
+            { "key": "search", "href": "/search" }
+          ]
+        },
+        {
+          "heading": "footer.hostHeading",
+          "links": [
+            { "key": "listYourProperty", "href": "/host/listings/create" },
+            { "key": "hostDashboard", "href": "/host/dashboard" }
+          ]
+        },
+        {
+          "heading": "footer.supportHeading",
+          "links": [
+            { "key": "helpCenter", "href": "/help" },
+            { "key": "contactUs", "href": "/contact" }
+          ]
+        }
+      ]
+    }
+  }
+}

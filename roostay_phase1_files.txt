@@ -1,0 +1,712 @@
+****************************************************************
+FILE: frontend/lib/constants.js
+****************************************************************
+// frontend/lib/constants.js
+// Centralized frontend constants and configuration
+// All values are driven by environment variables (NEXT_PUBLIC_*) or sensible defaults
+// Booking-related configuration mirrors the backend payment.config.json
+// Public payment info (bank details, shortcodes) is stored directly — NOT secrets
+// Author: Theron
+
+const constants = {
+  // ============================================================================
+  // APPLICATION CONFIGURATION
+  // ============================================================================
+  API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
+  APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'ROOSTAY',
+  APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  APP_DESCRIPTION: 'Find your perfect stay in Ethiopia.',
+
+  // ============================================================================
+  // PAGINATION & LIMITS
+  // ============================================================================
+  DEFAULT_PAGE_SIZE: 12,
+  MAX_PAGE_SIZE: 50,
+  MAX_IMAGE_SIZE_MB: 5,
+  MAX_IMAGES_PER_LISTING: 15,
+  ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
+
+  // ============================================================================
+  // CURRENCY
+  // ============================================================================
+  CURRENCY: 'ETB',
+  CURRENCY_SYMBOL: 'Br',
+
+  // ============================================================================
+  // BOOKING DEFAULTS
+  // ============================================================================
+  MIN_NIGHTS_DEFAULT: 1,
+  MAX_NIGHTS_DEFAULT: 30,
+
+  // ============================================================================
+  // GEOGRAPHIC DATA
+  // ============================================================================
+  CITIES: [
+    'Addis Ababa', 'Adama', 'Bahir Dar', 'Dire Dawa',
+    'Gondar', 'Hawassa', 'Jimma', 'Mekelle', 'Shashamane',
+  ],
+
+  // ============================================================================
+  // LISTING OPTIONS
+  // ============================================================================
+  PROPERTY_TYPES: [
+    { value: 'apartment', label: 'Apartment' },
+    { value: 'house', label: 'House' },
+    { value: 'villa', label: 'Villa' },
+    { value: 'condo', label: 'Condo' },
+    { value: 'guest_house', label: 'Guest House' },
+    { value: 'shared_room', label: 'Shared Room' },
+    { value: 'serviced_apartment', label: 'Serviced Apartment' },
+  ],
+
+  LISTING_TYPES: [
+    { value: 'short_term', label: 'Short Term' },
+    { value: 'long_term', label: 'Long Term' },
+    { value: 'both', label: 'Both' },
+  ],
+
+  CANCELLATION_POLICIES: [
+    { value: 'flexible', label: 'Flexible' },
+    { value: 'moderate', label: 'Moderate' },
+    { value: 'strict', label: 'Strict' },
+  ],
+
+  // ============================================================================
+  // STATUS LABELS & COLORS
+  // ============================================================================
+  BOOKING_STATUSES: {
+    pending: { label: 'Pending', color: '#F59E0B' },
+    confirmed: { label: 'Confirmed', color: '#10B981' },
+    cancelled: { label: 'Cancelled', color: '#EF4444' },
+    completed: { label: 'Completed', color: '#3B82F6' },
+    rejected: { label: 'Rejected', color: '#EF4444' },
+    expired: { label: 'Expired', color: '#6B7280' },
+  },
+
+  PAYMENT_STATUSES: {
+    pending: { label: 'Pending', color: '#F59E0B' },
+    processing: { label: 'Processing', color: '#3B82F6' },
+    completed: { label: 'Completed', color: '#10B981' },
+    failed: { label: 'Failed', color: '#EF4444' },
+    refunded: { label: 'Refunded', color: '#8B5CF6' },
+    cancelled: { label: 'Cancelled', color: '#6B7280' },
+    pending_review: { label: 'Pending Review', color: '#F59E0B' },
+  },
+
+  // ============================================================================
+  // ROUTE MAP
+  // ============================================================================
+  ROUTES: {
+    HOME: '/',
+    LOGIN: '/login',
+    REGISTER: '/register',
+    LISTINGS: '/listings',
+    SEARCH: '/search',
+    GUEST_DASHBOARD: '/guest/dashboard',
+    GUEST_BOOKINGS: '/guest/bookings',
+    GUEST_FAVORITES: '/guest/favorites',
+    GUEST_PROFILE: '/guest/profile',
+    HOST_DASHBOARD: '/host/dashboard',
+    HOST_LISTINGS: '/host/my-listings',
+    HOST_LISTINGS_CREATE: '/host/listings/create',
+    HOST_BOOKINGS: '/host/bookings',
+    HOST_WITHDRAWALS: '/host/withdrawals',
+    ADMIN_DASHBOARD: '/admin/dashboard',
+    ADMIN_USERS: '/admin/users',
+    ADMIN_LISTINGS: '/admin/listings',
+    ADMIN_PAYMENTS: '/admin/payments',
+    ADMIN_WITHDRAWALS: '/admin/withdrawals',
+    ADMIN_REPORTS: '/admin/reports',
+  },
+
+  // ============================================================================
+  // BOOKING CONFIGURATION
+  // Mirrors packages/config/payment.config.json for frontend use
+  // Public payment info (bank details, shortcodes) stored directly — NOT secrets
+  // These are displayed to guests so they can make payments
+  // ============================================================================
+  BOOKING_CONFIG: {
+    PAYMENT_TIMEOUT_MINUTES: 30,
+
+    // Public bank transfer details — guests need these to make payments
+    BANK_TRANSFER: {
+      BANK_NAME: 'Commercial Bank of Ethiopia',
+      ACCOUNT_NUMBER: '1000457856',
+      ACCOUNT_HOLDER: 'ROOSTAY PLC',
+    },
+
+    // Public Telebirr details — guests need these to make payments
+    TELEBIRR: {
+      SHORTCODE: '123456',
+      MERCHANT_NAME: 'ROOSTAY',
+    },
+
+    // All user-facing messages — change here to update across the entire app
+    MESSAGES: {
+      BOOKING_CREATED: 'Booking Created Successfully!',
+      BOOKING_AWAITING_CONFIRMATION:
+        'Your booking has been submitted and is awaiting confirmation. We will notify you once your payment is verified.',
+      BOOKING_REFERENCE_LABEL: 'Booking Reference',
+      PAYMENT_EXPIRED:
+        'Payment window has expired. Please close this modal and try again.',
+      COMPLETE_PAYMENT_WITHIN: 'Complete your payment within:',
+      ENTER_TRANSACTION_HINT:
+        'After sending payment, enter the reference number from your confirmation SMS.',
+      TRANSACTION_VERIFIED:
+        'Transaction number verified — not previously used.',
+      TRANSACTION_INVALID: 'This transaction number has already been used.',
+      TRANSACTION_REQUIRED:
+        'Please enter a valid transaction reference number.',
+      TRANSACTION_MUST_VERIFY:
+        'Please verify your transaction number before submitting.',
+      VALIDATION_FAILED:
+        'Failed to validate transaction number. Please try again.',
+      BOOKING_FAILED: 'Failed to create booking. Please try again.',
+      ADDITIONAL_NOTES_LABEL: 'Additional Notes (optional)',
+      ADDITIONAL_NOTES_PLACEHOLDER:
+        'Any additional information about your payment...',
+      SUBMIT_AND_BOOK: 'Submit & Book',
+      CANCEL: 'Cancel',
+      VIEW_MY_BOOKINGS: 'View My Bookings',
+      SELECT_PAYMENT_METHOD: 'Select Payment Method',
+      BANK_TRANSFER: 'Bank Transfer',
+      TELEBIRR: 'Telebirr',
+      BANK_TRANSFER_DETAILS: 'Bank Transfer Details',
+      TELEBIRR_DETAILS: 'Telebirr Payment Details',
+      BANK_LABEL: 'Bank',
+      ACCOUNT_NUMBER_LABEL: 'Account Number',
+      ACCOUNT_HOLDER_LABEL: 'Account Holder',
+      AMOUNT_TO_TRANSFER: 'Amount to Transfer',
+      MERCHANT_LABEL: 'Merchant',
+      SHORTCODE_LABEL: 'Shortcode',
+      AMOUNT_LABEL: 'Amount',
+      COPIED: 'Copied!',
+      COPY: 'Copy',
+      TRANSACTION_REFERENCE_NUMBER: 'Transaction Reference Number',
+      TELEBIRR_TRANSACTION_ID: 'Telebirr Transaction ID',
+      VERIFY: 'Verify',
+      IMPORTANT_NOTICE:
+        'Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.',
+      TRANSACTION_PLACEHOLDER_BANK: 'e.g., FT1234567890',
+      TRANSACTION_PLACEHOLDER_TELEBIRR: 'e.g., TB123456789',
+    },
+  },
+};
+
+export default constants;
+
+****************************************************************
+FILE: frontend/lib/auth.js
+****************************************************************
+// frontend/lib/auth.js
+// Authentication helpers using httpOnly cookies
+// No longer handles token storage in localStorage
+import { apiClient } from './api';
+import constants from './constants';
+
+const auth = {
+  async register(userData) {
+    const response = await apiClient.post('/auth/register', userData);
+    return response.data.user;
+  },
+  
+  async login(email, password) {
+    const response = await apiClient.post('/auth/login', { email, password });
+    return response.data.user;
+  },
+  
+  async logout() {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (e) {
+      console.error('Logout API failed, clearing local state anyway.', e);
+    }
+    if (typeof window !== 'undefined') {
+      window.location.href = constants.ROUTES.HOME;
+    }
+  },
+  
+  async getCurrentUser() {
+    try {
+      const response = await apiClient.get('/auth/me');
+      return response.data.user;
+    } catch {
+      return null;
+    }
+  },
+  
+  async isAuthenticated() {
+    const user = await this.getCurrentUser();
+    return !!user;
+  },
+  
+  getUserRole(user) {
+    return user?.role || null;
+  },
+  
+  redirectToDashboard(role) {
+    if (typeof window === 'undefined') return;
+    const map = { 
+      guest: constants.ROUTES.GUEST_DASHBOARD, 
+      host: constants.ROUTES.HOST_DASHBOARD, 
+      admin: constants.ROUTES.ADMIN_DASHBOARD 
+    };
+    window.location.href = map[role] || constants.ROUTES.HOME;
+  },
+};
+
+export default auth;
+
+****************************************************************
+FILE: packages/config/features.config.json
+****************************************************************
+{
+  "development": {
+    "maintenanceMode": false,
+    "registrationEnabled": true,
+    "emailVerificationRequired": false,
+    "phoneVerificationRequired": false,
+    "identityVerificationRequired": true,
+    "listingApprovalRequired": false,
+    "instantBookingEnabled": false,
+    "maxListingsPerHost": 50,
+    "maxImagesPerListing": 15,
+    "reviewModerationEnabled": false,
+    "messagingEnabled": true,
+    "notificationsEnabled": true,
+    "searchCacheEnabled": false,
+    "paginationDefaultLimit": 12,
+    "paginationMaxLimit": 50,
+    "bookingMinAdvanceHours": 2,
+    "bookingMaxAdvanceDays": 365,
+    "shortTermMinNights": 1,
+    "shortTermMaxNights": 30,
+    "longTermMinMonths": 1,
+    "longTermMaxMonths": 24,
+    "cancellationWindowHours": 48,
+    "refundPercentFull": 100,
+    "refundPercentPartial": 50,
+    "paymentTimeoutMinutes": 30,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "ui": {
+      "toastDuration": 4000,
+      "toastPosition": "top-right",
+      "dateFormat": "MMM DD, YYYY",
+      "currencyDisplay": "symbol",
+      "maxGuestCount": 16,
+      "defaultCheckInTime": "14:00",
+      "defaultCheckOutTime": "11:00",
+      "imagePlaceholder": "/images/placeholder-listing.svg",
+      "avatarPlaceholder": "/images/placeholder-avatar.svg",
+      "logoPath": "/images/logo.svg",
+      "faviconPath": "/favicon.ico",
+      "socialLinks": {
+        "facebook": "https://facebook.com/roostay",
+        "twitter": "https://twitter.com/roostay",
+        "instagram": "https://instagram.com/roostay",
+        "telegram": "https://t.me/roostay"
+      },
+      "contactEmail": "support@roostay.com",
+      "contactPhone": "+251900000000"
+    }
+  },
+  "production": {
+    "maintenanceMode": false,
+    "registrationEnabled": true,
+    "emailVerificationRequired": true,
+    "phoneVerificationRequired": false,
+    "identityVerificationRequired": true,
+    "listingApprovalRequired": true,
+    "instantBookingEnabled": false,
+    "maxListingsPerHost": 100,
+    "maxImagesPerListing": 15,
+    "reviewModerationEnabled": true,
+    "messagingEnabled": true,
+    "notificationsEnabled": true,
+    "searchCacheEnabled": true,
+    "paginationDefaultLimit": 12,
+    "paginationMaxLimit": 50,
+    "bookingMinAdvanceHours": 6,
+    "bookingMaxAdvanceDays": 365,
+    "shortTermMinNights": 1,
+    "shortTermMaxNights": 30,
+    "longTermMinMonths": 1,
+    "longTermMaxMonths": 24,
+    "cancellationWindowHours": 48,
+    "refundPercentFull": 100,
+    "refundPercentPartial": 50,
+    "paymentTimeoutMinutes": 30,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "ui": {
+      "toastDuration": 4000,
+      "toastPosition": "top-right",
+      "dateFormat": "MMM DD, YYYY",
+      "currencyDisplay": "symbol",
+      "maxGuestCount": 16,
+      "defaultCheckInTime": "14:00",
+      "defaultCheckOutTime": "11:00",
+      "imagePlaceholder": "/images/placeholder-listing.svg",
+      "avatarPlaceholder": "/images/placeholder-avatar.svg",
+      "logoPath": "/images/logo.svg",
+      "faviconPath": "/favicon.ico",
+      "socialLinks": {
+        "facebook": "https://facebook.com/roostay",
+        "twitter": "https://twitter.com/roostay",
+        "instagram": "https://instagram.com/roostay",
+        "telegram": "https://t.me/roostay"
+      },
+      "contactEmail": "support@roostay.com",
+      "contactPhone": "+251900000000"
+    }
+  },
+  "test": {
+    "maintenanceMode": false,
+    "registrationEnabled": true,
+    "emailVerificationRequired": false,
+    "phoneVerificationRequired": false,
+    "identityVerificationRequired": false,
+    "listingApprovalRequired": false,
+    "instantBookingEnabled": true,
+    "maxListingsPerHost": 10,
+    "maxImagesPerListing": 5,
+    "reviewModerationEnabled": false,
+    "messagingEnabled": true,
+    "notificationsEnabled": false,
+    "searchCacheEnabled": false,
+    "paginationDefaultLimit": 5,
+    "paginationMaxLimit": 20,
+    "bookingMinAdvanceHours": 0,
+    "bookingMaxAdvanceDays": 30,
+    "shortTermMinNights": 1,
+    "shortTermMaxNights": 14,
+    "longTermMinMonths": 1,
+    "longTermMaxMonths": 6,
+    "cancellationWindowHours": 1,
+    "refundPercentFull": 100,
+    "refundPercentPartial": 50,
+    "paymentTimeoutMinutes": 5,
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "ui": {
+      "toastDuration": 2000,
+      "toastPosition": "top-right",
+      "dateFormat": "MMM DD, YYYY",
+      "currencyDisplay": "symbol",
+      "maxGuestCount": 16,
+      "defaultCheckInTime": "14:00",
+      "defaultCheckOutTime": "11:00",
+      "imagePlaceholder": "/images/placeholder-listing.svg",
+      "avatarPlaceholder": "/images/placeholder-avatar.svg",
+      "logoPath": "/images/logo.svg",
+      "faviconPath": "/favicon.ico",
+      "socialLinks": {
+        "facebook": "https://facebook.com/roostay",
+        "twitter": "https://twitter.com/roostay",
+        "instagram": "https://instagram.com/roostay",
+        "telegram": "https://t.me/roostay"
+      },
+      "contactEmail": "support@roostay.com",
+      "contactPhone": "+251900000000"
+    }
+  }
+}
+
+****************************************************************
+FILE: packages/config/payment.config.json
+****************************************************************
+{
+  "development": {
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "paymentTimeoutMinutes": "PAYMENT_TIMEOUT_MINUTES",
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "bankTransfer": {
+      "enabled": true,
+      "bankName": "Commercial Bank of Ethiopia",
+      "accountNumber": "1000457856",
+      "accountHolder": "ROOSTAY PLC",
+      "referencePrefix": "ROOSTAY",
+      "verificationTimeoutHours": 48,
+      "instructions": "Please transfer the total amount and enter the transaction reference number from your confirmation SMS."
+    },
+    "telebirr": {
+      "enabled": true,
+      "merchantId": "TELEBIRR_MERCHANT_ID",
+      "apiKey": "TELEBIRR_API_KEY",
+      "shortcode": "123456",
+      "merchantName": "ROOSTAY"
+    }
+  },
+  "production": {
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "paymentTimeoutMinutes": "PAYMENT_TIMEOUT_MINUTES",
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "bankTransfer": {
+      "enabled": true,
+      "bankName": "Commercial Bank of Ethiopia",
+      "accountNumber": "1000457856",
+      "accountHolder": "ROOSTAY PLC",
+      "referencePrefix": "ROOSTAY",
+      "verificationTimeoutHours": 48,
+      "instructions": "Please transfer the total amount and enter the transaction reference number from your confirmation SMS."
+    },
+    "telebirr": {
+      "enabled": true,
+      "merchantId": "TELEBIRR_MERCHANT_ID",
+      "apiKey": "TELEBIRR_API_KEY",
+      "shortcode": "123456",
+      "merchantName": "ROOSTAY"
+    }
+  },
+  "test": {
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "paymentTimeoutMinutes": 5,
+    "requireTransactionNumber": false,
+    "preventDuplicateTransactions": false,
+    "bankTransfer": {
+      "enabled": true,
+      "bankName": "Test Bank",
+      "accountNumber": "1234567890",
+      "accountHolder": "TEST ACCOUNT",
+      "referencePrefix": "TEST",
+      "verificationTimeoutHours": 1,
+      "instructions": "Test instructions"
+    },
+    "telebirr": {
+      "enabled": true,
+      "merchantId": "test_merchant",
+      "apiKey": "test_key",
+      "shortcode": "999999",
+      "merchantName": "TEST"
+    }
+  }
+}
+
+****************************************************************
+FILE: packages/config/booking.config.json
+****************************************************************
+{
+  "development": {
+    "paymentTimeoutMinutes": "PAYMENT_TIMEOUT_MINUTES",
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "messages": {
+      "bookingCreated": "Booking Created Successfully!",
+      "bookingAwaitingConfirmation": "Your booking has been submitted and is awaiting confirmation. We will notify you once your payment is verified.",
+      "bookingReferenceLabel": "Booking Reference",
+      "paymentExpired": "Payment window has expired. Please close this modal and try again.",
+      "completePaymentWithin": "Complete your payment within:",
+      "enterTransactionHint": "After sending payment, enter the reference number from your confirmation SMS.",
+      "transactionVerified": "Transaction number verified — not previously used.",
+      "transactionInvalid": "This transaction number has already been used.",
+      "transactionRequired": "Please enter a valid transaction reference number.",
+      "transactionMustVerify": "Please verify your transaction number before submitting.",
+      "validationFailed": "Failed to validate transaction number. Please try again.",
+      "bookingFailed": "Failed to create booking. Please try again.",
+      "additionalNotesLabel": "Additional Notes (optional)",
+      "additionalNotesPlaceholder": "Any additional information about your payment...",
+      "submitAndBook": "Submit & Book",
+      "cancel": "Cancel",
+      "viewMyBookings": "View My Bookings",
+      "selectPaymentMethod": "Select Payment Method",
+      "bankTransfer": "Bank Transfer",
+      "telebirr": "Telebirr",
+      "bankTransferDetails": "Bank Transfer Details",
+      "telebirrDetails": "Telebirr Payment Details",
+      "bankLabel": "Bank",
+      "accountNumberLabel": "Account Number",
+      "accountHolderLabel": "Account Holder",
+      "amountToTransfer": "Amount to Transfer",
+      "merchantLabel": "Merchant",
+      "shortcodeLabel": "Shortcode",
+      "amountLabel": "Amount",
+      "copied": "Copied!",
+      "copy": "Copy",
+      "transactionReferenceNumber": "Transaction Reference Number",
+      "telebirrTransactionId": "Telebirr Transaction ID",
+      "verify": "Verify",
+      "importantNotice": "Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.",
+      "transactionPlaceholderBank": "e.g., FT1234567890",
+      "transactionPlaceholderTelebirr": "e.g., TB123456789"
+    },
+    "bankTransfer": {
+      "bankName": "BANK_NAME",
+      "accountNumber": "BANK_ACCOUNT_NUMBER",
+      "accountHolder": "BANK_ACCOUNT_HOLDER"
+    },
+    "telebirr": {
+      "shortcode": "TELEBIRR_SHORTCODE",
+      "merchantName": "APP_NAME"
+    }
+  },
+  "production": {
+    "paymentTimeoutMinutes": "PAYMENT_TIMEOUT_MINUTES",
+    "requireTransactionNumber": true,
+    "preventDuplicateTransactions": true,
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "messages": {
+      "bookingCreated": "Booking Created Successfully!",
+      "bookingAwaitingConfirmation": "Your booking has been submitted and is awaiting confirmation. We will notify you once your payment is verified.",
+      "bookingReferenceLabel": "Booking Reference",
+      "paymentExpired": "Payment window has expired. Please close this modal and try again.",
+      "completePaymentWithin": "Complete your payment within:",
+      "enterTransactionHint": "After sending payment, enter the reference number from your confirmation SMS.",
+      "transactionVerified": "Transaction number verified — not previously used.",
+      "transactionInvalid": "This transaction number has already been used.",
+      "transactionRequired": "Please enter a valid transaction reference number.",
+      "transactionMustVerify": "Please verify your transaction number before submitting.",
+      "validationFailed": "Failed to validate transaction number. Please try again.",
+      "bookingFailed": "Failed to create booking. Please try again.",
+      "additionalNotesLabel": "Additional Notes (optional)",
+      "additionalNotesPlaceholder": "Any additional information about your payment...",
+      "submitAndBook": "Submit & Book",
+      "cancel": "Cancel",
+      "viewMyBookings": "View My Bookings",
+      "selectPaymentMethod": "Select Payment Method",
+      "bankTransfer": "Bank Transfer",
+      "telebirr": "Telebirr",
+      "bankTransferDetails": "Bank Transfer Details",
+      "telebirrDetails": "Telebirr Payment Details",
+      "bankLabel": "Bank",
+      "accountNumberLabel": "Account Number",
+      "accountHolderLabel": "Account Holder",
+      "amountToTransfer": "Amount to Transfer",
+      "merchantLabel": "Merchant",
+      "shortcodeLabel": "Shortcode",
+      "amountLabel": "Amount",
+      "copied": "Copied!",
+      "copy": "Copy",
+      "transactionReferenceNumber": "Transaction Reference Number",
+      "telebirrTransactionId": "Telebirr Transaction ID",
+      "verify": "Verify",
+      "importantNotice": "Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.",
+      "transactionPlaceholderBank": "e.g., FT1234567890",
+      "transactionPlaceholderTelebirr": "e.g., TB123456789"
+    },
+    "bankTransfer": {
+      "bankName": "BANK_NAME",
+      "accountNumber": "BANK_ACCOUNT_NUMBER",
+      "accountHolder": "BANK_ACCOUNT_HOLDER"
+    },
+    "telebirr": {
+      "shortcode": "TELEBIRR_SHORTCODE",
+      "merchantName": "APP_NAME"
+    }
+  },
+  "test": {
+    "paymentTimeoutMinutes": 5,
+    "requireTransactionNumber": false,
+    "preventDuplicateTransactions": false,
+    "serviceFeePercent": 5,
+    "serviceFeeMin": 100,
+    "serviceFeeMax": 5000,
+    "currency": "ETB",
+    "currencySymbol": "Br",
+    "messages": {
+      "bookingCreated": "Booking Created (Test)!",
+      "bookingAwaitingConfirmation": "Test booking submitted.",
+      "bookingReferenceLabel": "Test Reference",
+      "paymentExpired": "Payment expired (test).",
+      "completePaymentWithin": "Complete within (test):",
+      "enterTransactionHint": "Enter test transaction number.",
+      "transactionVerified": "Transaction verified (test).",
+      "transactionInvalid": "Transaction already used (test).",
+      "transactionRequired": "Enter transaction number (test).",
+      "transactionMustVerify": "Verify first (test).",
+      "validationFailed": "Validation failed (test).",
+      "bookingFailed": "Booking failed (test).",
+      "additionalNotesLabel": "Notes (test)",
+      "additionalNotesPlaceholder": "Test notes...",
+      "submitAndBook": "Submit (Test)",
+      "cancel": "Cancel (Test)",
+      "viewMyBookings": "View Bookings (Test)",
+      "selectPaymentMethod": "Select Method (Test)",
+      "bankTransfer": "Bank (Test)",
+      "telebirr": "Telebirr (Test)",
+      "bankTransferDetails": "Bank Details (Test)",
+      "telebirrDetails": "Telebirr Details (Test)",
+      "bankLabel": "Bank (Test)",
+      "accountNumberLabel": "Account (Test)",
+      "accountHolderLabel": "Holder (Test)",
+      "amountToTransfer": "Amount (Test)",
+      "merchantLabel": "Merchant (Test)",
+      "shortcodeLabel": "Shortcode (Test)",
+      "amountLabel": "Amount (Test)",
+      "copied": "Copied!",
+      "copy": "Copy",
+      "transactionReferenceNumber": "Transaction # (Test)",
+      "telebirrTransactionId": "Telebirr ID (Test)",
+      "verify": "Verify (Test)",
+      "importantNotice": "Test notice.",
+      "transactionPlaceholderBank": "TEST123",
+      "transactionPlaceholderTelebirr": "TEST456"
+    },
+    "bankTransfer": {
+      "bankName": "Test Bank",
+      "accountNumber": "1234567890",
+      "accountHolder": "TEST"
+    },
+    "telebirr": {
+      "shortcode": "999999",
+      "merchantName": "TEST"
+    }
+  }
+}
+
+****************************************************************
+FILE: packages/config/app.config.json
+****************************************************************
+{
+  "development": {
+    "name": "ROOSTAY",
+    "env": "development",
+    "port": 3000,
+    "baseUrl": "http://localhost:3000",
+    "apiPrefix": "/api",
+    "debug": true,
+    "logLevel": "debug"
+  },
+  "production": {
+    "name": "ROOSTAY",
+    "env": "production",
+    "port": 8080,
+    "baseUrl": "https://roostay.vercel.app",
+    "apiPrefix": "/api",
+    "debug": false,
+    "logLevel": "error"
+  },
+  "test": {
+    "name": "ROOSTAY-TEST",
+    "env": "test",
+    "port": 3001,
+    "baseUrl": "http://localhost:3001",
+    "apiPrefix": "/api",
+    "debug": true,
+    "logLevel": "debug"
+  }
+}
+

@@ -1,11 +1,11 @@
 // frontend/app/listings/[id]/page.jsx
 // Listing Detail Page — displays full property information, image gallery, amenities, and reviews
-// Integrates BookingCard for the reservation flow
+// Integrates BookingCard for the reservation flow and Dynamic SEO for search engines
 // Author: Theron
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ImageGallery from '@/components/listing/ImageGallery';
@@ -17,9 +17,11 @@ import StarRating from '@/components/ui/StarRating';
 import Avatar from '@/components/ui/Avatar';
 import Skeleton from '@/components/ui/Skeleton';
 import { apiClient } from '@/lib/api';
+import { generateMetadata, generateListingJsonLd } from '@/lib/seo';
 
 export default function ListingDetailPage() {
   const params = useParams();
+  const pathname = usePathname();
   const [listing, setListing] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewSummary, setReviewSummary] = useState(null);
@@ -36,7 +38,6 @@ export default function ListingDetailPage() {
         if (listingRes?.data?.listing) {
           setListing(listingRes.data.listing);
         }
-
         if (reviewsRes?.data) {
           setReviewSummary(reviewsRes.data.summary);
           setReviews(reviewsRes.data.reviews || []);
@@ -50,6 +51,30 @@ export default function ListingDetailPage() {
 
     if (params.id) fetchData();
   }, [params.id]);
+
+  // Dynamically update document title and meta tags when listing loads
+  useEffect(() => {
+    if (listing) {
+      const price = listing.listingType === 'long_term' ? listing.pricePerMonth : listing.pricePerNight;
+      const location = listing.city || listing.location?.city || 'Ethiopia';
+      const dynamicTitle = `${listing.title} in ${location} - ${price} ${listing.listingType === 'long_term' ? '/month' : '/night'}`;
+      const dynamicDesc = `Book ${listing.title} in ${location}. ${listing.bedrooms} beds, ${listing.bathrooms} baths. ${listing.description.substring(0, 150)}...`;
+      
+      // Note: In a Server Component, we'd use generateMetadata(). 
+      // For Client Components, we update the document directly for SEO crawlers that execute JS, 
+      // but for best practice, consider moving data fetching to a Server Component in the future.
+      document.title = `${dynamicTitle} | ROOSTAY`;
+      
+      // Update meta description
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.name = 'description';
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.content = dynamicDesc;
+    }
+  }, [listing]);
 
   if (isLoading || !listing) {
     return (
@@ -70,8 +95,16 @@ export default function ListingDetailPage() {
     );
   }
 
+  const jsonLd = generateListingJsonLd(listing);
+
   return (
     <>
+      {/* JSON-LD Structured Data for Search Engines */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
+      
       <Header />
       <main className="listing-detail">
         <div className="listing-detail__header">
@@ -145,7 +178,7 @@ export default function ListingDetailPage() {
           </div>
 
           <div className="listing-detail__sidebar">
-            {listing && <BookingCard listing={listing} />}
+            <BookingCard listing={listing} />
           </div>
         </div>
       </main>

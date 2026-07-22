@@ -19,9 +19,7 @@ const favoriteRoutes = require('./favorite.routes');
 const uploadRoutes = require('./upload.routes');
 const adminRoutes = require('./admin.routes');
 const hostApplicationRoutes = require('./hostApplication.routes');
-
-// Message routes are imported but mounted separately
-// as they are currently in development
+const configRoutes = require('./config.routes');
 
 const router = express.Router();
 
@@ -29,7 +27,7 @@ const router = express.Router();
  * Creates and returns the fully configured API router.
  * All domain routes are mounted on the same router at their respective paths.
  * Route paths within each module are relative to the mount point.
- * 
+ *
  * Route registration order matters:
  * - Static paths must come before parameterized paths
  * - Each module handles its own middleware chain (auth, validation, rate limiting)
@@ -39,6 +37,9 @@ const router = express.Router();
 function createRoutes() {
   // Health check — public endpoint for monitoring
   router.use('/', healthRoutes);
+
+  // Configuration — public endpoint for frontend config
+  router.use('/', configRoutes);
 
   // Authentication — register, login, logout, token refresh
   router.use('/', authRoutes);

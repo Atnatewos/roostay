@@ -1,7 +1,8 @@
 // packages/config/index.js
-// Central configuration loader - loads and merges all config files
+// Central configuration loader — loads and merges all config files
 // Reads environment variables and resolves uppercase placeholder values
 // Supports DATABASE_URL connection string pattern matching
+// Provides feature flag evaluation and content string lookup utilities
 const path = require('path');
 
 /**
@@ -53,6 +54,15 @@ function loadConfig(filename) {
   return resolveEnvVars(envConfig);
 }
 
+/**
+ * Returns the current environment name.
+ *
+ * @returns {string} Current environment (development, production, test)
+ */
+function getEnvironment() {
+  return process.env.NODE_ENV || 'development';
+}
+
 // ============================================================================
 // LOAD ALL CONFIGURATION MODULES
 // Each module maps to a specific domain of the application
@@ -67,6 +77,96 @@ const rateLimit = loadConfig('rateLimit.config.json');
 const upload = loadConfig('upload.config.json');
 const features = loadConfig('features.config.json');
 const booking = loadConfig('booking.config.json');
+const content = loadConfig('content.config.json');
+const navigation = loadConfig('navigation.config.json');
+const pricing = loadConfig('pricing.config.json');
+
+// ============================================================================
+// FEATURE FLAG UTILITY
+// Checks if a feature is enabled by its path (e.g., "messagingEnabled")
+// ============================================================================
+
+/**
+ * Checks if a feature flag is enabled in the current environment.
+ * Features can be toggled ON/OFF per environment via features.config.json.
+ *
+ * Usage:
+ *   isEnabled('messagingEnabled')       // true/false
+ *   isEnabled('ui.socialLinks.facebook') // checks nested paths
+ *
+ * @param {string} featurePath - Dot-separated path to the feature flag
+ * @returns {boolean} Whether the feature is enabled
+ */
+function isEnabled(featurePath) {
+  const keys = featurePath.split('.');
+  let value = features;
+
+  for (const key of keys) {
+    if (value === null || value === undefined) return false;
+    value = value[key];
+  }
+
+  return value === true;
+}
+
+// ============================================================================
+// CONTENT STRING LOOKUP
+// Retrieves user-facing strings from content.config.json
+// ============================================================================
+
+/**
+ * Retrieves a content string by its dot-separated path.
+ * Falls back to the key name if the string is not found.
+ *
+ * Usage:
+ *   getContent('booking.messages.bookingCreated')  // "Booking Created Successfully!"
+ *   getContent('errors.unauthorized')               // "Please log in to continue."
+ *
+ * @param {string} contentPath - Dot-separated path to the content string
+ * @param {Object} [replacements] - Optional key-value pairs to replace in the string
+ * @returns {string} The content string with replacements applied
+ */
+function getContent(contentPath, replacements = {}) {
+  const keys = contentPath.split('.');
+  let value = content;
+
+  for (const key of keys) {
+    if (value === null || value === undefined) return contentPath;
+    value = value[key];
+  }
+
+  if (typeof value !== 'string') return contentPath;
+
+  // Apply any string replacements (e.g., {{appName}} → "ROOSTAY")
+  let result = value;
+  for (const [replaceKey, replaceValue] of Object.entries(replacements)) {
+    result = result.replace(new RegExp(`{{${replaceKey}}}`, 'g'), replaceValue);
+  }
+
+  return result;
+}
+
+/**
+ * Retrieves a nested object of content strings by its dot-separated path.
+ * Useful for getting a group of related strings (e.g., all booking messages).
+ *
+ * Usage:
+ *   getContentGroup('booking.messages')  // Returns the entire messages object
+ *
+ * @param {string} groupPath - Dot-separated path to the content group
+ * @returns {Object} The content group object, or empty object if not found
+ */
+function getContentGroup(groupPath) {
+  const keys = groupPath.split('.');
+  let value = content;
+
+  for (const key of keys) {
+    if (value === null || value === undefined) return {};
+    value = value[key];
+  }
+
+  return typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
 
 module.exports = {
   app,
@@ -79,4 +179,11 @@ module.exports = {
   upload,
   features,
   booking,
+  content,
+  navigation,
+  pricing,
+  getEnvironment,
+  isEnabled,
+  getContent,
+  getContentGroup,
 };

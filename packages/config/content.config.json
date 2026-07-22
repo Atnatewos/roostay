@@ -1,0 +1,491 @@
+{
+  "development": {
+    "app": {
+      "name": "ROOSTAY",
+      "tagline": "Find your perfect stay in Ethiopia.",
+      "description": "Book short-term and long-term rentals across Ethiopia. Find apartments, houses, villas, and more."
+    },
+    "homepage": {
+      "heroTitle": "Find Your Perfect Stay in Ethiopia",
+      "heroSubtitle": "From short-term getaways to long-term rentals — discover apartments, villas, and guest houses across Ethiopia.",
+      "searchPlaceholder": "Search by name, city...",
+      "allCities": "All Cities",
+      "searchButton": "Search",
+      "popularStays": "Popular Stays",
+      "viewAllListings": "View all listings",
+      "noListings": "No listings available yet. Be the first to host!",
+      "createListing": "Create a Listing",
+      "howItWorks": "How ROOSTAY Works",
+      "steps": [
+        { "number": 1, "title": "Search", "description": "Browse verified listings across Ethiopian cities." },
+        { "number": 2, "title": "Book", "description": "Choose your dates and book instantly." },
+        { "number": 3, "title": "Stay", "description": "Enjoy your stay and leave a review." }
+      ]
+    },
+    "booking": {
+      "messages": {
+        "bookingCreated": "Booking Created Successfully!",
+        "bookingAwaitingConfirmation": "Your booking has been submitted and is awaiting confirmation. We will notify you once your payment is verified.",
+        "bookingReferenceLabel": "Booking Reference",
+        "paymentExpired": "Payment window has expired. Please close this modal and try again.",
+        "completePaymentWithin": "Complete your payment within:",
+        "enterTransactionHint": "After sending payment, enter the reference number from your confirmation SMS.",
+        "transactionVerified": "Transaction number verified — not previously used.",
+        "transactionInvalid": "This transaction number has already been used.",
+        "transactionRequired": "Please enter a valid transaction reference number.",
+        "transactionMustVerify": "Please verify your transaction number before submitting.",
+        "validationFailed": "Failed to validate transaction number. Please try again.",
+        "bookingFailed": "Failed to create booking. Please try again.",
+        "additionalNotesLabel": "Additional Notes (optional)",
+        "additionalNotesPlaceholder": "Any additional information about your payment...",
+        "submitAndBook": "Submit & Book",
+        "cancel": "Cancel",
+        "viewMyBookings": "View My Bookings",
+        "selectPaymentMethod": "Select Payment Method",
+        "bankTransfer": "Bank Transfer",
+        "telebirr": "Telebirr",
+        "bankTransferDetails": "Bank Transfer Details",
+        "telebirrDetails": "Telebirr Payment Details",
+        "bankLabel": "Bank",
+        "accountNumberLabel": "Account Number",
+        "accountHolderLabel": "Account Holder",
+        "amountToTransfer": "Amount to Transfer",
+        "merchantLabel": "Merchant",
+        "shortcodeLabel": "Shortcode",
+        "amountLabel": "Amount",
+        "copied": "Copied!",
+        "copy": "Copy",
+        "transactionReferenceNumber": "Transaction Reference Number",
+        "telebirrTransactionId": "Telebirr Transaction ID",
+        "verify": "Verify",
+        "importantNotice": "Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.",
+        "transactionPlaceholderBank": "e.g., FT1234567890",
+        "transactionPlaceholderTelebirr": "e.g., TB123456789"
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "networkError": "Network error. Please check your connection.",
+      "unauthorized": "Please log in to continue.",
+      "forbidden": "You do not have permission to perform this action.",
+      "notFound": "The requested resource was not found.",
+      "validationFailed": "Please check your input and try again."
+    },
+    "auth": {
+      "loginTitle": "Welcome Back",
+      "loginSubtitle": "Sign in to your ROOSTAY account",
+      "registerTitle": "Create Account",
+      "registerSubtitle": "Join ROOSTAY to start booking stays in Ethiopia",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "firstNameLabel": "First Name",
+      "lastNameLabel": "Last Name",
+      "phoneLabel": "Phone (optional)",
+      "phonePlaceholder": "0911223344",
+      "passwordHelperText": "Min 8 chars, 1 uppercase, 1 lowercase, 1 number",
+      "signInButton": "Sign In",
+      "createAccountButton": "Create Account",
+      "noAccount": "Don't have an account?",
+      "hasAccount": "Already have an account?",
+      "signUpLink": "Sign Up",
+      "signInLink": "Sign In",
+      "loginFailed": "Login failed",
+      "registrationFailed": "Registration failed",
+      "logoutFailed": "Logout failed"
+    },
+    "navigation": {
+      "browse": "Browse",
+      "search": "Search",
+      "becomeHost": "Become a Host",
+      "dashboard": "Dashboard",
+      "admin": "Admin",
+      "myBookings": "My Bookings",
+      "favorites": "Favorites",
+      "myListings": "My Listings",
+      "bookings": "Bookings",
+      "profileSettings": "Profile Settings",
+      "logout": "Logout",
+      "login": "Login",
+      "signUp": "Sign Up"
+    },
+    "footer": {
+      "brandDescription": "Find your perfect stay in Ethiopia. Short-term getaways and long-term rentals across the country.",
+      "copyright": "ROOSTAY. All rights reserved.",
+      "exploreHeading": "Explore",
+      "hostHeading": "Host",
+      "supportHeading": "Support",
+      "browseListings": "Browse Listings",
+      "listYourProperty": "List Your Property",
+      "hostDashboard": "Host Dashboard",
+      "helpCenter": "Help Center",
+      "contactUs": "Contact Us",
+      "madeInEthiopia": "Made for Ethiopia"
+    },
+    "listing": {
+      "propertyTypes": [
+        { "value": "apartment", "label": "Apartment" },
+        { "value": "house", "label": "House" },
+        { "value": "villa", "label": "Villa" },
+        { "value": "condo", "label": "Condo" },
+        { "value": "guest_house", "label": "Guest House" },
+        { "value": "shared_room", "label": "Shared Room" },
+        { "value": "serviced_apartment", "label": "Serviced Apartment" }
+      ],
+      "listingTypes": [
+        { "value": "short_term", "label": "Short Term" },
+        { "value": "long_term", "label": "Long Term" },
+        { "value": "both", "label": "Both" }
+      ],
+      "cancellationPolicies": [
+        { "value": "flexible", "label": "Flexible" },
+        { "value": "moderate", "label": "Moderate" },
+        { "value": "strict", "label": "Strict" }
+      ]
+    },
+    "statusLabels": {
+      "booking": {
+        "pending": { "label": "Pending", "color": "#F59E0B" },
+        "confirmed": { "label": "Confirmed", "color": "#10B981" },
+        "cancelled": { "label": "Cancelled", "color": "#EF4444" },
+        "completed": { "label": "Completed", "color": "#3B82F6" },
+        "rejected": { "label": "Rejected", "color": "#EF4444" },
+        "expired": { "label": "Expired", "color": "#6B7280" }
+      },
+      "payment": {
+        "pending": { "label": "Pending", "color": "#F59E0B" },
+        "processing": { "label": "Processing", "color": "#3B82F6" },
+        "completed": { "label": "Completed", "color": "#10B981" },
+        "failed": { "label": "Failed", "color": "#EF4444" },
+        "refunded": { "label": "Refunded", "color": "#8B5CF6" },
+        "cancelled": { "label": "Cancelled", "color": "#6B7280" },
+        "pending_review": { "label": "Pending Review", "color": "#F59E0B" }
+      }
+    }
+  },
+  "production": {
+    "app": {
+      "name": "ROOSTAY",
+      "tagline": "Find your perfect stay in Ethiopia.",
+      "description": "Book short-term and long-term rentals across Ethiopia. Find apartments, houses, villas, and more."
+    },
+    "homepage": {
+      "heroTitle": "Find Your Perfect Stay in Ethiopia",
+      "heroSubtitle": "From short-term getaways to long-term rentals — discover apartments, villas, and guest houses across Ethiopia.",
+      "searchPlaceholder": "Search by name, city...",
+      "allCities": "All Cities",
+      "searchButton": "Search",
+      "popularStays": "Popular Stays",
+      "viewAllListings": "View all listings",
+      "noListings": "No listings available yet. Be the first to host!",
+      "createListing": "Create a Listing",
+      "howItWorks": "How ROOSTAY Works",
+      "steps": [
+        { "number": 1, "title": "Search", "description": "Browse verified listings across Ethiopian cities." },
+        { "number": 2, "title": "Book", "description": "Choose your dates and book instantly." },
+        { "number": 3, "title": "Stay", "description": "Enjoy your stay and leave a review." }
+      ]
+    },
+    "booking": {
+      "messages": {
+        "bookingCreated": "Booking Created Successfully!",
+        "bookingAwaitingConfirmation": "Your booking has been submitted and is awaiting confirmation. We will notify you once your payment is verified.",
+        "bookingReferenceLabel": "Booking Reference",
+        "paymentExpired": "Payment window has expired. Please close this modal and try again.",
+        "completePaymentWithin": "Complete your payment within:",
+        "enterTransactionHint": "After sending payment, enter the reference number from your confirmation SMS.",
+        "transactionVerified": "Transaction number verified — not previously used.",
+        "transactionInvalid": "This transaction number has already been used.",
+        "transactionRequired": "Please enter a valid transaction reference number.",
+        "transactionMustVerify": "Please verify your transaction number before submitting.",
+        "validationFailed": "Failed to validate transaction number. Please try again.",
+        "bookingFailed": "Failed to create booking. Please try again.",
+        "additionalNotesLabel": "Additional Notes (optional)",
+        "additionalNotesPlaceholder": "Any additional information about your payment...",
+        "submitAndBook": "Submit & Book",
+        "cancel": "Cancel",
+        "viewMyBookings": "View My Bookings",
+        "selectPaymentMethod": "Select Payment Method",
+        "bankTransfer": "Bank Transfer",
+        "telebirr": "Telebirr",
+        "bankTransferDetails": "Bank Transfer Details",
+        "telebirrDetails": "Telebirr Payment Details",
+        "bankLabel": "Bank",
+        "accountNumberLabel": "Account Number",
+        "accountHolderLabel": "Account Holder",
+        "amountToTransfer": "Amount to Transfer",
+        "merchantLabel": "Merchant",
+        "shortcodeLabel": "Shortcode",
+        "amountLabel": "Amount",
+        "copied": "Copied!",
+        "copy": "Copy",
+        "transactionReferenceNumber": "Transaction Reference Number",
+        "telebirrTransactionId": "Telebirr Transaction ID",
+        "verify": "Verify",
+        "importantNotice": "Complete the payment first, then enter the transaction number. Your booking will be confirmed after payment verification.",
+        "transactionPlaceholderBank": "e.g., FT1234567890",
+        "transactionPlaceholderTelebirr": "e.g., TB123456789"
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "networkError": "Network error. Please check your connection.",
+      "unauthorized": "Please log in to continue.",
+      "forbidden": "You do not have permission to perform this action.",
+      "notFound": "The requested resource was not found.",
+      "validationFailed": "Please check your input and try again."
+    },
+    "auth": {
+      "loginTitle": "Welcome Back",
+      "loginSubtitle": "Sign in to your ROOSTAY account",
+      "registerTitle": "Create Account",
+      "registerSubtitle": "Join ROOSTAY to start booking stays in Ethiopia",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "firstNameLabel": "First Name",
+      "lastNameLabel": "Last Name",
+      "phoneLabel": "Phone (optional)",
+      "phonePlaceholder": "0911223344",
+      "passwordHelperText": "Min 8 chars, 1 uppercase, 1 lowercase, 1 number",
+      "signInButton": "Sign In",
+      "createAccountButton": "Create Account",
+      "noAccount": "Don't have an account?",
+      "hasAccount": "Already have an account?",
+      "signUpLink": "Sign Up",
+      "signInLink": "Sign In",
+      "loginFailed": "Login failed",
+      "registrationFailed": "Registration failed",
+      "logoutFailed": "Logout failed"
+    },
+    "navigation": {
+      "browse": "Browse",
+      "search": "Search",
+      "becomeHost": "Become a Host",
+      "dashboard": "Dashboard",
+      "admin": "Admin",
+      "myBookings": "My Bookings",
+      "favorites": "Favorites",
+      "myListings": "My Listings",
+      "bookings": "Bookings",
+      "profileSettings": "Profile Settings",
+      "logout": "Logout",
+      "login": "Login",
+      "signUp": "Sign Up"
+    },
+    "footer": {
+      "brandDescription": "Find your perfect stay in Ethiopia. Short-term getaways and long-term rentals across the country.",
+      "copyright": "ROOSTAY. All rights reserved.",
+      "exploreHeading": "Explore",
+      "hostHeading": "Host",
+      "supportHeading": "Support",
+      "browseListings": "Browse Listings",
+      "listYourProperty": "List Your Property",
+      "hostDashboard": "Host Dashboard",
+      "helpCenter": "Help Center",
+      "contactUs": "Contact Us",
+      "madeInEthiopia": "Made for Ethiopia"
+    },
+    "listing": {
+      "propertyTypes": [
+        { "value": "apartment", "label": "Apartment" },
+        { "value": "house", "label": "House" },
+        { "value": "villa", "label": "Villa" },
+        { "value": "condo", "label": "Condo" },
+        { "value": "guest_house", "label": "Guest House" },
+        { "value": "shared_room", "label": "Shared Room" },
+        { "value": "serviced_apartment", "label": "Serviced Apartment" }
+      ],
+      "listingTypes": [
+        { "value": "short_term", "label": "Short Term" },
+        { "value": "long_term", "label": "Long Term" },
+        { "value": "both", "label": "Both" }
+      ],
+      "cancellationPolicies": [
+        { "value": "flexible", "label": "Flexible" },
+        { "value": "moderate", "label": "Moderate" },
+        { "value": "strict", "label": "Strict" }
+      ]
+    },
+    "statusLabels": {
+      "booking": {
+        "pending": { "label": "Pending", "color": "#F59E0B" },
+        "confirmed": { "label": "Confirmed", "color": "#10B981" },
+        "cancelled": { "label": "Cancelled", "color": "#EF4444" },
+        "completed": { "label": "Completed", "color": "#3B82F6" },
+        "rejected": { "label": "Rejected", "color": "#EF4444" },
+        "expired": { "label": "Expired", "color": "#6B7280" }
+      },
+      "payment": {
+        "pending": { "label": "Pending", "color": "#F59E0B" },
+        "processing": { "label": "Processing", "color": "#3B82F6" },
+        "completed": { "label": "Completed", "color": "#10B981" },
+        "failed": { "label": "Failed", "color": "#EF4444" },
+        "refunded": { "label": "Refunded", "color": "#8B5CF6" },
+        "cancelled": { "label": "Cancelled", "color": "#6B7280" },
+        "pending_review": { "label": "Pending Review", "color": "#F59E0B" }
+      }
+    }
+  },
+  "test": {
+    "app": {
+      "name": "ROOSTAY-TEST",
+      "tagline": "Test environment for ROOSTAY.",
+      "description": "Testing environment for ROOSTAY rental platform."
+    },
+    "homepage": {
+      "heroTitle": "[TEST] Find Your Perfect Stay in Ethiopia",
+      "heroSubtitle": "[TEST] From short-term getaways to long-term rentals.",
+      "searchPlaceholder": "[TEST] Search...",
+      "allCities": "All Cities",
+      "searchButton": "Search",
+      "popularStays": "Popular Stays",
+      "viewAllListings": "View all listings",
+      "noListings": "No listings yet.",
+      "createListing": "Create a Listing",
+      "howItWorks": "How ROOSTAY Works",
+      "steps": [
+        { "number": 1, "title": "Search", "description": "Browse listings." },
+        { "number": 2, "title": "Book", "description": "Choose dates." },
+        { "number": 3, "title": "Stay", "description": "Enjoy your stay." }
+      ]
+    },
+    "booking": {
+      "messages": {
+        "bookingCreated": "Booking Created (Test)!",
+        "bookingAwaitingConfirmation": "Test booking submitted.",
+        "bookingReferenceLabel": "Test Reference",
+        "paymentExpired": "Payment expired (test).",
+        "completePaymentWithin": "Complete within (test):",
+        "enterTransactionHint": "Enter test transaction number.",
+        "transactionVerified": "Transaction verified (test).",
+        "transactionInvalid": "Transaction already used (test).",
+        "transactionRequired": "Enter transaction number (test).",
+        "transactionMustVerify": "Verify first (test).",
+        "validationFailed": "Validation failed (test).",
+        "bookingFailed": "Booking failed (test).",
+        "additionalNotesLabel": "Notes (test)",
+        "additionalNotesPlaceholder": "Test notes...",
+        "submitAndBook": "Submit (Test)",
+        "cancel": "Cancel (Test)",
+        "viewMyBookings": "View Bookings (Test)",
+        "selectPaymentMethod": "Select Method (Test)",
+        "bankTransfer": "Bank (Test)",
+        "telebirr": "Telebirr (Test)",
+        "bankTransferDetails": "Bank Details (Test)",
+        "telebirrDetails": "Telebirr Details (Test)",
+        "bankLabel": "Bank (Test)",
+        "accountNumberLabel": "Account (Test)",
+        "accountHolderLabel": "Holder (Test)",
+        "amountToTransfer": "Amount (Test)",
+        "merchantLabel": "Merchant (Test)",
+        "shortcodeLabel": "Shortcode (Test)",
+        "amountLabel": "Amount (Test)",
+        "copied": "Copied!",
+        "copy": "Copy",
+        "transactionReferenceNumber": "Transaction # (Test)",
+        "telebirrTransactionId": "Telebirr ID (Test)",
+        "verify": "Verify (Test)",
+        "importantNotice": "Test notice.",
+        "transactionPlaceholderBank": "TEST123",
+        "transactionPlaceholderTelebirr": "TEST456"
+      }
+    },
+    "errors": {
+      "generic": "[TEST] Something went wrong.",
+      "networkError": "[TEST] Network error.",
+      "unauthorized": "[TEST] Please log in.",
+      "forbidden": "[TEST] Access denied.",
+      "notFound": "[TEST] Not found.",
+      "validationFailed": "[TEST] Validation failed."
+    },
+    "auth": {
+      "loginTitle": "[TEST] Welcome Back",
+      "loginSubtitle": "[TEST] Sign in",
+      "registerTitle": "[TEST] Create Account",
+      "registerSubtitle": "[TEST] Join ROOSTAY",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "firstNameLabel": "First Name",
+      "lastNameLabel": "Last Name",
+      "phoneLabel": "Phone",
+      "phonePlaceholder": "0911223344",
+      "passwordHelperText": "Min 8 chars",
+      "signInButton": "Sign In",
+      "createAccountButton": "Create Account",
+      "noAccount": "No account?",
+      "hasAccount": "Have an account?",
+      "signUpLink": "Sign Up",
+      "signInLink": "Sign In",
+      "loginFailed": "Login failed",
+      "registrationFailed": "Registration failed",
+      "logoutFailed": "Logout failed"
+    },
+    "navigation": {
+      "browse": "Browse",
+      "search": "Search",
+      "becomeHost": "Become a Host",
+      "dashboard": "Dashboard",
+      "admin": "Admin",
+      "myBookings": "My Bookings",
+      "favorites": "Favorites",
+      "myListings": "My Listings",
+      "bookings": "Bookings",
+      "profileSettings": "Profile Settings",
+      "logout": "Logout",
+      "login": "Login",
+      "signUp": "Sign Up"
+    },
+    "footer": {
+      "brandDescription": "[TEST] Find your perfect stay.",
+      "copyright": "ROOSTAY-TEST. All rights reserved.",
+      "exploreHeading": "Explore",
+      "hostHeading": "Host",
+      "supportHeading": "Support",
+      "browseListings": "Browse Listings",
+      "listYourProperty": "List Your Property",
+      "hostDashboard": "Host Dashboard",
+      "helpCenter": "Help Center",
+      "contactUs": "Contact Us",
+      "madeInEthiopia": "Made for Ethiopia"
+    },
+    "listing": {
+      "propertyTypes": [
+        { "value": "apartment", "label": "Apartment" },
+        { "value": "house", "label": "House" },
+        { "value": "villa", "label": "Villa" },
+        { "value": "condo", "label": "Condo" },
+        { "value": "guest_house", "label": "Guest House" },
+        { "value": "shared_room", "label": "Shared Room" },
+        { "value": "serviced_apartment", "label": "Serviced Apartment" }
+      ],
+      "listingTypes": [
+        { "value": "short_term", "label": "Short Term" },
+        { "value": "long_term", "label": "Long Term" },
+        { "value": "both", "label": "Both" }
+      ],
+      "cancellationPolicies": [
+        { "value": "flexible", "label": "Flexible" },
+        { "value": "moderate", "label": "Moderate" },
+        { "value": "strict", "label": "Strict" }
+      ]
+    },
+    "statusLabels": {
+      "booking": {
+        "pending": { "label": "Pending", "color": "#F59E0B" },
+        "confirmed": { "label": "Confirmed", "color": "#10B981" },
+        "cancelled": { "label": "Cancelled", "color": "#EF4444" },
+        "completed": { "label": "Completed", "color": "#3B82F6" },
+        "rejected": { "label": "Rejected", "color": "#EF4444" },
+        "expired": { "label": "Expired", "color": "#6B7280" }
+      },
+      "payment": {
+        "pending": { "label": "Pending", "color": "#F59E0B" },
+        "processing": { "label": "Processing", "color": "#3B82F6" },
+        "completed": { "label": "Completed", "color": "#10B981" },
+        "failed": { "label": "Failed", "color": "#EF4444" },
+        "refunded": { "label": "Refunded", "color": "#8B5CF6" },
+        "cancelled": { "label": "Cancelled", "color": "#6B7280" },
+        "pending_review": { "label": "Pending Review", "color": "#F59E0B" }
+      }
+    }
+  }
+}
