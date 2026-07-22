@@ -1,0 +1,404 @@
+/* ==========================================================================
+   ROOSTAY Admin Panel Styles
+   Professional, clean, data-dense admin interface
+   ========================================================================== */
+
+/* ==========================================================================
+   ADMIN LAYOUT — Sidebar + Content grid
+   ========================================================================== */
+
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-bg-secondary);
+}
+
+.admin-layout__content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  background-color: var(--color-bg-secondary);
+}
+
+/* ==========================================================================
+   ADMIN PAGE HEADER
+   ========================================================================== */
+
+.admin-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-3xl);
+}
+
+.admin-page-header__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin-bottom: var(--spacing-xs);
+}
+
+.admin-page-header__subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.admin-page-header__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   ADMIN STAT CARDS
+   ========================================================================== */
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-3xl);
+}
+
+.admin-stat-card {
+  background-color: var(--color-bg-elevated);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-2xl);
+  border: 1px solid var(--color-border-light);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.admin-stat-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.admin-stat-card:hover::before {
+  opacity: 1;
+}
+
+.admin-stat-card--warning::before {
+  background: var(--color-warning);
+  opacity: 1;
+}
+
+.admin-stat-card--success::before {
+  background: var(--color-success);
+  opacity: 1;
+}
+
+.admin-stat-card--danger::before {
+  background: var(--color-error);
+  opacity: 1;
+}
+
+.admin-stat-card__label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
+  color: var(--color-text-light);
+  margin-bottom: var(--spacing-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-stat-card__value {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  line-height: var(--line-height-tight);
+}
+
+.admin-stat-card__change {
+  font-size: var(--font-size-xs);
+  color: var(--color-success);
+  margin-top: var(--spacing-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ==========================================================================
+   ADMIN TABLE
+   ========================================================================== */
+
+.admin-table {
+  background-color: var(--color-bg-elevated);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-light);
+  overflow: hidden;
+}
+
+.admin-table__header {
+  display: grid;
+  padding: var(--spacing-md) var(--spacing-2xl);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
+  color: var(--color-text-light);
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.admin-table__row {
+  display: grid;
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background-color var(--transition-fast);
+}
+
+.admin-table__row:last-child {
+  border-bottom: none;
+}
+
+.admin-table__row:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.admin-table__row--selected {
+  background-color: var(--color-primary-light);
+  border-left: 3px solid var(--color-primary);
+}
+
+.admin-table__cell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* ==========================================================================
+   ADMIN FILTER BAR
+   ========================================================================== */
+
+.admin-filter-bar {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  align-items: center;
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  background-color: var(--color-bg-elevated);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-light);
+  margin-bottom: var(--spacing-2xl);
+}
+
+.admin-filter-bar__search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.admin-filter-bar__select {
+  width: 160px;
+}
+
+/* ==========================================================================
+   ADMIN BULK ACTIONS BAR
+   ========================================================================== */
+
+.admin-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-accent-light));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-primary);
+  margin-bottom: var(--spacing-lg);
+  animation: slideInDown 250ms var(--ease-out-expo);
+}
+
+.admin-bulk-bar__count {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+}
+
+.admin-bulk-bar__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* ==========================================================================
+   ADMIN DETAIL MODAL CONTENT
+   ========================================================================== */
+
+.admin-detail-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.admin-detail-section__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--spacing-lg);
+}
+
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.admin-detail-item__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
+  margin-bottom: var(--spacing-xs);
+}
+
+.admin-detail-item__value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+/* ==========================================================================
+   ADMIN AUDIT LOG — Old/New values comparison
+   ========================================================================== */
+
+.audit-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-lg);
+}
+
+.audit-compare__old {
+  padding: var(--spacing-lg);
+  background-color: var(--color-error-light);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-error);
+}
+
+.audit-compare__new {
+  padding: var(--spacing-lg);
+  background-color: var(--color-success-light);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-success);
+}
+
+.audit-compare__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
+  margin-bottom: var(--spacing-sm);
+}
+
+.audit-compare__old .audit-compare__label {
+  color: var(--color-error);
+}
+
+.audit-compare__new .audit-compare__label {
+  color: var(--color-success);
+}
+
+.audit-compare__content {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-secondary);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ==========================================================================
+   ADMIN REPORTS — Chart containers
+   ========================================================================== */
+
+.admin-chart-container {
+  background-color: var(--color-bg-elevated);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-light);
+  padding: var(--spacing-2xl);
+  margin-bottom: var(--spacing-2xl);
+}
+
+.admin-chart-container__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--spacing-2xl);
+}
+
+/* ==========================================================================
+   ADMIN STATUS TABS
+   ========================================================================== */
+
+.admin-status-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.admin-status-tab {
+  padding: var(--spacing-sm) var(--spacing-xl);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.admin-status-tab:hover {
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+}
+
+.admin-status-tab--active {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+/* ==========================================================================
+   ADMIN EMPTY STATE
+   ========================================================================== */
+
+.admin-empty {
+  text-align: center;
+  padding: var(--spacing-6xl) var(--spacing-2xl);
+}
+
+.admin-empty__icon {
+  font-size: var(--font-size-5xl);
+  color: var(--color-text-light);
+  margin-bottom: var(--spacing-2xl);
+  opacity: 0.5;
+}
+
+.admin-empty__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
+}
+
+.admin-empty__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  max-width: 400px;
+  margin: 0 auto;
+}

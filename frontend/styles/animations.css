@@ -1,0 +1,434 @@
+/* ==========================================================================
+   ROOSTAY Animation System
+   Micro-interactions, scroll reveals, loading states, effects
+   Performance-optimized: uses transform & opacity only where possible
+   ========================================================================== */
+
+/* ==========================================================================
+   SCROLL REVEAL — Elements animate in when scrolled into view
+   ========================================================================== */
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 600ms var(--ease-out-expo),
+              transform 600ms var(--ease-out-expo);
+}
+
+.scroll-reveal--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered children */
+.scroll-reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 500ms var(--ease-out-expo),
+              transform 500ms var(--ease-out-expo);
+}
+
+.scroll-reveal-stagger--visible > *:nth-child(1) { transition-delay: 0ms; }
+.scroll-reveal-stagger--visible > *:nth-child(2) { transition-delay: 80ms; }
+.scroll-reveal-stagger--visible > *:nth-child(3) { transition-delay: 160ms; }
+.scroll-reveal-stagger--visible > *:nth-child(4) { transition-delay: 240ms; }
+.scroll-reveal-stagger--visible > *:nth-child(5) { transition-delay: 320ms; }
+.scroll-reveal-stagger--visible > *:nth-child(6) { transition-delay: 400ms; }
+
+.scroll-reveal-stagger--visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   FADE IN
+   ========================================================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 300ms var(--ease-out-expo) both;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 400ms var(--ease-out-expo) both;
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 400ms var(--ease-out-expo) both;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 350ms var(--ease-out-expo) both;
+}
+
+/* ==========================================================================
+   SLIDE IN — For dropdowns, modals, drawers
+   ========================================================================== */
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideInUp 350ms var(--ease-out-expo) both;
+}
+
+.animate-slide-down {
+  animation: slideInDown 250ms var(--ease-out-expo) both;
+}
+
+/* ==========================================================================
+   SCALE — For modals, popovers
+   ========================================================================== */
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 250ms var(--ease-out-expo) both;
+}
+
+/* ==========================================================================
+   BUTTON RIPPLE EFFECT
+   ========================================================================== */
+
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.3) 10%, transparent 10%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10);
+  opacity: 0;
+  transition: transform 500ms, opacity 600ms;
+}
+
+.btn-ripple:active::after {
+  transform: scale(0);
+  opacity: 0.3;
+  transition: 0s;
+}
+
+/* ==========================================================================
+   PULSE — For notifications, status indicators
+   ========================================================================== */
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid var(--color-primary);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* ==========================================================================
+   SHAKE — For error states
+   ========================================================================== */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 500ms ease-in-out;
+}
+
+/* ==========================================================================
+   BOUNCE — For attention-grabbing elements
+   ========================================================================== */
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s ease infinite;
+}
+
+/* ==========================================================================
+   SPIN — For loaders
+   ========================================================================== */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 800ms linear infinite;
+}
+
+/* ==========================================================================
+   CHART BAR ANIMATION — For reports page
+   ========================================================================== */
+
+.chart-bar {
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 800ms var(--ease-out-expo);
+}
+
+.chart-bar--animated {
+  transform: scaleY(1);
+}
+
+/* Staggered bar animation delays */
+.chart-bar--delay-1 { transition-delay: 0ms; }
+.chart-bar--delay-2 { transition-delay: 100ms; }
+.chart-bar--delay-3 { transition-delay: 200ms; }
+.chart-bar--delay-4 { transition-delay: 300ms; }
+
+/* ==========================================================================
+   PAGE TRANSITION — Smooth route changes
+   ========================================================================== */
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: pageEnter 300ms var(--ease-out-expo) both;
+}
+
+/* ==========================================================================
+   HOVER LIFT — Subtle card elevation on hover
+   ========================================================================== */
+
+.hover-lift {
+  transition: transform var(--transition-base),
+              box-shadow var(--transition-base);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+.hover-lift--sm:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ==========================================================================
+   HOVER GLOW — Subtle glow on interactive elements
+   ========================================================================== */
+
+.hover-glow {
+  transition: box-shadow var(--transition-base),
+              border-color var(--transition-base);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+  border-color: var(--color-primary);
+}
+
+/* ==========================================================================
+   SKELETON LOADING — Shimmer effect (already exists, consolidated)
+   ========================================================================== */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 25%,
+    var(--color-bg-secondary) 50%,
+    var(--color-bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   REDUCED MOTION — Respect user preferences
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .scroll-reveal,
+  .scroll-reveal-stagger > * {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .chart-bar {
+    transform: scaleY(1);
+    transition: none;
+  }
+}

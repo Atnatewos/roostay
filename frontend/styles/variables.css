@@ -1,132 +1,196 @@
-/* frontend/styles/variables.css */
-/* ROOSTAY Design System — CSS Custom Properties */
-/* All design tokens in one place for consistent theming */
+/* ==========================================================================
+   ROOSTAY Design System — CSS Custom Properties
+   Trillion-dollar platform design tokens
+   Centralized theming for consistent, scalable styling
+   ========================================================================== */
 
 :root {
   /* ==========================================================================
-     BRAND COLORS 
+     BRAND COLORS
      ========================================================================== */
   --color-primary: #E41D56;
   --color-primary-hover: #D0184C;
   --color-primary-light: #FFE4EC;
   --color-primary-dark: #B01540;
-  
-  --color-secondary: #222222;
-  --color-secondary-hover: #000000;
-  
+  --color-primary-glow: rgba(228, 29, 86, 0.3);
+
+  --color-secondary: #1A1A2E;
+  --color-secondary-hover: #16213E;
+
   --color-accent: #00A699;
   --color-accent-hover: #008C7A;
   --color-accent-light: #E6F7F5;
-  
+  --color-accent-glow: rgba(0, 166, 153, 0.3);
+
+  /* ==========================================================================
+     SEMANTIC COLORS
+     ========================================================================== */
   --color-warning: #F59E0B;
   --color-warning-light: #FFF7E6;
+  --color-warning-dark: #D97706;
+
   --color-success: #10B981;
   --color-success-light: #E6F9F3;
+  --color-success-dark: #059669;
+
   --color-error: #EF4444;
   --color-error-light: #FEE2E2;
+  --color-error-dark: #DC2626;
+
   --color-info: #3B82F6;
   --color-info-light: #E6F0FE;
+  --color-info-dark: #2563EB;
 
   /* ==========================================================================
      NEUTRAL COLORS
      ========================================================================== */
   --color-white: #FFFFFF;
   --color-bg: #FFFFFF;
-  --color-bg-secondary: #F7F7F7;
-  --color-bg-tertiary: #EBEBEB;
-  --color-bg-hover: #F0F0F0;
-  
-  --color-text: #222222;
-  --color-text-secondary: #6A6A6A;
-  --color-text-light: #B0B0B0;
+  --color-bg-secondary: #F8F9FA;
+  --color-bg-tertiary: #F1F3F5;
+  --color-bg-hover: #ECEEF0;
+  --color-bg-elevated: #FFFFFF;
+
+  --color-text: #1A1A2E;
+  --color-text-secondary: #6B7280;
+  --color-text-light: #9CA3AF;
   --color-text-inverse: #FFFFFF;
-  
-  --color-border: #DDDDDD;
-  --color-border-light: #EBEBEB;
-  --color-border-hover: #B0B0B0;
+  --color-text-muted: #D1D5DB;
+
+  --color-border: #E5E7EB;
+  --color-border-light: #F3F4F6;
+  --color-border-hover: #D1D5DB;
+  --color-border-focus: #E41D56;
+
+  /* ==========================================================================
+     GLASS MORPHISM
+     ========================================================================== */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-bg-light: rgba(255, 255, 255, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --glass-blur: 16px;
 
   /* ==========================================================================
      TYPOGRAPHY — Circular-inspired font stack
      ========================================================================== */
-  --font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', 
+  --font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI',
                  Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-family-mono: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
-  
-  --font-size-xs: 0.75rem;    /* 12px */
-  --font-size-sm: 0.875rem;   /* 14px */
-  --font-size-base: 1rem;     /* 16px */
-  --font-size-md: 1.0625rem;  /* 17px */
-  --font-size-lg: 1.125rem;   /* 18px */
-  --font-size-xl: 1.25rem;    /* 20px */
-  --font-size-2xl: 1.5rem;    /* 24px */
-  --font-size-3xl: 1.75rem;   /* 28px */
-  --font-size-4xl: 2rem;      /* 32px */
-  --font-size-5xl: 2.5rem;    /* 40px */
-  --font-size-6xl: 3rem;      /* 48px */
-  
+  --font-family-display: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                        Roboto, sans-serif;
+
+  --font-size-xs: 0.75rem;      /* 12px */
+  --font-size-sm: 0.875rem;     /* 14px */
+  --font-size-base: 1rem;       /* 16px */
+  --font-size-md: 1.0625rem;    /* 17px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.25rem;      /* 20px */
+  --font-size-2xl: 1.5rem;      /* 24px */
+  --font-size-3xl: 1.75rem;     /* 28px */
+  --font-size-4xl: 2rem;        /* 32px */
+  --font-size-5xl: 2.5rem;      /* 40px */
+  --font-size-6xl: 3rem;        /* 48px */
+  --font-size-7xl: 3.5rem;      /* 56px */
+  --font-size-8xl: 4rem;        /* 64px */
+
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
-  
+  --font-weight-extrabold: 800;
+
   --line-height-tight: 1.2;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.75;
+  --line-height-loose: 2;
+
+  --letter-spacing-tight: -0.04em;
+  --letter-spacing-normal: -0.02em;
+  --letter-spacing-wide: 0.02em;
+  --letter-spacing-wider: 0.05em;
 
   /* ==========================================================================
      SPACING SYSTEM — 4px base
      ========================================================================== */
-  --spacing-2xs: 0.125rem;  /* 2px */
-  --spacing-xs: 0.25rem;    /* 4px */
-  --spacing-sm: 0.5rem;     /* 8px */
-  --spacing-md: 0.75rem;    /* 12px */
-  --spacing-lg: 1rem;       /* 16px */
-  --spacing-xl: 1.25rem;    /* 20px */
-  --spacing-2xl: 1.5rem;    /* 24px */
-  --spacing-3xl: 2rem;      /* 32px */
-  --spacing-4xl: 2.5rem;    /* 40px */
-  --spacing-5xl: 3rem;      /* 48px */
-  --spacing-6xl: 4rem;      /* 64px */
-  --spacing-7xl: 5rem;      /* 80px */
+  --spacing-2xs: 0.125rem;    /* 2px */
+  --spacing-xs: 0.25rem;      /* 4px */
+  --spacing-sm: 0.5rem;       /* 8px */
+  --spacing-md: 0.75rem;      /* 12px */
+  --spacing-lg: 1rem;         /* 16px */
+  --spacing-xl: 1.25rem;      /* 20px */
+  --spacing-2xl: 1.5rem;      /* 24px */
+  --spacing-3xl: 2rem;        /* 32px */
+  --spacing-4xl: 2.5rem;      /* 40px */
+  --spacing-5xl: 3rem;        /* 48px */
+  --spacing-6xl: 4rem;        /* 64px */
+  --spacing-7xl: 5rem;        /* 80px */
+  --spacing-8xl: 6rem;        /* 96px */
 
   /* ==========================================================================
      BORDER RADIUS
      ========================================================================== */
-  --radius-sm: 0.375rem;    /* 6px */
-  --radius-md: 0.5rem;      /* 8px */
-  --radius-lg: 0.75rem;     /* 12px */
-  --radius-xl: 1rem;        /* 16px */
-  --radius-2xl: 1.25rem;    /* 20px */
+  --radius-xs: 0.25rem;       /* 4px */
+  --radius-sm: 0.375rem;      /* 6px */
+  --radius-md: 0.5rem;        /* 8px */
+  --radius-lg: 0.75rem;       /* 12px */
+  --radius-xl: 1rem;          /* 16px */
+  --radius-2xl: 1.25rem;      /* 20px */
+  --radius-3xl: 1.5rem;       /* 24px */
   --radius-full: 9999px;
   --radius-circle: 50%;
 
   /* ==========================================================================
-     SHADOWS
+     SHADOWS — Elevation system
      ========================================================================== */
+  --shadow-none: 0 0 0 0 transparent;
+
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.08), 0 8px 10px rgba(0, 0, 0, 0.04);
-  --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.12);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06),
+               0 1px 2px rgba(0, 0, 0, 0.04);
+
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07),
+               0 2px 4px -2px rgba(0, 0, 0, 0.05);
+
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08),
+               0 4px 6px -4px rgba(0, 0, 0, 0.05);
+
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+               0 8px 10px -6px rgba(0, 0, 0, 0.05);
+
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06),
+                 0 4px 12px rgba(0, 0, 0, 0.04);
+
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.1),
+                       0 8px 24px rgba(0, 0, 0, 0.06);
+
+  --shadow-glow-primary: 0 0 20px var(--color-primary-glow);
+  --shadow-glow-accent: 0 0 20px var(--color-accent-glow);
 
   /* ==========================================================================
      TRANSITIONS & ANIMATIONS
      ========================================================================== */
+  --transition-instant: 50ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
   --transition-smooth: 500ms cubic-bezier(0.25, 0.1, 0.25, 1);
-  
+  --transition-spring: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --transition-bounce: 600ms cubic-bezier(0.68, -0.6, 0.32, 1.6);
+
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
   --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-in-out-cubic: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ==========================================================================
      Z-INDEX SCALE
      ========================================================================== */
+  --z-base: 0;
   --z-dropdown: 100;
   --z-sticky: 200;
   --z-fixed: 300;
@@ -135,6 +199,7 @@
   --z-toast: 600;
   --z-tooltip: 700;
   --z-loader: 800;
+  --z-debug: 9999;
 
   /* ==========================================================================
      LAYOUT
@@ -143,7 +208,10 @@
   --container-narrow: 768px;
   --container-wide: 1440px;
   --header-height: 72px;
+  --header-height-mobile: 60px;
   --sidebar-width: 260px;
+  --sidebar-width-collapsed: 72px;
+  --admin-content-max: 1400px;
 
   /* ==========================================================================
      COMPONENT-SPECIFIC
@@ -153,8 +221,40 @@
   --listing-image-height-sm: 220px;
   --input-height: 48px;
   --input-height-sm: 40px;
+  --input-height-lg: 56px;
   --avatar-size-sm: 32px;
   --avatar-size-md: 40px;
   --avatar-size-lg: 56px;
   --avatar-size-xl: 80px;
+  --avatar-size-2xl: 120px;
+}
+
+/* ==========================================================================
+   DARK MODE FOUNDATION — Ready for future toggle
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  /* 
+     Dark mode variables prepared for future implementation.
+     Currently disabled — uncomment and adjust to enable.
+  */
+  /*
+  :root {
+    --color-bg: #0F1117;
+    --color-bg-secondary: #1A1D27;
+    --color-bg-tertiary: #252836;
+    --color-bg-hover: #2D3143;
+    --color-bg-elevated: #1A1D27;
+    --color-text: #F1F3F5;
+    --color-text-secondary: #9CA3AF;
+    --color-text-light: #6B7280;
+    --color-border: #2D3143;
+    --color-border-light: #252836;
+    --color-border-hover: #4B5563;
+    --glass-bg: rgba(26, 29, 39, 0.7);
+    --glass-bg-strong: rgba(26, 29, 39, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  */
 }

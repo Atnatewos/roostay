@@ -1,6 +1,9 @@
-/* frontend/styles/main.css */
-/* ROOSTAY Master Stylesheet */
-/* Imports all CSS modules in the correct cascade order */
+/* ==========================================================================
+   ROOSTAY Master Stylesheet
+   Trillion-dollar design system — centralized, animated, modern
+   Cascade order: Tokens → Reset → Design System → Components → 
+                  Animations → Layout → Admin → Pages → Responsive
+   ========================================================================== */
 
 /* 1. Design Tokens — CSS Custom Properties */
 @import './variables.css';
@@ -8,17 +11,26 @@
 /* 2. CSS Reset — Normalize browser defaults */
 @import './reset.css';
 
-/* 3. Utility Classes — Rapid prototyping helpers */
+/* 3. Utility Classes — Layout, spacing, text helpers */
 @import './utilities.css';
 
-/* 4. Component Styles — UI kit components */
+/* 4. Centralized Design System — Shared patterns, effects, surfaces */
+@import './design-system.css';
+
+/* 5. Component Styles — UI kit components */
 @import './components.css';
 
-/* 5. Layout Styles — Header, Footer, Sidebar, Grids */
+/* 6. Animations — Micro-interactions, scroll reveals, effects */
+@import './animations.css';
+
+/* 7. Layout Styles — Header, Footer, Sidebar, Grids */
 @import './layout.css';
 
-/* 6. Page Styles — Page-specific styles */
+/* 8. Admin Styles — Admin panel specific */
+@import './admin.css';
+
+/* 9. Page Styles — Page-specific styles */
 @import './pages.css';
 
-/* 7. Responsive Design — Mobile-first media queries */
+/* 10. Responsive Design — Mobile-first media queries */
 @import './responsive.css';
