@@ -63,6 +63,29 @@
           ]
         }
       ]
+    },
+    "sidebar": {
+      "guest": [
+        { "key": "dashboard", "label": "Dashboard", "href": "/guest/dashboard", "icon": "home" },
+        { "key": "myBookings", "label": "My Bookings", "href": "/guest/bookings", "icon": "calendar" },
+        { "key": "favorites", "label": "Favorites", "href": "/guest/favorites", "icon": "heart" },
+        { "key": "profile", "label": "Profile", "href": "/guest/profile", "icon": "user" }
+      ],
+      "host": [
+        { "key": "dashboard", "label": "Dashboard", "href": "/host/dashboard", "icon": "home" },
+        { "key": "myListings", "label": "My Listings", "href": "/host/my-listings", "icon": "list" },
+        { "key": "createListing", "label": "Create Listing", "href": "/host/listings/create", "icon": "plus" },
+        { "key": "bookings", "label": "Bookings", "href": "/host/bookings", "icon": "calendar" },
+        { "key": "withdrawals", "label": "Withdrawals", "href": "/host/withdrawals", "icon": "dollar" }
+      ],
+      "admin": [
+        { "key": "dashboard", "label": "Dashboard", "href": "/admin/dashboard", "icon": "home" },
+        { "key": "users", "label": "Users", "href": "/admin/users", "icon": "users" },
+        { "key": "listings", "label": "Listings", "href": "/admin/listings", "icon": "building" },
+        { "key": "payments", "label": "Payments", "href": "/admin/payments", "icon": "credit-card" },
+        { "key": "withdrawals", "label": "Withdrawals", "href": "/admin/withdrawals", "icon": "dollar" },
+        { "key": "reports", "label": "Reports", "href": "/admin/reports", "icon": "chart" }
+      ]
     }
   },
   "production": {
@@ -129,6 +152,29 @@
           ]
         }
       ]
+    },
+    "sidebar": {
+      "guest": [
+        { "key": "dashboard", "label": "Dashboard", "href": "/guest/dashboard", "icon": "home" },
+        { "key": "myBookings", "label": "My Bookings", "href": "/guest/bookings", "icon": "calendar" },
+        { "key": "favorites", "label": "Favorites", "href": "/guest/favorites", "icon": "heart" },
+        { "key": "profile", "label": "Profile", "href": "/guest/profile", "icon": "user" }
+      ],
+      "host": [
+        { "key": "dashboard", "label": "Dashboard", "href": "/host/dashboard", "icon": "home" },
+        { "key": "myListings", "label": "My Listings", "href": "/host/my-listings", "icon": "list" },
+        { "key": "createListing", "label": "Create Listing", "href": "/host/listings/create", "icon": "plus" },
+        { "key": "bookings", "label": "Bookings", "href": "/host/bookings", "icon": "calendar" },
+        { "key": "withdrawals", "label": "Withdrawals", "href": "/host/withdrawals", "icon": "dollar" }
+      ],
+      "admin": [
+        { "key": "dashboard", "label": "Dashboard", "href": "/admin/dashboard", "icon": "home" },
+        { "key": "users", "label": "Users", "href": "/admin/users", "icon": "users" },
+        { "key": "listings", "label": "Listings", "href": "/admin/listings", "icon": "building" },
+        { "key": "payments", "label": "Payments", "href": "/admin/payments", "icon": "credit-card" },
+        { "key": "withdrawals", "label": "Withdrawals", "href": "/admin/withdrawals", "icon": "dollar" },
+        { "key": "reports", "label": "Reports", "href": "/admin/reports", "icon": "chart" }
+      ]
     }
   },
   "test": {
@@ -194,6 +240,29 @@
             { "key": "contactUs", "label": "[TEST] Contact Us", "href": "/contact" }
           ]
         }
+      ]
+    },
+    "sidebar": {
+      "guest": [
+        { "key": "dashboard", "label": "[TEST] Dashboard", "href": "/guest/dashboard", "icon": "home" },
+        { "key": "myBookings", "label": "[TEST] My Bookings", "href": "/guest/bookings", "icon": "calendar" },
+        { "key": "favorites", "label": "[TEST] Favorites", "href": "/guest/favorites", "icon": "heart" },
+        { "key": "profile", "label": "[TEST] Profile", "href": "/guest/profile", "icon": "user" }
+      ],
+      "host": [
+        { "key": "dashboard", "label": "[TEST] Dashboard", "href": "/host/dashboard", "icon": "home" },
+        { "key": "myListings", "label": "[TEST] My Listings", "href": "/host/my-listings", "icon": "list" },
+        { "key": "createListing", "label": "[TEST] Create Listing", "href": "/host/listings/create", "icon": "plus" },
+        { "key": "bookings", "label": "[TEST] Bookings", "href": "/host/bookings", "icon": "calendar" },
+        { "key": "withdrawals", "label": "[TEST] Withdrawals", "href": "/host/withdrawals", "icon": "dollar" }
+      ],
+      "admin": [
+        { "key": "dashboard", "label": "[TEST] Dashboard", "href": "/admin/dashboard", "icon": "home" },
+        { "key": "users", "label": "[TEST] Users", "href": "/admin/users", "icon": "users" },
+        { "key": "listings", "label": "[TEST] Listings", "href": "/admin/listings", "icon": "building" },
+        { "key": "payments", "label": "[TEST] Payments", "href": "/admin/payments", "icon": "credit-card" },
+        { "key": "withdrawals", "label": "[TEST] Withdrawals", "href": "/admin/withdrawals", "icon": "dollar" },
+        { "key": "reports", "label": "[TEST] Reports", "href": "/admin/reports", "icon": "chart" }
       ]
     }
   }
