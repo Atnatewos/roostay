@@ -497,7 +497,16 @@
         "active": "Active",
         "inactive": "Inactive",
         "activate": "Activate",
-        "deactivate": "Deactivate"
+        "deactivate": "Deactivate",
+        "viewDetails": "Details",
+        "userDetailTitle": "User Details",
+        "close": "Close",
+        "recentBookings": "Recent Bookings",
+        "noBookings": "No bookings found for this user.",
+        "bulkActivate": "Activate Selected",
+        "bulkDeactivate": "Deactivate Selected",
+        "clearSelection": "Clear"
+        
     },
     "listings": {
         "title": "Moderate Listings",
@@ -524,7 +533,13 @@
         "rejectTitle": "Reject Listing",
         "rejectingMessage": "You are rejecting:",
         "rejectReasonLabel": "Reason for rejection (optional)",
-        "rejectPlaceholder": "Provide a reason for the host..."
+        "rejectPlaceholder": "Provide a reason for the host...",
+        "selectAll": "Select all",
+        "deselectAll": "Deselect all",
+        "batchApprove": "Approve All Selected",
+        "batchReject": "Reject All Selected",
+        "clearSelection": "Clear",
+        "batchRejectNote": "Batch rejected by admin."
     },
     "listingDetail": {
         "title": "Listing",

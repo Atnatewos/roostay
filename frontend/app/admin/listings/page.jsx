@@ -1,7 +1,7 @@
 // frontend/app/admin/listings/page.jsx
 // Admin Listings Moderation Page — approve or reject pending property listings
 // Displays listings awaiting approval with property details and action buttons
-// Supports pagination for large volumes of pending listings
+// Supports checkbox selection for batch approve/reject and pagination
 // Inherits admin layout from app/admin/layout.jsx — no Header/Footer needed
 // All labels and placeholder images are config-driven via useConfig()
 // Author: Theron
@@ -18,6 +18,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import useConfig from '@/hooks/useConfig';
 import { apiClient, ApiError } from '@/lib/api';
+import { formatDate } from '@/lib/date';
 import constants from '@/lib/constants';
 
 /**
@@ -25,6 +26,7 @@ import constants from '@/lib/constants';
  * Allows administrators to review and approve or reject listings
  * submitted by hosts. Shows listing details, host information,
  * and provides moderation action buttons with optional notes.
+ * Supports batch approve/reject via checkbox selection.
  */
 export default function AdminListingsPage() {
   const { content, branding, payment } = useConfig();
@@ -40,6 +42,10 @@ export default function AdminListingsPage() {
   // Rejection modal state
   const [rejectModal, setRejectModal] = useState({ isOpen: false, listingId: null, listingTitle: '' });
   const [rejectNotes, setRejectNotes] = useState('');
+
+  // Batch selection state
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   // Placeholder image from branding config — zero hardcoded paths
   const placeholderImage = branding?.placeholders?.listing || '/assets/placeholders/placeholder-listing.svg';
@@ -63,6 +69,8 @@ export default function AdminListingsPage() {
       if (response?.pagination) {
         setPagination(response.pagination);
       }
+
+      setSelectedIds([]);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 403) setError(listingsContent.accessError || 'Admin access required.');
@@ -81,7 +89,7 @@ export default function AdminListingsPage() {
   }, [fetchPendingListings]);
 
   /**
-   * Moderates a listing — approves or rejects.
+   * Moderates a single listing — approves or rejects.
    *
    * @param {string} listingId - Listing ID to moderate
    * @param {string} action    - 'approve' or 'reject'
@@ -101,6 +109,7 @@ export default function AdminListingsPage() {
         ...prev,
         totalItems: prev.totalItems - 1,
       }));
+      setSelectedIds((prev) => prev.filter((id) => id !== listingId));
 
       if (rejectModal.isOpen) {
         setRejectModal({ isOpen: false, listingId: null, listingTitle: '' });
@@ -114,6 +123,40 @@ export default function AdminListingsPage() {
   }
 
   /**
+   * Batch moderates all selected listings.
+   *
+   * @param {string} action - 'approve' or 'reject'
+   */
+  async function handleBatchModerate(action) {
+    if (selectedIds.length === 0) return;
+
+    setIsBatchProcessing(true);
+
+    let successCount = 0;
+    for (const listingId of selectedIds) {
+      try {
+        await apiClient.patch(`/admin/listings/${listingId}/moderate`, {
+          action,
+          notes: action === 'reject' ? (listingsContent.batchRejectNote || 'Batch rejected by admin.') : null,
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to ${action} listing ${listingId}:`, err.message);
+      }
+    }
+
+    setIsBatchProcessing(false);
+
+    // Remove processed listings from local state
+    setListings((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
+    setPagination((prev) => ({
+      ...prev,
+      totalItems: prev.totalItems - successCount,
+    }));
+    setSelectedIds([]);
+  }
+
+  /**
    * Opens the rejection modal with optional notes.
    *
    * @param {string} listingId    - Listing ID
@@ -122,6 +165,30 @@ export default function AdminListingsPage() {
   function openRejectModal(listingId, listingTitle) {
     setRejectModal({ isOpen: true, listingId, listingTitle });
     setRejectNotes('');
+  }
+
+  /**
+   * Toggles selection of a single listing for batch actions.
+   *
+   * @param {string} listingId - Listing ID to toggle
+   */
+  function toggleSelection(listingId) {
+    setSelectedIds((prev) =>
+      prev.includes(listingId)
+        ? prev.filter((id) => id !== listingId)
+        : [...prev, listingId]
+    );
+  }
+
+  /**
+   * Toggles selection of all listings on the current page.
+   */
+  function toggleSelectAll() {
+    if (selectedIds.length === listings.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(listings.map((l) => l.id));
+    }
   }
 
   /**
@@ -149,6 +216,9 @@ export default function AdminListingsPage() {
     return listingsContent.priceNotSet || 'Price not set';
   }
 
+  // Determine if all listings on the current page are selected
+  const allSelected = listings.length > 0 && selectedIds.length === listings.length;
+
   return (
     <div className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
       {/* Page Header */}
@@ -160,6 +230,28 @@ export default function AdminListingsPage() {
           {pagination.totalItems} {pagination.totalItems === 1 ? (listingsContent.listingSingular || 'listing') : (listingsContent.listingPlural || 'listings')} {listingsContent.awaitingApproval || 'awaiting approval'}
         </p>
       </div>
+
+      {/* Batch Actions Bar — visible when listings are selected */}
+      {selectedIds.length > 0 && (
+        <Card padding="md" style={{ marginBottom: '1rem', backgroundColor: 'var(--color-primary-light)', border: '1px solid var(--color-primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+              {selectedIds.length} {selectedIds.length === 1 ? (listingsContent.listingSingular || 'listing') : (listingsContent.listingPlural || 'listings')} selected
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button variant="primary" size="sm" onClick={() => handleBatchModerate('approve')} isLoading={isBatchProcessing}>
+                {listingsContent.batchApprove || 'Approve All Selected'}
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => handleBatchModerate('reject')} isLoading={isBatchProcessing}>
+                {listingsContent.batchReject || 'Reject All Selected'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
+                {listingsContent.clearSelection || 'Clear'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Error State */}
       {error && (
@@ -176,7 +268,6 @@ export default function AdminListingsPage() {
           ))}
         </div>
       ) : listings.length === 0 ? (
-        /* Empty State */
         <Card padding="lg">
           <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
             <p style={{ fontSize: 'var(--font-size-lg)', color: 'var(--color-text-secondary)' }}>
@@ -186,12 +277,36 @@ export default function AdminListingsPage() {
         </Card>
       ) : (
         <>
+          {/* Select All Checkbox Row */}
+          <div style={{ padding: '0.5rem 1rem', marginBottom: '0.5rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+              />
+              {allSelected ? (listingsContent.deselectAll || 'Deselect all') : (listingsContent.selectAll || 'Select all')}
+            </label>
+          </div>
+
           {/* Listings Review List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
             {listings.map((listing) => (
-              <Card key={listing.id} padding="lg">
+              <Card key={listing.id} padding="lg" style={{ borderLeft: selectedIds.includes(listing.id) ? '4px solid var(--color-primary)' : 'none' }}>
                 {/* Listing Details */}
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                  {/* Checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(listing.id)}
+                      onChange={() => toggleSelection(listing.id)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                      aria-label={`Select ${listing.title}`}
+                    />
+                  </div>
+
                   {/* Thumbnail */}
                   <div
                     style={{

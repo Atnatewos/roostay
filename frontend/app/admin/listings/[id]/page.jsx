@@ -2,6 +2,7 @@
 // Admin Listing Detail Page
 // Displays full listing information for admin review before moderation
 // Shows property details, host info, images, amenities, and moderation actions
+// Uses centralized date and status utilities — no duplicated helper functions
 // Inherits admin layout from app/admin/layout.jsx — no Header/Footer needed
 // All labels are config-driven via useConfig()
 // Author: Theron
@@ -20,6 +21,8 @@ import AmenitiesList from '@/components/listing/AmenitiesList';
 import Modal from '@/components/ui/Modal';
 import useConfig from '@/hooks/useConfig';
 import { apiClient, ApiError } from '@/lib/api';
+import { formatDate } from '@/lib/date';
+import { getApprovalStatusBadge } from '@/lib/status';
 import constants from '@/lib/constants';
 
 /**
@@ -97,32 +100,6 @@ export default function AdminListingDetailPage() {
     }
   }
 
-  /**
-   * Returns a badge variant for the listing's approval status.
-   *
-   * @param {string} status - Approval status
-   * @returns {string} CSS badge variant
-   */
-  function getApprovalBadge(status) {
-    const map = { pending: 'warning', approved: 'success', rejected: 'danger' };
-    return map[status] || 'default';
-  }
-
-  /**
-   * Formats a date string for display.
-   *
-   * @param {string} dateStr - ISO date string
-   * @returns {string} Formatted date
-   */
-  function formatDate(dateStr) {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  }
-
   // Loading state
   if (isLoading) {
     return (
@@ -172,7 +149,7 @@ export default function AdminListingDetailPage() {
             {listing.title}
           </h1>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <Badge variant={getApprovalBadge(listing.approval_status || 'pending')} size="sm">
+            <Badge variant={getApprovalStatusBadge(listing.approval_status || 'pending')} size="sm">
               {listing.approval_status
                 ? listing.approval_status.charAt(0).toUpperCase() + listing.approval_status.slice(1)
                 : (detailContent.pending || 'Pending')}
@@ -222,28 +199,24 @@ export default function AdminListingDetailPage() {
               {detailContent.propertyDetails || 'Property Details'}
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
+              {[
+                { label: detailContent.type || 'Type', value: listing.propertyType?.replace('_', ' ') || 'N/A' },
+                { label: detailContent.bedrooms || 'Bedrooms', value: listing.bedrooms },
+                { label: detailContent.bathrooms || 'Bathrooms', value: listing.bathrooms },
+                { label: detailContent.maxGuests || 'Max Guests', value: listing.maxGuests },
+                { label: detailContent.beds || 'Beds', value: listing.bedsCount },
+              ].map((item) => (
+                <div key={item.label}>
+                  <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                    {item.label}
+                  </span>
+                  <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{item.value}</span>
+                </div>
+              ))}
               <div>
-                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>{detailContent.type || 'Type'}</span>
-                <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{listing.propertyType?.replace('_', ' ') || 'N/A'}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>{detailContent.bedrooms || 'Bedrooms'}</span>
-                <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{listing.bedrooms}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>{detailContent.bathrooms || 'Bathrooms'}</span>
-                <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{listing.bathrooms}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>{detailContent.maxGuests || 'Max Guests'}</span>
-                <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{listing.maxGuests}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>{detailContent.beds || 'Beds'}</span>
-                <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{listing.bedsCount}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>{detailContent.instantBook || 'Instant Book'}</span>
+                <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                  {detailContent.instantBook || 'Instant Book'}
+                </span>
                 <Badge variant={listing.instantBook ? 'success' : 'default'} size="sm">
                   {listing.instantBook ? (detailContent.yes || 'Yes') : (detailContent.no || 'No')}
                 </Badge>
@@ -279,30 +252,19 @@ export default function AdminListingDetailPage() {
               {detailContent.pricing || 'Pricing'}
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: 'var(--font-size-sm)' }}>
-              {listing.pricePerNight && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.perNight || 'Per Night'}</span>
-                  <span style={{ fontWeight: 'var(--font-weight-bold)' }}>{currencySymbol} {Number(listing.pricePerNight).toLocaleString()}</span>
+              {[
+                { label: detailContent.perNight || 'Per Night', value: listing.pricePerNight },
+                { label: detailContent.perMonth || 'Per Month', value: listing.pricePerMonth },
+                { label: detailContent.cleaningFee || 'Cleaning Fee', value: listing.cleaningFee },
+                { label: detailContent.securityDeposit || 'Security Deposit', value: listing.securityDeposit },
+              ].filter((item) => item.value).map((item) => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
+                  <span style={{ fontWeight: 'var(--font-weight-bold)' }}>
+                    {currencySymbol} {Number(item.value).toLocaleString()}
+                  </span>
                 </div>
-              )}
-              {listing.pricePerMonth && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.perMonth || 'Per Month'}</span>
-                  <span style={{ fontWeight: 'var(--font-weight-bold)' }}>{currencySymbol} {Number(listing.pricePerMonth).toLocaleString()}</span>
-                </div>
-              )}
-              {listing.cleaningFee > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.cleaningFee || 'Cleaning Fee'}</span>
-                  <span>{currencySymbol} {Number(listing.cleaningFee).toLocaleString()}</span>
-                </div>
-              )}
-              {listing.securityDeposit > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.securityDeposit || 'Security Deposit'}</span>
-                  <span>{currencySymbol} {Number(listing.securityDeposit).toLocaleString()}</span>
-                </div>
-              )}
+              ))}
             </div>
           </Card>
 
@@ -335,22 +297,17 @@ export default function AdminListingDetailPage() {
               {detailContent.settings || 'Settings'}
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: 'var(--font-size-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.minNights || 'Min Nights'}</span>
-                <span>{listing.minNights}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.checkIn || 'Check-in'}</span>
-                <span>{listing.checkInTime || '14:00'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.checkOut || 'Check-out'}</span>
-                <span>{listing.checkOutTime || '11:00'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>{detailContent.cancellation || 'Cancellation'}</span>
-                <span style={{ textTransform: 'capitalize' }}>{listing.cancellationPolicy || 'Flexible'}</span>
-              </div>
+              {[
+                { label: detailContent.minNights || 'Min Nights', value: listing.minNights },
+                { label: detailContent.checkIn || 'Check-in', value: listing.checkInTime || '14:00' },
+                { label: detailContent.checkOut || 'Check-out', value: listing.checkOutTime || '11:00' },
+                { label: detailContent.cancellation || 'Cancellation', value: listing.cancellationPolicy || 'Flexible', capitalize: true },
+              ].map((item) => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
+                  <span style={{ textTransform: item.capitalize ? 'capitalize' : 'none' }}>{item.value}</span>
+                </div>
+              ))}
             </div>
           </Card>
 
