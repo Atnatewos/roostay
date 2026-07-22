@@ -2,8 +2,11 @@
 // Express error handling middleware
 // Catches all errors thrown in route handlers and returns structured JSON responses
 // Handles both operational errors and unexpected programming errors
+// Emits error events for observability via events.errorOccurred()
+// Author: Theron
 
 const logger = require('./logger');
+const events = require('./events');
 const { AppError } = require('./errors');
 
 let config;
@@ -16,27 +19,29 @@ try {
 /**
  * Express error handling middleware.
  * Must be registered AFTER all routes in the Express app.
- * Handles:
- * - AppError instances (operational errors with status codes)
- * - Joi validation errors (converted to 400 responses)
- * - Multer file upload errors (converted to 400 responses)
- * - JWT errors (converted to 401 responses)
- * - PostgreSQL errors (converted to appropriate status codes)
- * - Unexpected errors (logged with stack trace, returns generic 500)
  *
- * @param {Error} err - The error object
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * @param {Error}    err  - The error object
+ * @param {Object}   req  - Express request object
+ * @param {Object}   res  - Express response object
  * @param {Function} next - Express next middleware function
  */
 function errorHandler(err, req, res, next) {
-  // Log the error with request context
+  // Log the error with full context
   logger.error('Unhandled error in request', {
     method: req.method,
     path: req.originalUrl,
     error: err.message,
     stack: config.app.debug ? err.stack : undefined,
     userId: req.user ? req.user.id : undefined,
+  });
+
+  // Emit error event for observability pipeline
+  events.errorOccurred(err, {
+    method: req.method,
+    path: req.originalUrl,
+    userId: req.user?.id,
+    userRole: req.user?.role,
+    ip: req.ip,
   });
 
   // Handle known operational errors
@@ -49,12 +54,10 @@ function errorHandler(err, req, res, next) {
       },
     };
 
-    // Include validation details if available
     if (err.details && Object.keys(err.details).length > 0) {
       response.error.details = err.details;
     }
 
-    // Include retry-after header for rate limit errors
     if (err.retryAfter) {
       res.set('Retry-After', String(err.retryAfter));
     }
@@ -151,10 +154,9 @@ function errorHandler(err, req, res, next) {
 
 /**
  * 404 handler middleware for routes that don't match any route.
- * Must be registered BEFORE the error handler but AFTER all routes.
  *
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * @param {Object}   req  - Express request object
+ * @param {Object}   res  - Express response object
  * @param {Function} next - Express next middleware function
  */
 function notFoundHandler(req, res, next) {
