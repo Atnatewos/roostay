@@ -7,12 +7,18 @@ const logger = require('../../utils/logger');
 
 const favoriteController = {
   /**
-   * POST /api/favorites/:listingId
+   * POST /api/favorites/:id
    * Toggles a listing as favorite for the authenticated user.
    * If already favorited, removes it. If not, adds it.
    */
   toggleFavorite: asyncHandler(async (req, res) => {
-    const result = await favoriteService.toggleFavorite(req.user.id, req.params.listingId);
+    const result = await favoriteService.toggleFavorite(req.user.id, req.params.id);
+
+    logger.info('Favorite toggled', {
+      userId: req.user.id,
+      listingId: req.params.id,
+      action: result.action,
+    });
 
     res.status(200).json({
       success: true,
@@ -37,11 +43,11 @@ const favoriteController = {
   }),
 
   /**
-   * GET /api/favorites/:listingId/check
-   * Checks if a specific listing is favorited.
+   * GET /api/favorites/:id/check
+   * Checks if a specific listing is favorited by the authenticated user.
    */
   checkFavorite: asyncHandler(async (req, res) => {
-    const isFavorited = await favoriteService.isFavorited(req.user.id, req.params.listingId);
+    const isFavorited = await favoriteService.isFavorited(req.user.id, req.params.id);
 
     res.status(200).json({
       success: true,

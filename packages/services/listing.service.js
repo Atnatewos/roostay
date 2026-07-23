@@ -3,6 +3,8 @@
 // Supports short-term, long-term, and dual listing types
 // All queries use parameterized statements for security
 // Feature flags control listing approval workflow via config
+// Now returns favorite_count for social proof on listing cards
+// Author: Theron
 
 const { query, queryOne } = require('../database');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/errors');
@@ -190,6 +192,7 @@ const listingService = {
 
   /**
    * Retrieves a single listing by ID with all related data.
+   * Includes favorite count for social proof display.
    *
    * @param {string} listingId - The listing ID
    * @returns {Promise<Object>} Full listing details with host info, amenities, images
@@ -229,6 +232,12 @@ const listingService = {
       `SELECT COUNT(*) as total_reviews,
               ROUND(AVG(rating_overall)::numeric, 1) as avg_rating
        FROM reviews WHERE listing_id = $1`,
+      [listingId]
+    );
+
+    // Fetch favorite count for social proof
+    const favoriteCount = await queryOne(
+      'SELECT COUNT(*) as count FROM favorites WHERE listing_id = $1',
       [listingId]
     );
 
@@ -278,6 +287,7 @@ const listingService = {
         avgRating: parseFloat(reviewsSummary.avg_rating) || 0,
       },
       viewCount: listing.view_count,
+      favoriteCount: parseInt(favoriteCount.count, 10) || 0,
       isActive: listing.is_active,
       isApproved: listing.is_approved,
       createdAt: listing.created_at,
@@ -286,10 +296,10 @@ const listingService = {
 
   /**
    * Searches listings with filters and pagination.
-   * Supports filtering by city, type, price range, guests, and amenities.
+   * Includes favorite count for social proof on each listing card.
    *
    * @param {Object} filters - Search filters
-   * @returns {Promise<Object>} Paginated search results
+   * @returns {Promise<Object>} Paginated search results with favorite counts
    */
   async searchListings(filters = {}) {
     const {
@@ -402,7 +412,8 @@ const listingService = {
               l.street_address, l.city, l.subcity,
               l.latitude, l.longitude,
               l.instant_book, l.view_count, l.created_at,
-              u.first_name as host_first_name, u.last_name as host_last_name
+              u.first_name as host_first_name, u.last_name as host_last_name,
+              (SELECT COUNT(*) FROM favorites f WHERE f.listing_id = l.id) as favorite_count
        FROM listings l
        JOIN users u ON l.host_id = u.id
        ${whereClause}
@@ -450,6 +461,7 @@ const listingService = {
         primaryImage: primaryImages[l.id] || null,
         instantBook: l.instant_book,
         viewCount: l.view_count,
+        favoriteCount: parseInt(l.favorite_count, 10) || 0,
         createdAt: l.created_at,
       })),
       pagination: {
@@ -584,7 +596,8 @@ const listingService = {
 
     const listings = await query(
       `SELECT l.*, 
-              (SELECT image_url FROM listing_images WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image
+              (SELECT image_url FROM listing_images WHERE listing_id = l.id AND is_primary = true LIMIT 1) as primary_image,
+              (SELECT COUNT(*) FROM favorites f WHERE f.listing_id = l.id) as favorite_count
        FROM listings l
        WHERE l.host_id = $1
        ORDER BY l.created_at DESC

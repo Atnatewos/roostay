@@ -1,7 +1,8 @@
 // frontend/components/listing/ListingCard.jsx
 // Property preview card component for listing grids
-// Premium vertical layout with inline-critical dimensions to prevent CSS conflicts
-// 1:1 aspect ratio image, heart overlay, clean typography
+// Premium vertical layout — only grid-critical dimensions use inline styles
+// All other styling comes from premium-listings.css for clean separation
+// Features animated heart burst, social proof saved count, 1:1 aspect ratio
 // Author: Theron
 'use client';
 
@@ -14,21 +15,34 @@ import constants from '@/lib/constants';
 const PLACEHOLDER = '/images/placeholder-listing.svg';
 
 /**
- * Premium listing card with inline-critical sizing to guarantee consistency.
- * Card width, image aspect ratio, and spacing are enforced via inline styles
- * to override any legacy CSS conflicts across the platform.
+ * Premium listing card — grid-critical dimensions are inline to prevent
+ * CSS cascade conflicts across the platform. All decorative styles,
+ * animations, hover states, and typography live in premium-listings.css.
  *
  * @param {Object}    props
  * @param {Object}    props.listing        - Listing data object
- * @param {boolean}   [props.showFavorite] - Whether to show favorite heart
- * @param {Function}  [props.onToggle]     - Optional callback when favorite state changes (listingId, isNowFavorited)
+ * @param {boolean}   [props.showFavorite]  - Whether to show favorite heart
+ * @param {Function}  [props.onToggle]      - Callback on favorite state change
  */
-export default function ListingCard({ listing, showFavorite = true, onToggle }) {
-  // Default to true if the listing object explicitly says so, otherwise false
-  const [isFavorited, setIsFavorited] = useState(listing.isFavorited ?? false);
+export default function ListingCard({
+  listing,
+  showFavorite = true,
+  onToggle,
+}) {
+  // Initialize favorite state — check multiple possible fields from different API endpoints
+  const [isFavorited, setIsFavorited] = useState(
+    listing.isFavorited ||
+    listing.is_favorited ||
+    listing.isFavourite ||
+    listing.is_favourite ||
+    false
+  );
 
-  // Resolve image with fallback chain
-  const rawImageUrl = listing.primaryImage || listing.primary_image || listing.image_url;
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Resolve image with multi-field fallback
+  const rawImageUrl =
+    listing.primaryImage || listing.primary_image || listing.image_url;
   const displayImage = rawImageUrl || PLACEHOLDER;
 
   // Resolve listing type and pricing
@@ -44,29 +58,34 @@ export default function ListingCard({ listing, showFavorite = true, onToggle }) 
   const pricePeriod = listingType === 'long_term' ? 'month' : 'night';
 
   // Resolve rating
-  const rating = listing.reviews?.avgRating || listing.reviews?.avg_rating || 0;
-  const reviewCount = listing.reviews?.total || listing.reviews?.totalReviews || 0;
+  const rating =
+    listing.reviews?.avgRating || listing.reviews?.avg_rating || 0;
 
   // Resolve location
   const location = listing.city || listing.location?.city || '';
   const sublocation = listing.subcity || listing.location?.subcity || '';
 
+  // Social proof — how many users have saved this listing
+  const savedCount = listing.favoriteCount || listing.favorite_count || 0;
+
   /**
    * Toggles favorite state for this listing.
-   * Stops event propagation to prevent link navigation.
-   * Notifies parent component via onToggle callback if provided.
-   *
-   * @param {Event} e - Click event
+   * Triggers a heart burst animation on the like action.
    */
   async function handleFavoriteToggle(e) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     try {
       await apiClient.post(`/favorites/${listing.id}`);
       const newState = !isFavorited;
       setIsFavorited(newState);
-      
+
+      if (newState) {
+        setIsAnimating(true);
+        setTimeout(() => setIsAnimating(false), 600);
+      }
+
       if (onToggle) {
         onToggle(listing.id, newState);
       }
@@ -79,37 +98,20 @@ export default function ListingCard({ listing, showFavorite = true, onToggle }) 
     <div
       className="premium-listing-card"
       style={{
-        position: 'relative',
-        cursor: 'pointer',
-        borderRadius: '12px',
-        background: 'transparent',
-        border: 'none',
-        boxShadow: 'none',
         width: '100%',
         minWidth: '0',
         maxWidth: '100%',
-        margin: '0',
-        padding: '0',
       }}
     >
       <Link
         href={`/listings/${listing.id}`}
-        style={{
-          display: 'block',
-          textDecoration: 'none',
-          color: 'inherit',
-        }}
+        className="premium-listing-card__link"
       >
-        {/* Image Container — inline 1:1 aspect ratio is CRITICAL */}
+        {/* Image Container — 1:1 aspect ratio enforced inline */}
         <div
           className="premium-listing-card__image-wrapper"
           style={{
-            position: 'relative',
-            width: '100%',
             aspectRatio: '1 / 1',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            background: '#F1F3F5',
           }}
         >
           <img
@@ -117,15 +119,6 @@ export default function ListingCard({ listing, showFavorite = true, onToggle }) 
             alt={listing.title}
             className="premium-listing-card__image"
             loading="lazy"
-            style={{
-              display: 'block',
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              position: 'absolute',
-              inset: '0',
-              transition: 'transform 0.3s ease',
-            }}
             onError={(e) => {
               if (e.target.src !== PLACEHOLDER) {
                 e.target.src = PLACEHOLDER;
@@ -134,17 +127,11 @@ export default function ListingCard({ listing, showFavorite = true, onToggle }) 
           />
 
           {/* Badges Overlay */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '12px',
-              left: '12px',
-              display: 'flex',
-              gap: '6px',
-              zIndex: '2',
-            }}
-          >
-            <Badge variant={listingType === 'short_term' ? 'primary' : 'info'} size="sm">
+          <div className="premium-listing-card__badges">
+            <Badge
+              variant={listingType === 'short_term' ? 'primary' : 'info'}
+              size="sm"
+            >
               {listingType === 'short_term' ? 'Short Stay' : 'Long Stay'}
             </Badge>
             {(listing.instantBook || listing.instant_book) && (
@@ -154,89 +141,89 @@ export default function ListingCard({ listing, showFavorite = true, onToggle }) 
             )}
           </div>
 
-          {/* Favorite Heart Overlay */}
+          {/* Favorite Heart Overlay — Fast pop animation with glow and sparkles */}
           {showFavorite && (
             <button
               type="button"
               onClick={handleFavoriteToggle}
-              aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                zIndex: '3',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.15s ease',
-              }}
+              aria-label={
+                isFavorited
+                  ? 'Remove from favorites'
+                  : 'Add to favorites'
+              }
+              className={`premium-listing-card__heart ${
+                isFavorited ? 'premium-listing-card__heart--active' : ''
+              } ${isAnimating ? 'premium-listing-card__heart--popping' : ''}`}
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="24"
-                height="24"
-                style={{
-                  fill: isFavorited ? '#E41D56' : 'rgba(0, 0, 0, 0.25)',
-                  stroke: isFavorited ? '#E41D56' : '#FFFFFF',
-                  strokeWidth: '2px',
-                  filter: isFavorited ? 'none' : 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4))',
-                  transition: 'fill 0.15s ease',
-                }}
-              >
+              {/* Heart SVG */}
+              <svg viewBox="0 0 24 24" width="24" height="24">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
+              </svg>
+
+              {/* Inner glow ring */}
+              <span
+                className={`premium-listing-card__heart-ring ${
+                  isAnimating
+                    ? 'premium-listing-card__heart-ring--bursting'
+                    : ''
+                }`}
+              />
+
+              {/* Outer glow ring */}
+              <span
+                className={`premium-listing-card__heart-ring premium-listing-card__heart-ring--outer ${
+                  isAnimating
+                    ? 'premium-listing-card__heart-ring--bursting'
+                    : ''
+                }`}
+              />
+
+              {/* Sparkle particles */}
+              <span
+                className={`premium-listing-card__heart-sparkle ${
+                  isAnimating
+                    ? 'premium-listing-card__heart-sparkle--bursting'
+                    : ''
+                }`}
+              />
+              <span
+                className={`premium-listing-card__heart-sparkle ${
+                  isAnimating
+                    ? 'premium-listing-card__heart-sparkle--bursting'
+                    : ''
+                }`}
+              />
+              <span
+                className={`premium-listing-card__heart-sparkle ${
+                  isAnimating
+                    ? 'premium-listing-card__heart-sparkle--bursting'
+                    : ''
+                }`}
+              />
+              <span
+                className={`premium-listing-card__heart-sparkle ${
+                  isAnimating
+                    ? 'premium-listing-card__heart-sparkle--bursting'
+                    : ''
+                }`}
+              />
             </button>
           )}
         </div>
 
         {/* Content Below Image */}
-        <div
-          style={{
-            padding: '12px 0 0 0',
-          }}
-        >
-          {/* Title Row */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: '8px',
-              marginBottom: '2px',
-            }}
-          >
-            <h3
-              style={{
-                fontSize: '15px',
-                fontWeight: '600',
-                color: '#1A1A2E',
-                lineHeight: '1.3',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: '1',
-                margin: '0',
-              }}
-            >
-              {listing.title}
-            </h3>
+        <div className="premium-listing-card__content">
+          {/* Title Row with Rating */}
+          <div className="premium-listing-card__title-row">
+            <h3 className="premium-listing-card__title">{listing.title}</h3>
             {rating > 0 && (
-              <span
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '2px',
-                  fontSize: '14px',
-                  fontWeight: '400',
-                  color: '#1A1A2E',
-                  flexShrink: '0',
-                }}
-              >
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="#1A1A2E">
+              <span className="premium-listing-card__rating">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="12"
+                  height="12"
+                  fill="currentColor"
+                >
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
                 {rating}
@@ -245,41 +232,40 @@ export default function ListingCard({ listing, showFavorite = true, onToggle }) 
           </div>
 
           {/* Location */}
-          <p
-            style={{
-              fontSize: '15px',
-              fontWeight: '400',
-              color: '#9CA3AF',
-              margin: '0 0 2px 0',
-            }}
-          >
+          <p className="premium-listing-card__location">
             {sublocation ? `${sublocation}, ${location}` : location}
           </p>
 
           {/* Property Details */}
-          <p
-            style={{
-              fontSize: '15px',
-              fontWeight: '400',
-              color: '#9CA3AF',
-              margin: '0 0 2px 0',
-            }}
-          >
+          <p className="premium-listing-card__details">
             {listing.bedrooms} bed{listing.bedrooms !== 1 ? 's' : ''} ·{' '}
             {listing.bathrooms} bath{listing.bathrooms !== 1 ? 's' : ''}
           </p>
 
-          {/* Price */}
-          <p
-            style={{
-              fontSize: '15px',
-              color: '#1A1A2E',
-              margin: '6px 0 0 0',
-            }}
-          >
-            <span style={{ fontWeight: '600' }}>{priceDisplay}</span>
-            <span style={{ fontWeight: '400' }}> {pricePeriod}</span>
-          </p>
+          {/* Price Row with Social Proof Saved Count */}
+          <div className="premium-listing-card__footer">
+            <p className="premium-listing-card__price">
+              <span className="premium-listing-card__price-amount">
+                {priceDisplay}
+              </span>
+              <span className="premium-listing-card__price-period">
+                {' '}
+                {pricePeriod}
+              </span>
+            </p>
+
+            {savedCount > 0 && (
+              <span
+                className="premium-listing-card__saved-count"
+                title={`Saved by ${savedCount} ${savedCount === 1 ? 'traveler' : 'travelers'}`}
+              >
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+                {savedCount}
+              </span>
+            )}
+          </div>
         </div>
       </Link>
     </div>

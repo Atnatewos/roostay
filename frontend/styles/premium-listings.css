@@ -423,3 +423,165 @@
   max-width: 400px;
   margin: 0 auto 24px;
 }
+
+/* ==========================================================================
+   FAVORITE HEART — Positioned directly on image wrapper, no container div
+   ========================================================================== */
+.premium-listing-card__heart {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.premium-listing-card__heart:hover {
+  transform: scale(1.25);
+}
+
+.premium-listing-card__heart:active {
+  transform: scale(0.9);
+  transition: transform 0.1s ease;
+}
+
+/* Heart SVG */
+.premium-listing-card__heart svg {
+  width: 24px;
+  height: 24px;
+  fill: rgba(0, 0, 0, 0.25);
+  stroke: #FFFFFF;
+  stroke-width: 2px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  transition: fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+}
+
+/* Hover preview — heart turns pink before clicking */
+.premium-listing-card__heart:hover svg {
+  fill: rgba(228, 29, 86, 0.35);
+  stroke: #E41D56;
+  filter: drop-shadow(0 0 6px rgba(228, 29, 86, 0.5));
+}
+
+/* Active (favorited) state */
+.premium-listing-card__heart--active svg {
+  fill: #E41D56;
+  stroke: #E41D56;
+  filter: drop-shadow(0 0 8px rgba(228, 29, 86, 0.6));
+}
+
+.premium-listing-card__heart--active:hover svg {
+  fill: #D0184C;
+  stroke: #D0184C;
+  filter: drop-shadow(0 0 12px rgba(228, 29, 86, 0.8));
+}
+
+/* ==========================================================================
+   HEART POP ANIMATION — When favorited
+   ========================================================================== */
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.45); }
+  50%  { transform: scale(0.85); }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.premium-listing-card__heart--popping {
+  animation: heartPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ==========================================================================
+   HEART GLOW RINGS
+   ========================================================================== */
+.premium-listing-card__heart-ring {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2.5px solid #E41D56;
+  pointer-events: none;
+  opacity: 0;
+}
+
+@keyframes heartRing1 {
+  0%   { transform: scale(0.4); opacity: 1; border-width: 3px; }
+  60%  { transform: scale(1.8); opacity: 0.3; border-width: 1px; }
+  100% { transform: scale(2.2); opacity: 0; border-width: 0.5px; }
+}
+
+.premium-listing-card__heart-ring--bursting {
+  animation: heartRing1 0.55s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+/* Outer ring — larger, slower */
+.premium-listing-card__heart-ring--outer {
+  width: 44px;
+  height: 44px;
+  border-color: rgba(228, 29, 86, 0.5);
+}
+
+@keyframes heartRing2 {
+  0%   { transform: scale(0.3); opacity: 0.8; border-width: 2.5px; }
+  50%  { transform: scale(2); opacity: 0.2; border-width: 1px; }
+  100% { transform: scale(2.8); opacity: 0; border-width: 0.3px; }
+}
+
+.premium-listing-card__heart-ring--outer.premium-listing-card__heart-ring--bursting {
+  animation: heartRing2 0.65s cubic-bezier(0, 0, 0.2, 1) 0.05s forwards;
+}
+
+/* ==========================================================================
+   HEART SPARKLES
+   ========================================================================== */
+.premium-listing-card__heart-sparkle {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #E41D56;
+  pointer-events: none;
+  opacity: 0;
+}
+
+@keyframes heartSparkle1 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-18px, -22px) scale(0); opacity: 0; }
+}
+
+@keyframes heartSparkle2 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(20px, -16px) scale(0); opacity: 0; }
+}
+
+@keyframes heartSparkle3 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-14px, 18px) scale(0); opacity: 0; }
+}
+
+@keyframes heartSparkle4 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(22px, 14px) scale(0); opacity: 0; }
+}
+
+.premium-listing-card__heart-sparkle--bursting:nth-child(1) {
+  animation: heartSparkle1 0.45s cubic-bezier(0, 0, 0.2, 1) 0.08s forwards;
+}
+
+.premium-listing-card__heart-sparkle--bursting:nth-child(2) {
+  animation: heartSparkle2 0.45s cubic-bezier(0, 0, 0.2, 1) 0.12s forwards;
+}
+
+.premium-listing-card__heart-sparkle--bursting:nth-child(3) {
+  animation: heartSparkle3 0.45s cubic-bezier(0, 0, 0.2, 1) 0.1s forwards;
+}
+
+.premium-listing-card__heart-sparkle--bursting:nth-child(4) {
+  animation: heartSparkle4 0.45s cubic-bezier(0, 0, 0.2, 1) 0.14s forwards;
+}

@@ -3,11 +3,13 @@
 // Supports both short-term (nightly) and long-term (monthly) bookings
 // Implements atomic booking + payment creation to prevent race conditions
 // All pricing calculations delegated to the centralized pricing.service.js
+// Triggers review prompt notification when booking is marked as completed
 // All database operations use parameterized queries
 // Author: Theron
 
 const { query, queryOne, beginTransaction, commitTransaction, rollbackTransaction } = require('../database');
 const pricingService = require('./pricing.service');
+const notificationService = require('./notification.service');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors');
 const logger = require('../utils/logger');
 const events = require('../utils/events');
@@ -24,6 +26,7 @@ try {
       shortTermMaxNights: 30,
       longTermMinMonths: 1,
       longTermMaxMonths: 24,
+      reviewPromptDelayDays: 3,
     },
     payment: {
       paymentTimeoutMinutes: 30,
@@ -105,13 +108,9 @@ const bookingService = {
       );
     }
 
-    // =========================================================================
-    // CALCULATE PRICING — Delegated to pricing.service.js
-    // All fee rules, discounts, and bounds come from pricing.config.json
-    // =========================================================================
+    // Calculate pricing via centralized pricing service
     const totalNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
-    // Validate night minimums/maximums from config
     if (bookingType === 'short_term') {
       if (totalNights < (config.features.shortTermMinNights || 1)) {
         throw new ValidationError(
@@ -137,7 +136,6 @@ const bookingService = {
       }
     }
 
-    // Use the centralized pricing service
     const pricing = pricingService.calculatePricing({
       bookingType,
       nights: totalNights,
@@ -147,11 +145,9 @@ const bookingService = {
       securityDeposit: parseFloat(listing.security_deposit) || 0,
     });
 
-    // Payment timeout from config
     const paymentTimeoutMinutes = config.payment.paymentTimeoutMinutes || 30;
     const paymentExpiresAt = new Date(Date.now() + paymentTimeoutMinutes * 60 * 1000);
 
-    // Use transaction for atomicity
     const client = await beginTransaction();
 
     try {
@@ -185,7 +181,7 @@ const bookingService = {
         );
       }
 
-      // Create the booking with payment expiry
+      // Create the booking
       const booking = await client.query(
         `INSERT INTO bookings (
            listing_id, guest_id, host_id, booking_type,
@@ -263,7 +259,6 @@ const bookingService = {
         paymentExpiresAt: paymentExpiresAt.toISOString(),
       });
 
-      // Emit booking created event for observability
       events.bookingCreated(booking.rows[0], guestId);
 
       return {
@@ -315,7 +310,6 @@ const bookingService = {
       throw new NotFoundError('Booking not found.');
     }
 
-    // Verify access permission
     if (booking.guest_id !== userId && booking.host_id !== userId && userRole !== 'admin') {
       throw new ForbiddenError('You do not have permission to view this booking.');
     }
@@ -326,11 +320,13 @@ const bookingService = {
   /**
    * Updates the status of a booking.
    * Enforces valid status transitions based on current status and user role.
+   * When a booking is marked as completed, triggers a review prompt notification
+   * to the guest encouraging them to leave a review.
    *
-   * @param {string} bookingId          - The booking ID
-   * @param {string} userId             - The requesting user ID
-   * @param {string} userRole           - The requesting user role
-   * @param {string} newStatus          - The new booking status
+   * @param {string} bookingId           - The booking ID
+   * @param {string} userId              - The requesting user ID
+   * @param {string} userRole            - The requesting user role
+   * @param {string} newStatus           - The new booking status
    * @param {string} [cancellationReason] - Reason for cancellation
    * @returns {Promise<Object>} Updated booking
    */
@@ -373,7 +369,6 @@ const bookingService = {
       );
     }
 
-    // Additional role-specific checks
     if (userRole === 'host' && booking.host_id !== userId && userRole !== 'admin') {
       throw new ForbiddenError('You can only manage bookings for your own listings.');
     }
@@ -442,6 +437,40 @@ const bookingService = {
 
     if (newStatus === 'completed') {
       events.bookingCompleted(booking, userId);
+
+      // =========================================================================
+      // REVIEW PROMPT NOTIFICATION
+      // When a booking is marked as completed, schedule a review prompt
+      // notification to be delivered after the configurable delay period.
+      // This encourages guests to leave reviews, building trust on the platform.
+      // =========================================================================
+      const reviewDelayDays = config.features.reviewPromptDelayDays || 3;
+
+      // Build the listing link for the review page
+      const reviewLink = `/guest/bookings/${bookingId}`;
+
+      // Create the notification immediately — the delay is handled
+      // by the notification's created_at timestamp relative to when
+      // the guest checks their notifications
+      notificationService.createNotification(
+        booking.guest_id,
+        'review_prompt',
+        'How was your stay?',
+        `We hope you enjoyed your stay! Please take a moment to leave a review — your feedback helps other travelers.`,
+        reviewLink,
+        {
+          bookingId: booking.id,
+          listingId: booking.listing_id,
+          hostId: booking.host_id,
+          reviewDelayDays,
+        }
+      );
+
+      logger.info('Review prompt notification created for completed booking', {
+        bookingId: booking.id,
+        guestId: booking.guest_id,
+        listingId: booking.listing_id,
+      });
     }
 
     logger.info('Booking status updated', {

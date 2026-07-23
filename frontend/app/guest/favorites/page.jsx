@@ -1,6 +1,7 @@
 // frontend/app/guest/favorites/page.jsx
 // Guest Favorites Page — displays all saved/favorited property listings
 // Uses the shared ListingCard component for 100% visual consistency
+// Features optimistic removal on unfavorite, empty state, and pagination
 // Author: Theron
 'use client';
 
@@ -12,51 +13,71 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import ListingCard from '@/components/listing/ListingCard';
 import Pagination from '@/components/ui/Pagination';
-import Skeleton from '@/components/ui/Skeleton';
+import useConfig from '@/hooks/useConfig';
 import { apiClient, ApiError } from '@/lib/api';
 import constants from '@/lib/constants';
 
 /**
  * Guest Favorites Page
- * Displays a responsive grid of favorited listings.
- * Leverages the shared ListingCard component to ensure identical 
- * styling, spacing, and behavior across the entire platform.
+ * Displays a responsive grid of favorited listings using the shared
+ * ListingCard component to ensure identical styling, spacing, and
+ * behavior across the entire platform. Supports optimistic unfavorite
+ * removal and pagination.
  */
 export default function GuestFavoritesPage() {
+  const { content } = useConfig();
+  const favoritesContent = content?.favorites || {};
+
+  // Favorites data state
   const [favorites, setFavorites] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, totalItems: 0 });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    totalItems: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   /**
    * Fetches paginated favorites from the API.
-   * Uses useCallback to enable clean retry functionality on error.
+   * Wrapped in useCallback for clean retry on error.
    *
    * @param {number} [page=1] - Page number to fetch
    */
   const fetchFavorites = useCallback(async (page = 1) => {
     setIsLoading(true);
     setError(null);
+
     try {
-      const response = await apiClient.get(`/favorites?page=${page}&limit=12`);
+      const response = await apiClient.get(
+        `/favorites?page=${page}&limit=12`
+      );
+
       setFavorites(response?.data || []);
+
       if (response?.pagination) {
         setPagination(response.pagination);
       }
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) {
-          setError('Please log in to view your favorites.');
+          setError(
+            favoritesContent.loginRequired ||
+              'Please log in to view your favorites.'
+          );
         } else {
           setError(err.message);
         }
       } else {
-        setError('Failed to load favorites. Please try again.');
+        setError(
+          favoritesContent.loadError ||
+            'Failed to load favorites. Please try again.'
+        );
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [favoritesContent.loginRequired, favoritesContent.loadError]);
 
   // Fetch favorites on initial mount
   useEffect(() => {
@@ -64,17 +85,19 @@ export default function GuestFavoritesPage() {
   }, [fetchFavorites]);
 
   /**
-   * Handles the favorite toggle event triggered by the ListingCard component.
-   * Optimistically removes the listing from the local state when unfavorited
-   * to provide instant, responsive feedback to the user.
+   * Handles the favorite toggle event from ListingCard.
+   * When a listing is unfavorited, it is optimistically removed
+   * from the local state for instant user feedback.
    *
-   * @param {string} listingId - The ID of the listing that was toggled
-   * @param {boolean} isNowFavorited - The new favorite state (false means it was removed)
+   * @param {string}  listingId       - The listing ID that was toggled
+   * @param {boolean} isNowFavorited  - The new favorite state
    */
   function handleFavoriteToggle(listingId, isNowFavorited) {
     if (!isNowFavorited) {
-      // Optimistically remove from UI immediately
-      setFavorites((prev) => prev.filter((fav) => fav.id !== listingId));
+      // Optimistic removal — instant UI response
+      setFavorites((prev) =>
+        prev.filter((fav) => fav.id !== listingId)
+      );
       setPagination((prev) => ({
         ...prev,
         totalItems: Math.max(0, prev.totalItems - 1),
@@ -83,8 +106,7 @@ export default function GuestFavoritesPage() {
   }
 
   /**
-   * Handles page changes from the Pagination component.
-   * Scrolls to top of page for better user experience.
+   * Handles page changes with smooth scroll to top.
    *
    * @param {number} page - New page number
    */
@@ -96,37 +118,67 @@ export default function GuestFavoritesPage() {
   return (
     <>
       <Header />
-      <main className="container" style={{ paddingTop: '3rem', paddingBottom: '4rem' }}>
+      <main
+        className="container"
+        style={{ paddingTop: '3rem', paddingBottom: '4rem' }}
+      >
         {/* Page Header */}
         <div style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: '0.5rem' }}>
-            My Favorites
+          <h1
+            style={{
+              fontSize: 'var(--font-size-3xl)',
+              fontWeight: 'var(--font-weight-bold)',
+              marginBottom: '0.5rem',
+            }}
+          >
+            {favoritesContent.title || 'My Favorites'}
           </h1>
           <p style={{ color: 'var(--color-text-secondary)' }}>
             {pagination.totalItems > 0
-              ? `You have ${pagination.totalItems} saved ${pagination.totalItems === 1 ? 'listing' : 'listings'}.`
-              : 'Save listings you love to find them quickly later.'}
+              ? `${favoritesContent.youHave || 'You have'} ${pagination.totalItems} ${pagination.totalItems === 1 ? (favoritesContent.listingSingular || 'saved listing') : (favoritesContent.listingPlural || 'saved listings')}.`
+              : favoritesContent.emptyHint ||
+                'Save listings you love to find them quickly later.'}
           </p>
         </div>
 
         {/* Error State */}
         {error && (
-          <Card padding="lg" style={{ marginBottom: '2rem', borderLeft: '3px solid var(--color-error)' }}>
-            <p style={{ color: 'var(--color-error)', marginBottom: '1rem' }}>{error}</p>
+          <Card
+            padding="lg"
+            style={{
+              marginBottom: '2rem',
+              borderLeft: '3px solid var(--color-error)',
+            }}
+          >
+            <p
+              style={{
+                color: 'var(--color-error)',
+                marginBottom: '1rem',
+              }}
+            >
+              {error}
+            </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button variant="outline" size="sm" onClick={() => fetchFavorites(1)}>
-                Try Again
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchFavorites(1)}
+              >
+                {favoritesContent.tryAgain || 'Try Again'}
               </Button>
               {error.includes('log in') && (
-                <Link href={constants.ROUTES.LOGIN} className="btn btn--primary btn--sm">
-                  Sign In
+                <Link
+                  href={constants.ROUTES.LOGIN}
+                  className="btn btn--primary btn--sm"
+                >
+                  {favoritesContent.signIn || 'Sign In'}
                 </Link>
               )}
             </div>
           </Card>
         )}
 
-        {/* Loading State */}
+        {/* Loading State — Skeleton grid matching premium card dimensions */}
         {isLoading ? (
           <div className="premium-listings-grid">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -141,38 +193,68 @@ export default function GuestFavoritesPage() {
             ))}
           </div>
         ) : favorites.length === 0 && !error ? (
-          /* Empty State */
+          /* Empty State — Shown when user has no saved listings */
           <Card padding="lg">
-            <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }}>
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '4rem 1rem',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '3rem',
+                  marginBottom: '1rem',
+                  opacity: 0.3,
+                }}
+              >
                 &#9825;
               </div>
-              <h2 style={{ fontSize: 'var(--font-size-xl)', marginBottom: '0.5rem' }}>
-                No favorites yet
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-xl)',
+                  marginBottom: '0.5rem',
+                }}
+              >
+                {favoritesContent.emptyTitle || 'No favorites yet'}
               </h2>
-              <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem auto' }}>
-                Tap the heart icon on any listing to save it here. Start exploring to find your perfect stay.
+              <p
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '2rem',
+                  maxWidth: '400px',
+                  margin: '0 auto 2rem auto',
+                }}
+              >
+                {favoritesContent.emptyDescription ||
+                  'Tap the heart icon on any listing to save it here. Start exploring to find your perfect stay.'}
               </p>
-              <Link href={constants.ROUTES.LISTINGS} className="btn btn--primary">
-                Browse Listings
+              <Link
+                href={constants.ROUTES.LISTINGS}
+                className="btn btn--primary"
+              >
+                {favoritesContent.browseListings || 'Browse Listings'}
               </Link>
             </div>
           </Card>
         ) : (
           <>
-            {/* Favorites Grid — Uses shared premium grid for perfect consistency */}
-            <div className="premium-listings-grid" style={{ marginBottom: '2rem' }}>
+            {/* Favorites Grid — Uses shared premium grid for consistency */}
+            <div
+              className="premium-listings-grid"
+              style={{ marginBottom: '2rem' }}
+            >
               {favorites.map((favorite) => (
-                <ListingCard 
-                  key={favorite.id} 
-                  listing={favorite} 
+                <ListingCard
+                  key={favorite.id}
+                  listing={favorite}
                   showFavorite={true}
                   onToggle={handleFavoriteToggle}
                 />
               ))}
             </div>
 
-            {/* Pagination */}
+            {/* Pagination Controls */}
             {pagination.totalPages > 1 && (
               <Pagination
                 currentPage={pagination.page}
