@@ -53,7 +53,8 @@ const listingController = {
    * Public endpoint — increments view count on each request.
    */
   getListingById: asyncHandler(async (req, res) => {
-    const listing = await listingService.getListingById(req.params.id);
+
+    const listing = await listingService.getListingById(req.params.id, req.user?.id);
 
     res.status(200).json({
       success: true,

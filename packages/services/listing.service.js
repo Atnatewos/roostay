@@ -3,7 +3,7 @@
 // Supports short-term, long-term, and dual listing types
 // All queries use parameterized statements for security
 // Feature flags control listing approval workflow via config
-// Now returns favorite_count for social proof on listing cards
+// Returns favorite_count AND is_favorited when user is authenticated
 // Author: Theron
 
 const { query, queryOne } = require('../database');
@@ -36,7 +36,6 @@ const listingService = {
    * @returns {Promise<Object>} Created listing
    */
   async createListing(hostId, listingData) {
-    // Check host listing limit from config
     const hostListingCount = await queryOne(
       'SELECT COUNT(*) as count FROM listings WHERE host_id = $1',
       [hostId]
@@ -50,39 +49,19 @@ const listingService = {
     }
 
     const {
-      title,
-      description,
-      listingType,
-      propertyType,
-      bedrooms,
-      bathrooms,
-      maxGuests,
-      bedsCount,
-      pricePerNight,
-      pricePerMonth,
-      cleaningFee,
-      securityDeposit,
-      weeklyDiscountPercent,
-      monthlyDiscountPercent,
-      streetAddress,
-      city,
-      region,
-      subcity,
-      wereda,
-      latitude,
-      longitude,
-      nearbyLandmarks,
-      instantBook,
-      minNights,
-      maxNights,
-      checkInTime,
-      checkOutTime,
-      houseRules,
-      cancellationPolicy,
+      title, description, listingType, propertyType,
+      bedrooms, bathrooms, maxGuests, bedsCount,
+      pricePerNight, pricePerMonth,
+      cleaningFee, securityDeposit,
+      weeklyDiscountPercent, monthlyDiscountPercent,
+      streetAddress, city, region, subcity, wereda,
+      latitude, longitude, nearbyLandmarks,
+      instantBook, minNights, maxNights,
+      checkInTime, checkOutTime,
+      houseRules, cancellationPolicy,
       amenities,
     } = listingData;
 
-    // Validate listing type pricing
     if ((listingType === 'short_term' || listingType === 'both') && !pricePerNight) {
       throw new ValidationError('Price per night is required for short-term listings.');
     }
@@ -91,7 +70,6 @@ const listingService = {
       throw new ValidationError('Price per month is required for long-term listings.');
     }
 
-    // Determine approval state based on feature flag
     const approvalRequired = config.features.listingApprovalRequired !== false;
     const isApproved = approvalRequired ? false : true;
     const approvalStatus = approvalRequired ? 'pending' : 'approved';
@@ -123,48 +101,24 @@ const listingService = {
         true, $31, $32
       ) RETURNING *`,
       [
-        hostId,
-        title,
-        description,
-        listingType,
-        propertyType,
-        bedrooms || 1,
-        bathrooms || 1,
-        maxGuests || 1,
-        bedsCount || 1,
-        pricePerNight || null,
-        pricePerMonth || null,
-        cleaningFee || 0,
-        securityDeposit || 0,
-        weeklyDiscountPercent || 0,
-        monthlyDiscountPercent || 0,
-        streetAddress,
-        city,
-        region || null,
-        subcity || null,
-        wereda || null,
-        latitude || null,
-        longitude || null,
-        nearbyLandmarks || null,
-        instantBook || false,
-        minNights || 1,
-        maxNights || null,
-        checkInTime || '14:00',
-        checkOutTime || '11:00',
-        houseRules || null,
-        cancellationPolicy || 'flexible',
-        isApproved,
-        approvalStatus,
+        hostId, title, description, listingType, propertyType,
+        bedrooms || 1, bathrooms || 1, maxGuests || 1, bedsCount || 1,
+        pricePerNight || null, pricePerMonth || null,
+        cleaningFee || 0, securityDeposit || 0,
+        weeklyDiscountPercent || 0, monthlyDiscountPercent || 0,
+        streetAddress, city,
+        region || null, subcity || null, wereda || null,
+        latitude || null, longitude || null, nearbyLandmarks || null,
+        instantBook || false, minNights || 1, maxNights || null,
+        checkInTime || '14:00', checkOutTime || '11:00',
+        houseRules || null, cancellationPolicy || 'flexible',
+        isApproved, approvalStatus,
       ]
     );
 
-    // Insert amenities if provided
     if (amenities && Array.isArray(amenities) && amenities.length > 0) {
       const amenityValues = amenities
-        .map(
-          (a, index) =>
-            `($1, $${index * 3 + 2}, $${index * 3 + 3}, $${index * 3 + 4})`
-        )
+        .map((a, index) => `($1, $${index * 3 + 2}, $${index * 3 + 3}, $${index * 3 + 4})`)
         .join(', ');
 
       const amenityParams = [listing.id];
@@ -180,11 +134,7 @@ const listingService = {
     }
 
     logger.info('Listing created', {
-      listingId: listing.id,
-      hostId,
-      listingType,
-      city,
-      approvalStatus,
+      listingId: listing.id, hostId, listingType, city, approvalStatus,
     });
 
     return listing;
@@ -192,13 +142,14 @@ const listingService = {
 
   /**
    * Retrieves a single listing by ID with all related data.
-   * Includes favorite count for social proof display.
+   * When a userId is provided, also checks if that user has favorited this listing.
    *
    * @param {string} listingId - The listing ID
-   * @returns {Promise<Object>} Full listing details with host info, amenities, images
+   * @param {string} [userId]  - Optional user ID to check favorite status
+   * @returns {Promise<Object>} Full listing details
    * @throws {NotFoundError} If listing does not exist
    */
-  async getListingById(listingId) {
+  async getListingById(listingId, userId) {
     const listing = await queryOne(
       `SELECT l.*, u.first_name as host_first_name, u.last_name as host_last_name,
               u.profile_image_url as host_image_url
@@ -212,22 +163,18 @@ const listingService = {
       throw new NotFoundError('Listing not found.');
     }
 
-    // Increment view count
     await query('UPDATE listings SET view_count = view_count + 1 WHERE id = $1', [listingId]);
 
-    // Fetch amenities
     const amenities = await query(
       'SELECT amenity_name, category, icon_name FROM listing_amenities WHERE listing_id = $1 ORDER BY category, amenity_name',
       [listingId]
     );
 
-    // Fetch images
     const images = await query(
       'SELECT id, image_url, thumbnail_url, alt_text, sort_order, is_primary FROM listing_images WHERE listing_id = $1 ORDER BY sort_order',
       [listingId]
     );
 
-    // Fetch reviews summary
     const reviewsSummary = await queryOne(
       `SELECT COUNT(*) as total_reviews,
               ROUND(AVG(rating_overall)::numeric, 1) as avg_rating
@@ -235,11 +182,20 @@ const listingService = {
       [listingId]
     );
 
-    // Fetch favorite count for social proof
     const favoriteCount = await queryOne(
       'SELECT COUNT(*) as count FROM favorites WHERE listing_id = $1',
       [listingId]
     );
+
+    // Check if the requesting user has favorited this listing
+    let isFavorited = false;
+    if (userId) {
+      const favCheck = await queryOne(
+        'SELECT 1 as exists FROM favorites WHERE user_id = $1 AND listing_id = $2',
+        [userId, listingId]
+      );
+      isFavorited = !!favCheck;
+    }
 
     return {
       id: listing.id,
@@ -288,6 +244,7 @@ const listingService = {
       },
       viewCount: listing.view_count,
       favoriteCount: parseInt(favoriteCount.count, 10) || 0,
+      isFavorited,
       isActive: listing.is_active,
       isApproved: listing.is_approved,
       createdAt: listing.created_at,
@@ -296,28 +253,21 @@ const listingService = {
 
   /**
    * Searches listings with filters and pagination.
-   * Includes favorite count for social proof on each listing card.
+   * When a userId is provided, includes is_favorited status for each listing.
    *
    * @param {Object} filters - Search filters
-   * @returns {Promise<Object>} Paginated search results with favorite counts
+   * @param {string} [filters.userId] - Optional user ID to check favorite status
+   * @returns {Promise<Object>} Paginated search results
    */
   async searchListings(filters = {}) {
     const {
       page = 1,
       limit = config.features.paginationDefaultLimit || 12,
-      city,
-      listingType,
-      propertyType,
-      minPrice,
-      maxPrice,
-      guests,
-      bedrooms,
-      bathrooms,
-      amenities,
-      instantBook,
-      search,
-      sortBy = 'created_at',
-      sortOrder = 'DESC',
+      city, listingType, propertyType,
+      minPrice, maxPrice, guests, bedrooms, bathrooms,
+      amenities, instantBook, search,
+      sortBy = 'created_at', sortOrder = 'DESC',
+      userId,
     } = filters;
 
     const offset = (page - 1) * limit;
@@ -386,13 +336,8 @@ const listingService = {
       paramIndex++;
     }
 
-    // Validate sort field to prevent SQL injection
     const allowedSortFields = [
-      'created_at',
-      'price_per_night',
-      'price_per_month',
-      'view_count',
-      'bedrooms',
+      'created_at', 'price_per_night', 'price_per_month', 'view_count', 'bedrooms',
     ];
     const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
     const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
@@ -405,6 +350,11 @@ const listingService = {
     params.push(limit);
     params.push(offset);
 
+    // Build the is_favorited check if userId is provided
+    const favoriteCheck = userId
+      ? `, EXISTS(SELECT 1 FROM favorites f WHERE f.listing_id = l.id AND f.user_id = '${userId}') as is_favorited`
+      : ', false as is_favorited';
+
     const listings = await query(
       `SELECT l.id, l.title, l.listing_type, l.property_type,
               l.bedrooms, l.bathrooms, l.max_guests,
@@ -414,6 +364,7 @@ const listingService = {
               l.instant_book, l.view_count, l.created_at,
               u.first_name as host_first_name, u.last_name as host_last_name,
               (SELECT COUNT(*) FROM favorites f WHERE f.listing_id = l.id) as favorite_count
+              ${favoriteCheck}
        FROM listings l
        JOIN users u ON l.host_id = u.id
        ${whereClause}
@@ -422,7 +373,6 @@ const listingService = {
       params
     );
 
-    // Get primary image for each listing
     const listingIds = listings.rows.map((l) => l.id);
     let primaryImages = {};
     if (listingIds.length > 0) {
@@ -462,35 +412,21 @@ const listingService = {
         instantBook: l.instant_book,
         viewCount: l.view_count,
         favoriteCount: parseInt(l.favorite_count, 10) || 0,
+        isFavorited: l.is_favorited || false,
         createdAt: l.created_at,
       })),
       pagination: {
-        page,
-        limit,
+        page, limit,
         totalItems: parseInt(countResult.total, 10),
         totalPages: Math.ceil(parseInt(countResult.total, 10) / limit),
       },
     };
   },
 
-  /**
-   * Updates a listing. Only the owner can update.
-   *
-   * @param {string} listingId - The listing ID
-   * @param {string} hostId    - The host user ID
-   * @param {Object} updates   - Fields to update
-   * @returns {Promise<Object>} Updated listing
-   */
   async updateListing(listingId, hostId, updates) {
     const listing = await queryOne('SELECT * FROM listings WHERE id = $1', [listingId]);
-
-    if (!listing) {
-      throw new NotFoundError('Listing not found.');
-    }
-
-    if (listing.host_id !== hostId) {
-      throw new ForbiddenError('You can only update your own listings.');
-    }
+    if (!listing) throw new NotFoundError('Listing not found.');
+    if (listing.host_id !== hostId) throw new ForbiddenError('You can only update your own listings.');
 
     const updatableFields = [
       'title', 'description', 'price_per_night', 'price_per_month',
@@ -505,25 +441,16 @@ const listingService = {
     ];
 
     const fieldMap = {
-      pricePerNight: 'price_per_night',
-      pricePerMonth: 'price_per_month',
-      maxGuests: 'max_guests',
-      bedsCount: 'beds_count',
-      cleaningFee: 'cleaning_fee',
-      securityDeposit: 'security_deposit',
+      pricePerNight: 'price_per_night', pricePerMonth: 'price_per_month',
+      maxGuests: 'max_guests', bedsCount: 'beds_count',
+      cleaningFee: 'cleaning_fee', securityDeposit: 'security_deposit',
       weeklyDiscountPercent: 'weekly_discount_percent',
       monthlyDiscountPercent: 'monthly_discount_percent',
-      streetAddress: 'street_address',
-      nearbyLandmarks: 'nearby_landmarks',
-      instantBook: 'instant_book',
-      minNights: 'min_nights',
-      maxNights: 'max_nights',
-      checkInTime: 'check_in_time',
-      checkOutTime: 'check_out_time',
-      houseRules: 'house_rules',
-      cancellationPolicy: 'cancellation_policy',
-      listingType: 'listing_type',
-      propertyType: 'property_type',
+      streetAddress: 'street_address', nearbyLandmarks: 'nearby_landmarks',
+      instantBook: 'instant_book', minNights: 'min_nights', maxNights: 'max_nights',
+      checkInTime: 'check_in_time', checkOutTime: 'check_out_time',
+      houseRules: 'house_rules', cancellationPolicy: 'cancellation_policy',
+      listingType: 'listing_type', propertyType: 'property_type',
     };
 
     const setClauses = [];
@@ -539,59 +466,34 @@ const listingService = {
       }
     }
 
-    if (setClauses.length === 0) {
-      throw new ValidationError('No valid fields to update.');
-    }
+    if (setClauses.length === 0) throw new ValidationError('No valid fields to update.');
 
     params.push(listingId);
-
     const updated = await queryOne(
       `UPDATE listings SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
       params
     );
 
     logger.info('Listing updated', { listingId, hostId });
-
     return updated;
   },
 
-  /**
-   * Deletes a listing. Only the owner or admin can delete.
-   *
-   * @param {string} listingId - The listing ID
-   * @param {string} userId    - The requesting user ID
-   * @param {string} userRole  - The requesting user role
-   */
   async deleteListing(listingId, userId, userRole) {
     const listing = await queryOne('SELECT host_id FROM listings WHERE id = $1', [listingId]);
-
-    if (!listing) {
-      throw new NotFoundError('Listing not found.');
-    }
-
+    if (!listing) throw new NotFoundError('Listing not found.');
     if (listing.host_id !== userId && userRole !== 'admin') {
       throw new ForbiddenError('You do not have permission to delete this listing.');
     }
-
     await query('DELETE FROM listings WHERE id = $1', [listingId]);
-
     logger.info('Listing deleted', { listingId, userId });
   },
 
-  /**
-   * Gets all listings for a specific host.
-   *
-   * @param {string} hostId  - The host user ID
-   * @param {Object} options - Pagination options
-   * @returns {Promise<Object>} Paginated host listings
-   */
   async getHostListings(hostId, options = {}) {
     const { page = 1, limit = 20 } = options;
     const offset = (page - 1) * limit;
 
     const countResult = await queryOne(
-      'SELECT COUNT(*) as total FROM listings WHERE host_id = $1',
-      [hostId]
+      'SELECT COUNT(*) as total FROM listings WHERE host_id = $1', [hostId]
     );
 
     const listings = await query(
@@ -607,12 +509,7 @@ const listingService = {
 
     return {
       listings: listings.rows,
-      pagination: {
-        page,
-        limit,
-        totalItems: parseInt(countResult.total, 10),
-        totalPages: Math.ceil(parseInt(countResult.total, 10) / limit),
-      },
+      pagination: { page, limit, totalItems: parseInt(countResult.total, 10), totalPages: Math.ceil(parseInt(countResult.total, 10) / limit) },
     };
   },
 };
