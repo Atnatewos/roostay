@@ -1,25 +1,43 @@
 // packages/utils/token.js
 // JWT token utility for ROOSTAY authentication
 // Handles access token and refresh token generation and verification
-// All secrets and expiry times come from auth config
+// Prioritizes environment variables for secrets to ensure zero hardcoded credentials
 
 const jwt = require('jsonwebtoken');
 const { AuthError } = require('./errors');
 const logger = require('./logger');
 
-let config;
+// Attempt to load centralized config, fallback to empty object if unavailable
+let appConfig;
 try {
-  config = require('@roostay/config');
+  appConfig = require('@roostay/config');
 } catch {
-  config = {
-    auth: {
-      jwtSecret: process.env.JWT_SECRET || 'dev-secret',
-      jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret',
-      jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
-      jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-      tokenType: 'Bearer',
-    },
-  };
+  appConfig = {};
+}
+
+/**
+ * Resolves authentication configuration.
+ * Environment variables take absolute precedence over config files for secrets,
+ * adhering to the twelve-factor app methodology and preventing hardcoded credentials.
+ */
+const authConfig = {
+  jwtSecret: process.env.JWT_SECRET || appConfig.auth?.jwtSecret,
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || appConfig.auth?.jwtRefreshSecret,
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || appConfig.auth?.jwtExpiresIn || '1h',
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || appConfig.auth?.jwtRefreshExpiresIn || '7d',
+  tokenType: appConfig.auth?.tokenType || 'Bearer',
+};
+
+// Security Check: Ensure critical secrets are defined before proceeding
+// This prevents cryptic 'secretOrPrivateKey must have a value' crashes from jsonwebtoken
+if (!authConfig.jwtSecret) {
+  logger.error('FATAL: JWT_SECRET is missing. Define it in your .env file.');
+  throw new Error('JWT_SECRET must be defined in environment variables');
+}
+
+if (!authConfig.jwtRefreshSecret) {
+  logger.error('FATAL: JWT_REFRESH_SECRET is missing. Define it in your .env file.');
+  throw new Error('JWT_REFRESH_SECRET must be defined in environment variables');
 }
 
 /**
@@ -37,8 +55,8 @@ function generateAccessToken(user) {
     type: 'access',
   };
 
-  return jwt.sign(payload, config.auth.jwtSecret, {
-    expiresIn: config.auth.jwtExpiresIn,
+  return jwt.sign(payload, authConfig.jwtSecret, {
+    expiresIn: authConfig.jwtExpiresIn,
   });
 }
 
@@ -55,8 +73,8 @@ function generateRefreshToken(user) {
     type: 'refresh',
   };
 
-  return jwt.sign(payload, config.auth.jwtRefreshSecret, {
-    expiresIn: config.auth.jwtRefreshExpiresIn,
+  return jwt.sign(payload, authConfig.jwtRefreshSecret, {
+    expiresIn: authConfig.jwtRefreshExpiresIn,
   });
 }
 
@@ -76,8 +94,8 @@ function generateTokenPair(user) {
   return {
     accessToken,
     refreshToken,
-    tokenType: config.auth.tokenType,
-    expiresIn: config.auth.jwtExpiresIn,
+    tokenType: authConfig.tokenType,
+    expiresIn: authConfig.jwtExpiresIn,
   };
 }
 
@@ -91,7 +109,7 @@ function generateTokenPair(user) {
  */
 function verifyAccessToken(token) {
   try {
-    const decoded = jwt.verify(token, config.auth.jwtSecret);
+    const decoded = jwt.verify(token, authConfig.jwtSecret);
 
     // Ensure this is an access token, not a refresh token
     if (decoded.type !== 'access') {
@@ -127,7 +145,7 @@ function verifyAccessToken(token) {
  */
 function verifyRefreshToken(token) {
   try {
-    const decoded = jwt.verify(token, config.auth.jwtRefreshSecret);
+    const decoded = jwt.verify(token, authConfig.jwtRefreshSecret);
 
     // Ensure this is a refresh token, not an access token
     if (decoded.type !== 'refresh') {
@@ -161,7 +179,7 @@ function verifyRefreshToken(token) {
  * @returns {string|null} Extracted token or null if not found
  */
 function extractTokenFromHeader(authHeader) {
-  if (!authHeader || !authHeader.startsWith(`${config.auth.tokenType} `)) {
+  if (!authHeader || !authHeader.startsWith(`${authConfig.tokenType} `)) {
     return null;
   }
 

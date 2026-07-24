@@ -10,7 +10,20 @@ let config;
 try {
   config = require('@roostay/config');
 } catch {
-  config = { auth: { cookies: { accessName: 'roostay_access_token', refreshName: 'roostay_refresh_token', secure: false, sameSite: 'lax', maxAgeAccess: 900000, maxAgeRefresh: 604800000, path: '/' } } };
+  config = { 
+    auth: { 
+      cookies: { 
+        accessName: 'roostay_access_token', 
+        refreshName: 'roostay_refresh_token', 
+        // Fallback: enforce secure=true in production (HTTPS)
+        secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'lax', 
+        maxAgeAccess: 900000, 
+        maxAgeRefresh: 604800000, 
+        path: '/' 
+      } 
+    } 
+  };
 }
 
 /**
@@ -19,20 +32,26 @@ try {
 function setAuthCookies(res, tokens) {
   const cookieConfig = config.auth.cookies;
   
+  // Dynamically enforce secure=true in production to prevent browser cookie rejection on HTTPS
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secureFlag = cookieConfig.secure !== undefined ? cookieConfig.secure : isProduction;
+  const sameSiteFlag = cookieConfig.sameSite || 'lax';
+  const pathFlag = cookieConfig.path || '/';
+
   res.cookie(cookieConfig.accessName, tokens.accessToken, {
     httpOnly: true,
-    secure: cookieConfig.secure,
-    sameSite: cookieConfig.sameSite,
+    secure: secureFlag,
+    sameSite: sameSiteFlag,
     maxAge: cookieConfig.maxAgeAccess,
-    path: cookieConfig.path,
+    path: pathFlag,
   });
 
   res.cookie(cookieConfig.refreshName, tokens.refreshToken, {
     httpOnly: true,
-    secure: cookieConfig.secure,
-    sameSite: cookieConfig.sameSite,
+    secure: secureFlag,
+    sameSite: sameSiteFlag,
     maxAge: cookieConfig.maxAgeRefresh,
-    path: cookieConfig.path,
+    path: pathFlag,
   });
 }
 
@@ -41,8 +60,20 @@ function setAuthCookies(res, tokens) {
  */
 function clearAuthCookies(res) {
   const cookieConfig = config.auth.cookies;
-  res.clearCookie(cookieConfig.accessName, { path: cookieConfig.path });
-  res.clearCookie(cookieConfig.refreshName, { path: cookieConfig.path });
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secureFlag = cookieConfig.secure !== undefined ? cookieConfig.secure : isProduction;
+  const pathFlag = cookieConfig.path || '/';
+
+  res.clearCookie(cookieConfig.accessName, { 
+    path: pathFlag,
+    secure: secureFlag,
+    sameSite: cookieConfig.sameSite || 'lax'
+  });
+  res.clearCookie(cookieConfig.refreshName, { 
+    path: pathFlag,
+    secure: secureFlag,
+    sameSite: cookieConfig.sameSite || 'lax'
+  });
 }
 
 const authController = {
