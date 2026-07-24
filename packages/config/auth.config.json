@@ -7,7 +7,8 @@
       "sameSite": "lax",
       "maxAgeAccess": 900000,
       "maxAgeRefresh": 604800000,
-      "path": "/"
+      "path": "/",
+      "domain": null
     }
   },
   "production": {
@@ -15,10 +16,11 @@
       "accessName": "roostay_access_token",
       "refreshName": "roostay_refresh_token",
       "secure": true,
-      "sameSite": "lax",
+      "sameSite": "none",
       "maxAgeAccess": 900000,
       "maxAgeRefresh": 604800000,
-      "path": "/"
+      "path": "/",
+      "domain": null
     }
   },
   "test": {
@@ -29,7 +31,8 @@
       "sameSite": "lax",
       "maxAgeAccess": 900000,
       "maxAgeRefresh": 604800000,
-      "path": "/"
+      "path": "/",
+      "domain": null
     }
   }
 }
